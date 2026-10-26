@@ -201,7 +201,7 @@ public:
     void mouseDown (const juce::MouseEvent&) override {}   // le voile capte les clics
 
 private:
-    static constexpr const char* buyUrl = "https://sidekey.fr";
+    static constexpr const char* buyUrl = "https://sidekeysystem.com/";
     static constexpr float rowH = 38.0f, labelW = 110.0f;
 
     // Boutons de la feuille : principal (bleu), secondaire (gris), lien
