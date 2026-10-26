@@ -284,20 +284,27 @@ void drawInset(juce::Graphics& g, juce::Rectangle<float> r, float radius, float 
     g.restoreState();
 }
 
+// Rayon extérieur de la lunette : les modules sont des rectangles (coins arrondis
+// par-dessus via drawScreenGlass) ; avec screenRadius+bezelW (16 px), le coin du
+// rectangle sortait d'un pixel hors de la courbe extérieure. Le coin reste
+// dedans tant que (R - bezelW)·√2 < R, soit R < 3,41·bezelW : on garde une marge.
+static float bezelOuterRadius() { return juce::jmin(screenRadius+bezelW, bezelW*3.1f); }
+
 void drawBezel(juce::Graphics& g, juce::Rectangle<float> s)
 {
     const auto o=s.expanded(bezelW);
-    juce::Path p; p.addRoundedRectangle(o, screenRadius+bezelW);
+    const float R=bezelOuterRadius();
+    juce::Path p; p.addRoundedRectangle(o, R);
     g.setColour(bezel); g.fillPath(p);
     // la lunette s'enfonce dans la carte : filet sombre net sur son bord extérieur
     // (une ombre floue assombrissait tout l'anneau, et les coins de l'écran,
     // peints à la couleur pure par drawScreenGlass, ressortaient en petits angles clairs)
     g.setColour(juce::Colours::black.withAlpha(light ? 0.45f : 0.6f));
-    g.drawRoundedRectangle(o.reduced(0.5f), screenRadius+bezelW-0.5f, 1.f);
+    g.drawRoundedRectangle(o.reduced(0.5f), R-0.5f, 1.f);
     juce::ColourGradient lip(juce::Colours::transparentWhite, o.getX(), o.getY(),
                              shadowLight.withMultipliedAlpha(light ? 0.9f : 1.f), o.getX(), o.getBottom(), false);
     g.setGradientFill(lip);
-    g.drawRoundedRectangle(o.expanded(0.5f), screenRadius+bezelW+0.5f, 1.f);
+    g.drawRoundedRectangle(o.expanded(0.5f), R+0.5f, 1.f);
 }
 
 void drawScreenGlass(juce::Graphics& g, juce::Rectangle<float> s)
