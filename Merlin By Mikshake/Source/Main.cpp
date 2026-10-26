@@ -454,6 +454,13 @@ private:
         h.getAudioSource    = [this] { return audioSource; };
         h.setAudioSource    = [this] (int s) { selectAudioSource (s); };
         h.getSourceName     = [this] { return currentSourceName(); };
+        h.holdKeyboard      = [this] (bool on) { holdKeyboardForLicence (on); };
+        // écran de licence déjà ouvert au démarrage (avant ce branchement)
+        juce::MessageManager::callAsync ([sp = juce::Component::SafePointer<LeakEditor> (leak), this]
+        {
+            if (sp != nullptr && sp->isLicenceOpen())
+                holdKeyboardForLicence (true);
+        });
         h.openAudioSettings = [this] { if (! usingSystem) showAudioSettings(); };
         h.isFullScreen      = [this] { return fullScreen; };
         h.isAlwaysOnTop     = [this] { return alwaysOnTop; };
@@ -835,15 +842,35 @@ private:
     MenuFocus menuFocus { *this };
 
     bool  keyboardInMerlin = false;
+    bool  licenceKeyboard = false;      // écran de licence ouvert : saisie / collage de la clé
     void* keyboardReturnTo = nullptr;   // fenêtre (Ableton) qui avait le clavier avant
 
     void applyNoActivate()
     {
-        setMouseClickGrabsKeyboardFocus (keyboardInMerlin);
+        const bool kb = keyboardInMerlin || licenceKeyboard;
+        setMouseClickGrabsKeyboardFocus (kb);
         if (auto* p = getPeer())
-            WindowsDisplay::setNoActivate (p->getNativeHandle(), ! keyboardInMerlin);
+            WindowsDisplay::setNoActivate (p->getNativeHandle(), ! kb);
         if (auto* p = fullScreenWindow.getPeer())
-            WindowsDisplay::setNoActivate (p->getNativeHandle(), ! keyboardInMerlin);
+            WindowsDisplay::setNoActivate (p->getNativeHandle(), ! kb);
+    }
+
+    // L'écran de licence passe outre le bouton clavier : la fenêtre s'active
+    // pour qu'on puisse taper ou coller la clé, puis revient au réglage choisi.
+    void holdKeyboardForLicence (bool on)
+    {
+        if (on == licenceKeyboard)
+            return;
+        licenceKeyboard = on;
+        fullScreenWindow.setMouseClickGrabsKeyboardFocus (on || keyboardInMerlin);
+        applyNoActivate();
+        if (on)
+        {
+            juce::Component& w = fullScreen ? static_cast<juce::Component&> (fullScreenWindow) : *this;
+            if (auto* p = w.getPeer())
+                WindowsDisplay::activate (p->getNativeHandle());
+            w.toFront (true);
+        }
     }
 
     // Bouton clavier : allumé, Merlin prend le clavier ; éteint, il le rend à

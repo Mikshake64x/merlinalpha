@@ -1279,8 +1279,10 @@ public:
         std::function<bool()>         isAlwaysOnTop;
         std::function<void(bool)>     setAlwaysOnTop;
         std::function<void(bool)>     setKeyboardInMerlin;   // bouton clavier de l'en-tête
+        std::function<void(bool)>     holdKeyboard;          // écran de licence : clavier à Merlin le temps de la saisie
     };
     HostHooks host;
+    bool isLicenceOpen() const { return licenseOverlay.isVisible(); }   // écran de licence affiché
 
 private:
     void timerCallback() override;
@@ -1348,7 +1350,11 @@ private:
     // Les modules GPU sont des fenêtres OpenGL natives : rien ne peut être
     // peint par-dessus, leur rendu est donc suspendu tant qu'About ou
     // Settings est ouvert.
-    void componentVisibilityChanged(juce::Component&) override { updateGpuSuspension(); }
+    void componentVisibilityChanged(juce::Component&) override
+    {
+        updateGpuSuspension();
+        if(host.holdKeyboard) host.holdKeyboard(licenseOverlay.isVisible());   // saisie de la clé (appli)
+    }
     void updateGpuSuspension();
     int  windowSwaps { 0 };   // transferts de fenêtre en cours (plein écran)
 
