@@ -3292,6 +3292,21 @@ void TopBar::paint(juce::Graphics& g)
     }
     drawAlphaBadge(g, { x0+ink.getRight()+gap+r, base-cap*0.5f }, r);
 
+    // démo en cours : pastille ambre à droite de la pastille α (clic = licence)
+    demoBounds={};
+    if(demoText.isNotEmpty()){
+        const auto f=juce::Font(Lang::withScriptFallback(juce::FontOptions(juce::jmax(9.f, cap*0.62f)))).boldened();
+        const float tw=juce::GlyphArrangement::getStringWidth(f, demoText);
+        demoBounds={ x0+ink.getRight()+gap+2.f*r+cap*0.7f, base-cap*0.5f-cap*0.62f, tw+cap*1.2f, cap*1.24f };
+        g.setColour(juce::Colour(0xff3a2e0e));
+        g.fillRoundedRectangle(demoBounds, demoBounds.getHeight()*0.5f);
+        g.setColour(juce::Colour(0xff6b5418));
+        g.drawRoundedRectangle(demoBounds.reduced(0.5f), demoBounds.getHeight()*0.5f, 1.f);
+        g.setColour(juce::Colour(0xffffcc4d));
+        g.setFont(f);
+        g.drawText(demoText, demoBounds, juce::Justification::centred, false);
+    }
+
     if(hasSubtitle){
         g.setFont(Ui::iceland((juce::jlimit(7.f,9.5f,(float)H*0.16f))).withExtraKerningFactor(0.22f));
         g.setColour(Neu::textDim);
@@ -5154,9 +5169,29 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     addChildComponent(aboutOverlay);
     addChildComponent(settingsOverlay);
     addChildComponent(optionsOverlay);
+    addChildComponent(licenseOverlay);   // au-dessus de tout
     aboutOverlay.addComponentListener(this);
     settingsOverlay.addComponentListener(this);
     optionsOverlay.addComponentListener(this);
+    licenseOverlay.addComponentListener(this);
+
+    // Licence : logotype de la feuille, pastille DÉMO de l'en-tête
+    licenseOverlay.drawBrand = [](juce::Graphics& g, juce::Rectangle<float> r){
+        const float cap=r.getHeight()*0.55f;
+        juce::Font wf(juce::FontOptions(audiowideTypeface()).withHeight(100.f));
+        juce::GlyphArrangement m; m.addLineOfText(wf, "M", 0.f, 0.f);
+        wf=wf.withHeight(100.f*cap/juce::jmax(1.f, -m.getBoundingBox(0,-1,false).getY())).withExtraKerningFactor(0.08f);
+        juce::GlyphArrangement word; word.addLineOfText(wf, "MERLIN", 0.f, 0.f);
+        const auto ink=word.getBoundingBox(0,-1,false);
+        const float x0=r.getX()-ink.getX(), base=r.getCentreY()+cap*0.5f;
+        g.setColour(juce::Colour(OptionsUi::lightTheme() ? 0xFF4A5462 : 0xFFC9D0D9));
+        word.draw(g, juce::AffineTransform::translation(x0, base));
+        drawAlphaBadge(g, { x0+ink.getRight()+0.47f*cap+0.79f*cap, base-cap*0.5f }, 0.79f*cap);
+    };
+    licenseOverlay.onDismiss = [this]{ updateLicenseUi(); };
+    topBar.onDemoClicked = [this]{ openLicence(); };
+    license->addChangeListener(this);
+    updateLicenseUi();
 
     // Galerie des templates (panneau Settings) : survol = aperçu, clic = appliquer
     settingsOverlay.setProcessor(&audioProcessor);
@@ -5290,9 +5325,11 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
 LeakEditor::~LeakEditor()
 {
     stopTimer();
+    license->removeChangeListener(this);
     aboutOverlay.removeComponentListener(this);
     settingsOverlay.removeComponentListener(this);
     optionsOverlay.removeComponentListener(this);
+    licenseOverlay.removeComponentListener(this);
     setLookAndFeel(nullptr);
 }
 
@@ -5334,6 +5371,13 @@ OptionsOverlay::State LeakEditor::optionsState() const
                                 audioProcessor.customSpectroMidColor, audioProcessor.customSpectroHighColor };
     for(int i=0;i<8;++i) s.roles[i]=juce::Colour(roles[i]);
     s.presetName = audioProcessor.currentPresetName;
+    {
+        using S=LicenseManager::Status;
+        const auto ls=license->getStatus();
+        s.licenceText = ls==S::licensed ? TR("Activée sur cet ordinateur")
+                      : ls==S::trial    ? TR("Démo : {0} jours restants").replace("{0}", juce::String(license->getTrialDaysLeft()))
+                                        : TR("Non activée");
+    }
     s.language   = audioProcessor.language;
     return s;
 }
@@ -5394,6 +5438,7 @@ void LeakEditor::setupOptions()
     o.onOpenPresetFolder = []{ auto f=LeakAudioProcessor::getPresetFolder(); f.createDirectory(); f.startAsProcess(); };
     o.onResetLayout      = [this]{ if(settingsOverlay.onResetLayout) settingsOverlay.onResetLayout(); optionsOverlay.setVisible(false); };
     o.onOpenAbout        = [this]{ optionsOverlay.setVisible(false); aboutOverlay.setVisible(true); };
+    o.onOpenLicence      = [this]{ openLicence(); };
     // Langue : appliquée en place (recréer l'éditeur ferait planter les modules OpenGL)
     o.onLanguageSelected = [this](int id){
         if(id==audioProcessor.language) return;
@@ -6128,6 +6173,7 @@ void LeakEditor::updateLayout()
     aboutOverlay   .setBounds(getLocalBounds());
     settingsOverlay.setBounds(getLocalBounds());
     optionsOverlay .setBounds(getLocalBounds());
+    licenseOverlay .setBounds(getLocalBounds());
 
     applyFrameRate(audioProcessor.uiFps);   // modules cachés à l'arrêt
 
@@ -6191,10 +6237,30 @@ void LeakEditor::applyGraphics()
     settingsOverlay.setLightCpuMode(audioProcessor.lightCpuMode);
 }
 
+// Licence : pastille DÉMO, feuille imposée tant que Merlin n'est ni activé ni en démo
+void LeakEditor::updateLicenseUi()
+{
+    using S=LicenseManager::Status;
+    const auto s=license->getStatus();
+    topBar.setDemoBadge(s==S::trial ? TR("DÉMO · {0} JOURS").replace("{0}", juce::String(license->getTrialDaysLeft()))
+                                    : juce::String());
+    if(! license->isUsable() && s!=S::activating && ! licenseOverlay.isVisible())
+        openLicence();
+}
+
+void LeakEditor::openLicence()
+{
+    aboutOverlay.setVisible(false);
+    settingsOverlay.setVisible(false);
+    optionsOverlay.setVisible(false);
+    OptionsUi::lightTheme()=audioProcessor.lightTint;   // feuille au thème de Merlin
+    licenseOverlay.open();
+}
+
 void LeakEditor::updateGpuSuspension()
 {
     const bool covered=aboutOverlay.isVisible() || settingsOverlay.isVisible() || optionsOverlay.isVisible()
-                       || windowSwaps>0;
+                       || licenseOverlay.isVisible() || windowSwaps>0;
     for(auto* g : gpuModules())
         g->setSuspended(covered);
 }
@@ -6250,6 +6316,8 @@ void LeakEditor::applyLanguage()
 {
     Lang::set(audioProcessor.language);
     topBar.retranslate();
+    licenseOverlay.refresh();
+    updateLicenseUi();   // pastille DÉMO
     masterStyleToggle.setTooltip(TR("Master meter: Instrument / Console"));
     Lang::retranslateTree(*this);   // boutons à texte fixe ("RESET", "LINE"…)
     optionsOverlay.retranslate();
@@ -6272,6 +6340,7 @@ void LeakEditor::applyLook()
     // modules OpenGL : leur calque 2D (coins de la lunette) n'est refait que
     // s'ils sont eux-mêmes invalidés
     for(auto* gm : gpuModules()) gm->repaint();
+    if(licenseOverlay.isVisible()){ OptionsUi::lightTheme()=audioProcessor.lightTint; licenseOverlay.refresh(); }
 }
 
 void LeakEditor::setTemplate(LeakAudioProcessor::UiTemplate t)

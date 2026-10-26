@@ -10,6 +10,7 @@
 #include "GpuSurface.h"
 #include "Lang.h"
 #include "OptionsOverlay.h"
+#include "LicenseOverlay.h"
 
 // NB : toutes les couleurs ci-dessous sont des variables 'inline' (C++17, une
 // seule instance partagée entre PluginEditor.cpp et PluginProcessor.cpp),
@@ -1038,11 +1039,16 @@ public:
     void setGlitch(bool b) { if(b || glitching){ glitching=b; repaint(); } }
     void mouseDown(const juce::MouseEvent& e) override
     {
-        if((logoBounds.contains(e.position) || blackbirdBounds.contains(e.position)) && onAboutClicked)
+        if(demoBounds.contains(e.position) && onDemoClicked)
+            onDemoClicked();
+        else if((logoBounds.contains(e.position) || blackbirdBounds.contains(e.position)) && onAboutClicked)
             onAboutClicked();
         else if(titleBounds.contains(e.position) && onTitleClicked)
             onTitleClicked();
     }
+    // pastille « DÉMO · X JOURS » à droite du logotype (vide = masquée)
+    void setDemoBadge(const juce::String& t) { if(t!=demoText){ demoText=t; repaint(); } }
+    std::function<void()>    onDemoClicked;
     std::function<void()>    onAboutClicked;
     std::function<void()>    onTitleClicked;
     std::function<void()>    onSettingsClicked;
@@ -1088,7 +1094,8 @@ private:
     juce::Random  rng;
     juce::Image   logoImage;
     juce::Image   blackbirdImage;
-    juce::Rectangle<float> logoBounds, blackbirdBounds, titleBounds;
+    juce::Rectangle<float> logoBounds, blackbirdBounds, titleBounds, demoBounds;
+    juce::String     demoText;
     NeuLookAndFeel   laf;
     KebabButton      gearBtn;   // menu d'options (trois points, comme Sevenpack Alpha)
     FullScreenButton fullScreenBtn;
@@ -1237,7 +1244,8 @@ private:
 //==============================================================================
 class LeakEditor : public juce::AudioProcessorEditor,
                    private juce::Timer,
-                   private juce::ComponentListener
+                   private juce::ComponentListener,
+                   private juce::ChangeListener   // état de la licence
 {
 public:
     explicit LeakEditor(LeakAudioProcessor&);
@@ -1357,6 +1365,12 @@ private:
     AboutOverlay         aboutOverlay;
     SettingsOverlay      settingsOverlay;   // galerie des templates (ouverte depuis Options > Apparence)
     OptionsOverlay       optionsOverlay;    // menu Options (trois points)
+    // licence (DRM SideKey) : un gestionnaire partagé par l'appli et toutes les instances du plugin
+    juce::SharedResourcePointer<LicenseManager> license;
+    LicenseOverlay       licenseOverlay { *license };
+    void changeListenerCallback(juce::ChangeBroadcaster*) override { updateLicenseUi(); }
+    void updateLicenseUi();
+    void openLicence();
 
     void setupOptions();
     void openOptions();

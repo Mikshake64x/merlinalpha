@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="MrlaPg" name="Merlin Alpha Plugin" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="Side Key System"
-              companyEmail="https://sidekey.fr" companyWebsite="https://sidekey.fr"
-              version="1.62.0" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
-              displaySplashScreen="0" defines="MERLIN_PLUGIN=1"
-              pluginFormats="buildAU,buildVST3" pluginName="Merlin Alpha" pluginDesc="Advanced Audio Analyzer"
+<JUCERPROJECT id="MrlaPg" name="Merlin Alpha Plugin" projectType="audioplug"
+              useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
+              companyName="Side Key System" companyEmail="https://sidekey.fr"
+              companyWebsite="https://sidekey.fr" version="1.63.0" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
+              displaySplashScreen="0" defines="MERLIN_PLUGIN=1" pluginFormats="buildAU,buildVST3"
+              pluginName="Merlin Alpha" pluginDesc="Advanced Audio Analyzer"
               pluginManufacturer="Side Key System" pluginManufacturerCode="SdKy"
               pluginCode="Mrla" pluginCharacteristicsValue="" pluginVST3Category="Analyzer,Fx"
               pluginAUMainType="'aufx'">
@@ -15,24 +15,21 @@
             file="../Merlin By Mikshake/Source/PluginProcessor.cpp"/>
       <FILE id="MpProH" name="PluginProcessor.h" compile="0" resource="0"
             file="../Merlin By Mikshake/Source/PluginProcessor.h"/>
-      <FILE id="MpEdC" name="PluginEditor.cpp" compile="1" resource="0"
-            file="../Merlin By Mikshake/Source/PluginEditor.cpp"/>
-      <FILE id="MpEdH" name="PluginEditor.h" compile="0" resource="0"
-            file="../Merlin By Mikshake/Source/PluginEditor.h"/>
-      <FILE id="MpModH" name="AppMode.h" compile="0" resource="0"
-            file="../Merlin By Mikshake/Source/AppMode.h"/>
+      <FILE id="MpEdC" name="PluginEditor.cpp" compile="1" resource="0" file="../Merlin By Mikshake/Source/PluginEditor.cpp"/>
+      <FILE id="MpEdH" name="PluginEditor.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/PluginEditor.h"/>
+      <FILE id="MpModH" name="AppMode.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/AppMode.h"/>
+      <FILE id="MpLicM" name="LicenseManager.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/LicenseManager.h"/>
+      <FILE id="MpLicO" name="LicenseOverlay.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/LicenseOverlay.h"/>
       <FILE id="MpGpuC" name="GpuSpectrogram.cpp" compile="1" resource="0"
             file="../Merlin By Mikshake/Source/GpuSpectrogram.cpp"/>
       <FILE id="MpGpuH" name="GpuSpectrogram.h" compile="0" resource="0"
             file="../Merlin By Mikshake/Source/GpuSpectrogram.h"/>
-      <FILE id="MpGSfC" name="GpuSurface.cpp" compile="1" resource="0"
-            file="../Merlin By Mikshake/Source/GpuSurface.cpp"/>
-      <FILE id="MpGSfH" name="GpuSurface.h" compile="0" resource="0"
-            file="../Merlin By Mikshake/Source/GpuSurface.h"/>
-      <FILE id="MpGMC" name="GpuModule.cpp" compile="1" resource="0"
-            file="../Merlin By Mikshake/Source/GpuModule.cpp"/>
-      <FILE id="MpGMH" name="GpuModule.h" compile="0" resource="0"
-            file="../Merlin By Mikshake/Source/GpuModule.h"/>
+      <FILE id="MpGSfC" name="GpuSurface.cpp" compile="1" resource="0" file="../Merlin By Mikshake/Source/GpuSurface.cpp"/>
+      <FILE id="MpGSfH" name="GpuSurface.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/GpuSurface.h"/>
+      <FILE id="MpGMC" name="GpuModule.cpp" compile="1" resource="0" file="../Merlin By Mikshake/Source/GpuModule.cpp"/>
+      <FILE id="MpGMH" name="GpuModule.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/GpuModule.h"/>
       <FILE id="MpDotC" name="GpuDotSpectrum.cpp" compile="1" resource="0"
             file="../Merlin By Mikshake/Source/GpuDotSpectrum.cpp"/>
       <FILE id="MpDotH" name="GpuDotSpectrum.h" compile="0" resource="0"
@@ -51,16 +48,13 @@
             file="../Merlin By Mikshake/Source/SystemLoopback.h"/>
       <FILE id="MpOptH" name="OptionsOverlay.h" compile="0" resource="0"
             file="../Merlin By Mikshake/Source/OptionsOverlay.h"/>
-      <FILE id="MpLngC" name="Lang.cpp" compile="1" resource="0"
-            file="../Merlin By Mikshake/Source/Lang.cpp"/>
-      <FILE id="MpLngH" name="Lang.h" compile="0" resource="0"
-            file="../Merlin By Mikshake/Source/Lang.h"/>
+      <FILE id="MpLngC" name="Lang.cpp" compile="1" resource="0" file="../Merlin By Mikshake/Source/Lang.cpp"/>
+      <FILE id="MpLngH" name="Lang.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/Lang.h"/>
       <FILE id="CEh14v" name="sidekey_monogram.png" compile="0" resource="1"
             file="../Merlin By Mikshake/Source/sidekey_monogram.png"/>
       <FILE id="DUF9WC" name="sidekey_blackbird.png" compile="0" resource="1"
             file="../Merlin By Mikshake/Source/sidekey_blackbird.png"/>
-      <FILE id="z0sYQk" name="merle.png" compile="0" resource="1"
-            file="../Merlin By Mikshake/Source/merle.png"/>
+      <FILE id="z0sYQk" name="merle.png" compile="0" resource="1" file="../Merlin By Mikshake/Source/merle.png"/>
       <FILE id="AwdF0n" name="Audiowide-Regular.ttf" compile="0" resource="1"
             file="../Merlin By Mikshake/Source/Audiowide-Regular.ttf"/>
       <FILE id="lLoAXi" name="mikshake_about.png" compile="0" resource="1"
@@ -73,12 +67,14 @@
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
     <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_audio_processors_headless" showAllCode="1" useLocalCopy="0"
             useGlobalPath="0"/>
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_cryptography" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
@@ -106,6 +102,7 @@
         <MODULEPATH id="juce_audio_processors" path="D:/JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="D:/JUCE/modules"/>
         <MODULEPATH id="juce_audio_utils" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="D:/JUCE/modules"/>
         <MODULEPATH id="juce_core" path="D:/JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="D:/JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="D:/JUCE/modules"/>
@@ -115,7 +112,8 @@
         <MODULEPATH id="juce_gui_extra" path="D:/JUCE/modules"/>
       </MODULEPATHS>
     </VS2026>
-    <XCODE_MAC targetFolder="Builds/MacOSX" xcodeValidArchs="x86_64,arm64" bigIcon="z0sYQk" smallIcon="z0sYQk">
+    <XCODE_MAC targetFolder="Builds/MacOSX" xcodeValidArchs="x86_64,arm64" bigIcon="z0sYQk"
+               smallIcon="z0sYQk">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="Merlin Alpha" macOSDeploymentTarget="11.0"
                        enablePluginBinaryCopyStep="0"/>
@@ -131,6 +129,7 @@
         <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>

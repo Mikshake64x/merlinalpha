@@ -1149,6 +1149,7 @@ public:
         int accentIndex = -1;
         juce::Colour roles[8];
         juce::String presetName;
+        juce::String licenceText;           // « Activée », « Démo : 12 jours restants »…
         int language = 0;                   // Lang::Id
     };
 
@@ -1241,6 +1242,7 @@ public:
         for (int i = 0; i < 8; ++i)
             roleChips[i].setColour (s.roles[i]);
 
+        pages[kAboutPage].setRowSubtitle (TR ("Licence"), s.licenceText);
         pages[kPresetsPage].setRowSubtitle (TR ("Enregistrer le preset"),
                                             s.presetName.isNotEmpty() ? TR ("Preset en cours : {0}").replace ("{0}", s.presetName)
                                                                       : TR ("Disposition, réglages des modules et apparence"));
@@ -1369,7 +1371,7 @@ public:
     std::function<void (int, juce::Colour)> onColourRoleChanged;
     std::function<void()>       onColoursReset;
     // Presets / à propos
-    std::function<void()>       onSavePreset, onOpenPresetFolder, onResetLayout, onOpenAbout;
+    std::function<void()>       onSavePreset, onOpenPresetFolder, onResetLayout, onOpenAbout, onOpenLicence;
     // Langue
     std::function<void (int)>   onLanguageSelected;      // Lang::Id
 
@@ -1552,7 +1554,10 @@ private:
         p.addGroup ({});
         p.addRow (Icon::info, juce::Colour (0xff8e8e93), juce::String (juce::CharPointer_UTF8 ("Merlin \xce\xb1")), TR ("Version") + " " + ProjectInfo::versionString);
         p.addRow (Icon::key, juce::Colour (0xffffcc00), "Side Key System", "sidekey.fr", &aboutButton, 90);
+        licenceButton.setButtonText (TR ("Gérer"));
+        p.addRow (Icon::check, juce::Colour (0xff30d158), TR ("Licence"), {}, &licenceButton, 90);
         aboutButton.onClick = [this] { if (onOpenAbout) onOpenAbout(); };
+        licenceButton.onClick = [this] { if (onOpenLicence) onOpenLicence(); };
     }
 
     // Langue : une ligne par langue (nom natif, nom dans la langue courante),
@@ -1602,6 +1607,7 @@ private:
     OptionsUi::PillButton resetLayoutButton  { juce::CharPointer_UTF8 ("Réinitialiser") };
     // À propos
     OptionsUi::PillButton aboutButton { juce::CharPointer_UTF8 ("À propos") };
+    OptionsUi::PillButton licenceButton { "Licence" };
 
     OptionsUi::Page pages[kNumCategories];
     juce::OwnedArray<OptionsUi::CategoryItem> categoryItems;
