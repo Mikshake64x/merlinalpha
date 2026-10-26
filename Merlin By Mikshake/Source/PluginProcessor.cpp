@@ -1099,7 +1099,7 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             uiTemplate = UiTemplate::Neumorphic;   // v1.44 : seul template gardé (Stadium et Forest retirés)
             highContrast = true;   // mode contraste permanent (v1.51) : l'ancien réglage est ignoré
             modules3D = xml->getBoolAttribute("modules3D", false);
-            largeText = xml->getBoolAttribute("largeText", false);
+            largeText = true;   // gros texte toujours activé à l'ouverture (réglable ensuite dans Options › Affichage)
             masterConsole = xml->getBoolAttribute("masterConsole", false);
             peakHoldOn  = xml->getBoolAttribute("peakHoldOn", true);
             peakHoldIdx = xml->getIntAttribute("peakHoldIdx", 2);

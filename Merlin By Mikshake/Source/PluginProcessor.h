@@ -128,7 +128,7 @@ public:
     bool lightTint    { false };
     bool highContrast { true };   // toujours actif depuis la v1.51 (demande du user)
     bool modules3D    { false };   // modules en 3D (interrupteur cube) — Spectrum : Blocks 3D
-    bool largeText    { false };   // textes agrandis (interrupteur "Aa") — lecture à distance
+    bool largeText    { true };    // textes agrandis (Options › Affichage) — activé à chaque ouverture
     bool masterConsole{ false };   // section master : false = A "Instrument", true = C "Console mastering"
 
     // Sens de défilement du spectrogramme 3D (indépendant par module) —

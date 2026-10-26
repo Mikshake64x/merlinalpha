@@ -3087,7 +3087,7 @@ TopBar::TopBar()
     addAndMakeVisible(themeToggle);
     addChildComponent(contrastToggle);   // contraste permanent (v1.51) : interrupteur masqué
     addAndMakeVisible(modules3DToggle);
-    addAndMakeVisible(largeTextToggle);
+    addChildComponent(largeTextToggle);   // retiré de l'en-tête (v1.65) : réglage dans Options › Affichage
     // premier plan, plein écran, clavier : propres à l'appli (en plugin, la fenêtre est à la DAW)
     addChildComponent(onTopToggle);    onTopToggle  .setVisible(! AppMode::isPlugin);
 
@@ -3196,7 +3196,6 @@ void TopBar::resized()
     themeToggle    .setBounds(tx,ty,tw,th); tx+=tw+8;
     // (contrastToggle masqué : contraste permanent)
     modules3DToggle.setBounds(tx,ty,tw,th); tx+=tw+8;
-    largeTextToggle.setBounds(tx,ty,tw,th); tx+=tw+8;
     onTopToggle    .setBounds(tx,ty,tw,th);   // toujours au premier plan
 }
 // Nom affiché de l'appli (titre de l'en-tête, À propos)
