@@ -21,21 +21,18 @@ jobs:
           echo "Version $V"
 
       - name: Build app
-        run: |
-          xcodebuild -project "Merlin By Mikshake/Builds/MacOSX/Merlin Alpha.xcodeproj" \
-            -alltargets -configuration Release \
-            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" | tail -n 30
+        run: bash packaging/ci_build.sh "Merlin By Mikshake/Builds/MacOSX/Merlin Alpha.xcodeproj" app.log
 
       - name: Build plugins (AU + VST3)
-        run: |
-          xcodebuild -project "Merlin Alpha Plugin/Builds/MacOSX/Merlin Alpha Plugin.xcodeproj" \
-            -alltargets -configuration Release \
-            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" | tail -n 30
+        run: bash packaging/ci_build.sh "Merlin Alpha Plugin/Builds/MacOSX/Merlin Alpha Plugin.xcodeproj" plugin.log
 
       - name: Ad-hoc signing
         run: |
+          set -e
           APP="Merlin By Mikshake/Builds/MacOSX/build/Release/Merlin Alpha.app"
           PLG="Merlin Alpha Plugin/Builds/MacOSX/build/Release"
+          echo "::notice::produits app : $(ls "Merlin By Mikshake/Builds/MacOSX/build/Release" 2>&1 | tr '\n' ' ')"
+          echo "::notice::produits plugin : $(ls "$PLG" 2>&1 | tr '\n' ' ')"
           for b in "$APP" "$PLG/Merlin Alpha.component" "$PLG/Merlin Alpha.vst3"; do
             codesign --force --deep -s - "$b"
             codesign --verify --verbose "$b"
