@@ -748,12 +748,30 @@ namespace OptionsUi
         }
 
         // sous-titre d'une ligne reperee par son titre (infos qui changent)
+        // un sous-titre qui apparaît / disparaît change la hauteur de la ligne :
+        // la carte est alors recalculée (sinon la dernière ligne était coupée)
         void setRowSubtitle (const juce::String& title, const juce::String& subtitle)
+        {
+            bool heightChanged = false;
+            for (auto& grp : groups)
+                for (auto& r : grp.rows)
+                    if (r.title == title)
+                    {
+                        heightChanged |= r.subtitle.isEmpty() != subtitle.isEmpty();
+                        r.subtitle = subtitle;
+                    }
+            if (heightChanged && getWidth() > 0)
+                layout (getWidth());
+            repaint();
+        }
+
+        // pastille dessinée par l'appelant à la place du pictogramme (ex. α de Merlin)
+        void setRowPainter (const juce::String& title, std::function<void (juce::Graphics&, juce::Rectangle<float>)> fn)
         {
             for (auto& grp : groups)
                 for (auto& r : grp.rows)
                     if (r.title == title)
-                        r.subtitle = subtitle;
+                        r.painter = fn;
             repaint();
         }
 
@@ -886,6 +904,10 @@ namespace OptionsUi
                         g.setFont (font (11.0f, 2));
                         g.drawText (r.badgeText, badge, juce::Justification::centred, false);
                     }
+                    else if (r.painter != nullptr)
+                    {
+                        r.painter (g, badge);
+                    }
                     else
                     {
                         drawBadge (g, *icons, r.icon, badge, r.colour);
@@ -969,6 +991,7 @@ namespace OptionsUi
             int controlWidth = 0, controlHeight = 28;
             bool visible = true, checked = false;
             std::function<void()> onClick;
+            std::function<void (juce::Graphics&, juce::Rectangle<float>)> painter;
             juce::Rectangle<float> bounds;
         };
 
@@ -1372,6 +1395,8 @@ public:
     std::function<void()>       onColoursReset;
     // Presets / à propos
     std::function<void()>       onSavePreset, onOpenPresetFolder, onResetLayout, onOpenAbout, onOpenLicence;
+    // pastille α de Merlin (ligne Version de « À propos »), dessinée par l'éditeur
+    std::function<void (juce::Graphics&, juce::Rectangle<float>)> drawAppBadge;
     // Langue
     std::function<void (int)>   onLanguageSelected;      // Lang::Id
 
@@ -1552,8 +1577,10 @@ private:
         auto& p = pages[kAboutPage];
         aboutButton.setButtonText (TR ("À propos"));
         p.addGroup ({});
-        p.addRow (Icon::info, juce::Colour (0xff8e8e93), juce::String (juce::CharPointer_UTF8 ("Merlin \xce\xb1")), TR ("Version") + " " + ProjectInfo::versionString);
-        p.addRow (Icon::key, juce::Colour (0xffffcc00), "Side Key System", "sidekey.fr", &aboutButton, 90);
+        const juce::String appName (juce::CharPointer_UTF8 ("Merlin \xce\xb1"));
+        p.addRow (Icon::info, juce::Colour (0xff8e8e93), appName, TR ("Version") + " " + ProjectInfo::versionString);
+        p.setRowPainter (appName, [this] (juce::Graphics& g, juce::Rectangle<float> r) { if (drawAppBadge) drawAppBadge (g, r); });
+        p.addRow (Icon::key, juce::Colour (0xffffcc00), "Side Key System", "sidekeysystem.com", &aboutButton, 90);
         licenceButton.setButtonText (TR ("Gérer"));
         p.addRow (Icon::check, juce::Colour (0xff30d158), TR ("Licence"), {}, &licenceButton, 90);
         aboutButton.onClick = [this] { if (onOpenAbout) onOpenAbout(); };

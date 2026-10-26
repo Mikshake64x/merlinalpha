@@ -47,7 +47,7 @@ namespace ProjectInfo
 {
     const char* const  projectName    = "Merlin Alpha Plugin";
     const char* const  companyName    = "Side Key System";
-    const char* const  versionString  = "1.64.0";
-    const int          versionNumber  = 0x14000;
+    const char* const  versionString  = "1.64.1";
+    const int          versionNumber  = 0x14001;
 }
 #endif

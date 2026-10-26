@@ -3585,7 +3585,7 @@ AboutOverlay::AboutOverlay()
 void AboutOverlay::mouseDown(const juce::MouseEvent& e)
 {
     if(websiteBounds.contains(e.position)){
-        juce::URL("https://sidekey.fr").launchInDefaultBrowser();
+        juce::URL("https://sidekeysystem.com/").launchInDefaultBrowser();
         return;
     }
     setVisible(false);
@@ -3645,10 +3645,10 @@ void AboutOverlay::drawWebsiteLink(juce::Graphics& g, juce::Rectangle<float> are
     websiteBounds = area.withSizeKeepingCentre(area.getWidth(), 16.0f);
     g.setColour(Col::accent);
     g.setFont(juce::Font(juce::FontOptions(13.0f, juce::Font::bold)).withExtraKerningFactor(0.04f));
-    g.drawFittedText("sidekey.fr", websiteBounds.toNearestInt(), juce::Justification::centredLeft, 1);
+    g.drawFittedText("sidekeysystem.com", websiteBounds.toNearestInt(), juce::Justification::centredLeft, 1);
 
     juce::GlyphArrangement ga;
-    ga.addLineOfText(g.getCurrentFont(), "sidekey.fr", 0.0f, 0.0f);
+    ga.addLineOfText(g.getCurrentFont(), "sidekeysystem.com", 0.0f, 0.0f);
     const float textW = ga.getBoundingBox(0, -1, true).getWidth();
     g.drawLine(websiteBounds.getX(), websiteBounds.getBottom() - 3.0f,
                websiteBounds.getX() + textW, websiteBounds.getBottom() - 3.0f, 1.0f);
@@ -5439,6 +5439,16 @@ void LeakEditor::setupOptions()
     o.onResetLayout      = [this]{ if(settingsOverlay.onResetLayout) settingsOverlay.onResetLayout(); optionsOverlay.setVisible(false); };
     o.onOpenAbout        = [this]{ optionsOverlay.setVisible(false); aboutOverlay.setVisible(true); };
     o.onOpenLicence      = [this]{ openLicence(); };
+    // ligne Version : pastille α de Merlin au format des pictogrammes (carré arrondi 28 px)
+    o.drawAppBadge = [](juce::Graphics& g, juce::Rectangle<float> r){
+        g.setColour(juce::Colour(0xFF2B3037));
+        g.fillRoundedRectangle(r, 7.f);
+        static const juce::Path alpha=alphaGlyph();
+        auto a=alpha;
+        a.applyTransform(juce::AffineTransform::translation(-53.f,-55.f).scaled(r.getWidth()*0.0068f).translated(r.getCentreX(), r.getCentreY()));
+        g.setColour(juce::Colour(0xFF2FE0A8));
+        g.strokePath(a, juce::PathStrokeType(r.getWidth()*0.085f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    };
     // Langue : appliquée en place (recréer l'éditeur ferait planter les modules OpenGL)
     o.onLanguageSelected = [this](int id){
         if(id==audioProcessor.language) return;

@@ -3,7 +3,7 @@
 <JUCERPROJECT id="MrlaPg" name="Merlin Alpha Plugin" projectType="audioplug"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
               companyName="Side Key System" companyEmail="https://sidekey.fr"
-              companyWebsite="https://sidekey.fr" version="1.64.0" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
+              companyWebsite="https://sidekey.fr" version="1.64.1" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
               displaySplashScreen="0" defines="MERLIN_PLUGIN=1" pluginFormats="buildAU,buildVST3"
               pluginName="Merlin Alpha" pluginDesc="Advanced Audio Analyzer"
               pluginManufacturer="Side Key System" pluginManufacturerCode="SdKy"
