@@ -376,6 +376,21 @@ public:
         setResizeLimits (w, h, 16384, 16384);
     }
 
+    // Merlin relancé alors qu'il tourne déjà : on ramène la fenêtre existante
+    void bringToFront()
+    {
+        if (fullScreen)
+        {
+            fullScreenWindow.toFront (true);
+            return;
+        }
+        if (isMinimised())
+            setMinimised (false);
+        if (auto* p = getPeer())
+            WindowsDisplay::activate (p->getNativeHandle());
+        toFront (true);
+    }
+
     ~MainWindow() override
     {
         stopTimer();
@@ -914,7 +929,8 @@ class MerlinApplication final : public juce::JUCEApplication
 public:
     const juce::String getApplicationName() override    { return ProjectInfo::projectName; }
     const juce::String getApplicationVersion() override { return ProjectInfo::versionString; }
-    bool moreThanOneInstanceAllowed() override          { return true; }
+    // une seule fenêtre Merlin : un second lancement réveille la première
+    bool moreThanOneInstanceAllowed() override          { return false; }
 
     void initialise (const juce::String&) override
     {
@@ -963,7 +979,11 @@ public:
         quit();
     }
 
-    void anotherInstanceStarted (const juce::String&) override {}
+    void anotherInstanceStarted (const juce::String&) override
+    {
+        if (mainWindow != nullptr)
+            mainWindow->bringToFront();
+    }
 
 private:
     juce::ApplicationProperties appProperties;
