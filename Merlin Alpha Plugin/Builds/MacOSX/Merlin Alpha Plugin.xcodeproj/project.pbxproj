@@ -1,0 +1,2075 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		BB8FFB54DC80D661C9F5106E /* Merlin Alpha Plugin - All */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = B847AEF2627338D47A0886B3;
+			buildPhases = (
+			);
+			dependencies = (
+				10062A8C507F5F3A8E96AF7D,
+				F60ABC29958EFEF3D567C95A,
+				7B61205D303ED17A82D90059,
+				E68FB364AAF816A2937AFA78,
+			);
+			name = "Merlin Alpha Plugin - All";
+			productName = "Merlin Alpha Plugin";
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		00436C393BE812166C94C1D9 /* juce_VST3ManifestHelper.cpp */ = {isa = PBXBuildFile; fileRef = 36F58140CD288B25EE75EF7F; settings = { COMPILER_FLAGS = "-w -DJUCE_SKIP_PRECOMPILED_HEADER"; }; };
+		016068A507CA0D357EF3395E /* include_juce_data_structures.mm */ = {isa = PBXBuildFile; fileRef = D4CE2C0090FFED22AE675277; };
+		03E1844231509B40DF7D50F8 /* include_juce_core_CompilationTime.cpp */ = {isa = PBXBuildFile; fileRef = 9A42ED8A5DC5431AFE03B077; };
+		074CF131DB48255BD19A6131 /* include_juce_core.mm */ = {isa = PBXBuildFile; fileRef = 12FB532446B9321BB89BD48E; };
+		07A5F37EC7D54EC3556849EB /* VST3 */ = {isa = PBXBuildFile; fileRef = 5EC93BF76CCAC4564BD38E89; };
+		09A545A41DDA327E929398EC /* Lang.cpp */ = {isa = PBXBuildFile; fileRef = FE761DC1D834B3F92693B078; };
+		09E1C795BACD840E7E3911B6 /* include_juce_graphics_Harfbuzz.cpp */ = {isa = PBXBuildFile; fileRef = A1A59317AA5DAF876C38B4BF; };
+		0A5E30600C651D9952778843 /* IOKit.framework */ = {isa = PBXBuildFile; fileRef = D78267DD3E5FBFF7A9EA2370; };
+		0CE3E8264F372333146B86C5 /* Shared Code */ = {isa = PBXBuildFile; fileRef = AD2AA14C678DEF943774AA70; };
+		0FF82F51F06FF487C2F5DF4A /* Foundation.framework */ = {isa = PBXBuildFile; fileRef = 839BA18685243342AF4EFD97; };
+		1C829B01B32A5AF300DC597E /* include_juce_events.mm */ = {isa = PBXBuildFile; fileRef = DF06E95037822034E4E8067B; };
+		1EB68BC4E41B905CA5085AAB /* include_juce_graphics_libjpg_1.c */ = {isa = PBXBuildFile; fileRef = 90D99B91D49A293FD8D1ACFD; };
+		2DBD9FE265DCEC98BFCF8217 /* include_juce_graphics_libjpg_2.c */ = {isa = PBXBuildFile; fileRef = 8DA4A9499677EA740BEA5286; };
+		2F85D55162E66F33495BC97F /* include_juce_graphics_libjpg_3.c */ = {isa = PBXBuildFile; fileRef = 89DEE26EAF810F06C568DC5C; };
+		36287611AA1B6B5D25C50867 /* include_juce_opengl.mm */ = {isa = PBXBuildFile; fileRef = 319EF3A81FC493CD2A5AA206; };
+		3CC23E4D167BCF6C21531472 /* include_juce_audio_plugin_client_AU_2.mm */ = {isa = PBXBuildFile; fileRef = 43DE232054C76A376AF0DBA3; };
+		3E1EF022FEE982693033535B /* include_juce_audio_plugin_client_AU_1.mm */ = {isa = PBXBuildFile; fileRef = E18CA3D92FBDC9845657DC63; };
+		3EBC7E62160A8FC6BF99DAEE /* GpuDotSpectrum.cpp */ = {isa = PBXBuildFile; fileRef = ECD55D3982DC0A2F748DACA2; };
+		42C6C51AC93D0429577CD7EA /* include_juce_audio_plugin_client_ARA.cpp */ = {isa = PBXBuildFile; fileRef = 56E96AC41B07C10317CA8238; };
+		4367FAA20C64E78D7177DBCF /* VST3 Manifest Helper */ = {isa = PBXBuildFile; fileRef = FCFDB761F28D76C3CEB55793; };
+		447AA898CFCA676202B698DD /* PluginEditor.cpp */ = {isa = PBXBuildFile; fileRef = 6D4AFC59F4A03ECFC5622249; };
+		45E04C7BA9C9FFEB4696A5A2 /* include_juce_gui_basics_4.cpp */ = {isa = PBXBuildFile; fileRef = D0B858E0DD30B3A927F3C062; };
+		47BC67B09C2910B579CB9932 /* include_juce_gui_extra.mm */ = {isa = PBXBuildFile; fileRef = 3191D5A1927A3B69FD077C7D; };
+		4A151C0D2CD044EBA09BE056 /* OpenGL.framework */ = {isa = PBXBuildFile; fileRef = 4B72E7CF562CA5D47D379C83; };
+		4A59DD84149FD872AB91AB98 /* PluginProcessor.cpp */ = {isa = PBXBuildFile; fileRef = 8C8491637087E893862FF2C2; };
+		4FF9B9A9405E16C2884DADE8 /* GpuSpectrogram.cpp */ = {isa = PBXBuildFile; fileRef = E6A566367082C9668D436D06; };
+		5265291D36C66508CB29FF51 /* include_juce_audio_utils.mm */ = {isa = PBXBuildFile; fileRef = DECE8909159B65AC51482AE0; };
+		5A7369481958DCC950FE6EAC /* RecentFilesMenuTemplate.nib */ = {isa = PBXBuildFile; fileRef = 5553B00B83CBA4A1B9DE29CD; };
+		612177824F14C2F0A2EE79D2 /* include_juce_core_zlib.c */ = {isa = PBXBuildFile; fileRef = 13E40C62F43F1629213901FB; };
+		62BA932268133EDE0D2E5EA6 /* MetalKit.framework */ = {isa = PBXBuildFile; fileRef = E2F6ABC2499086D1E1386968; settings = { ATTRIBUTES = (Weak, ); }; };
+		632E76076D0613A2A4F7E76E /* include_juce_audio_processors_headless_ara.cpp */ = {isa = PBXBuildFile; fileRef = BA4E663A0F59CFA40D652EA4; };
+		682EB56E40372B98BA8D30A3 /* GpuSurface.cpp */ = {isa = PBXBuildFile; fileRef = D8A5A88F94F66C996B41E2CF; };
+		6D922ADA78260129B9721B16 /* Security.framework */ = {isa = PBXBuildFile; fileRef = 6EEF89C29A7C17A4B7262457; };
+		6E6F43B8040587CDAD318338 /* AU */ = {isa = PBXBuildFile; fileRef = 805288AD32965F92FAA3D74C; };
+		73CFA6296C3458A44F1B6F8A /* include_juce_graphics_libpng.c */ = {isa = PBXBuildFile; fileRef = A6EB94707295044A9D769FFA; };
+		7504F1E18AB9043FAEBA879B /* include_juce_audio_processors_headless_lv2_libs.cpp */ = {isa = PBXBuildFile; fileRef = 315EF83B873D382C9D7506FB; };
+		751406737708D0AADFE78255 /* include_juce_audio_processors.mm */ = {isa = PBXBuildFile; fileRef = 4A49CB4FB789A6C15418F133; };
+		7F0EAD58ED72A7E6B7774F78 /* Cocoa.framework */ = {isa = PBXBuildFile; fileRef = 171F52B5078861AD9AE5FFD7; };
+		80318DC083A8D5182F35A09F /* include_juce_gui_basics_5.cpp */ = {isa = PBXBuildFile; fileRef = ACF8D32645958E3936969047; };
+		87DAFC55E172E556E7D0A5A9 /* AppIcon.icns */ = {isa = PBXBuildFile; fileRef = 72FE93E16975EF8A5385B0FD; };
+		8D3404E4F07A627CC62CD9A0 /* AudioUnit.framework */ = {isa = PBXBuildFile; fileRef = A50F52274604977605E67D50; };
+		8F0349C8E656C671F5A6BF3B /* include_juce_gui_basics_2.cpp */ = {isa = PBXBuildFile; fileRef = 456809C7B64BDA1D84F2F22B; };
+		959BFA3DB2A3327AE5CC3D3C /* include_juce_audio_plugin_client_VST3.mm */ = {isa = PBXBuildFile; fileRef = 0FE28A98A05090B6A1AE09F7; };
+		9D23775D5A4A50C1C59AD435 /* include_juce_gui_basics.mm */ = {isa = PBXBuildFile; fileRef = B3DE3A9F63F3A3B103076D8A; };
+		A90810EAF9FA0176526586B5 /* include_juce_gui_basics_3.cpp */ = {isa = PBXBuildFile; fileRef = EEF076F50509FD7E500EA413; };
+		ABB3E94F0711AEE825FC5119 /* include_juce_graphics_Sheenbidi.c */ = {isa = PBXBuildFile; fileRef = 8D5F9C2ED42730197B668424; };
+		ABFDBA45F9A659ADAC0A6123 /* include_juce_audio_processors_headless.mm */ = {isa = PBXBuildFile; fileRef = 9CA44C7501F49F61384FF332; };
+		AFBAD335E920E46F096E07EF /* GpuOscilloscope.cpp */ = {isa = PBXBuildFile; fileRef = 10A5E23B11DB9A29F7A00A6E; };
+		B0D9F642560FCB43CEBA0537 /* Accelerate.framework */ = {isa = PBXBuildFile; fileRef = AB4FBDB4D5EE280C099F154D; };
+		B458A4C1738D58770B7C825C /* CoreAudio.framework */ = {isa = PBXBuildFile; fileRef = 9D3D62DDC1134BAD8BBFB68C; };
+		B4E51F5EB759E83BE3146BDB /* include_juce_graphics_lunasvg.c */ = {isa = PBXBuildFile; fileRef = 22BB10748A3128C93A3E8F81; };
+		BF3AE7FFAFAA252E7C52C1B4 /* AudioToolbox.framework */ = {isa = PBXBuildFile; fileRef = 98A2938A30387EC4C446D457; };
+		BFC555B0594BD8A37881ACA8 /* SystemLoopback.cpp */ = {isa = PBXBuildFile; fileRef = DE2404D846810FF44DF8749A; };
+		C11EB5E349859DF45E79E2A5 /* BinaryData.cpp */ = {isa = PBXBuildFile; fileRef = 0EE374782F03BFC8569EAC2E; };
+		C3D3728310A6CE62931C6C2A /* GpuModule.cpp */ = {isa = PBXBuildFile; fileRef = E753E80D4FA4E8334AE63C71; };
+		C68465EB25C4A2E0789E9776 /* include_juce_audio_basics.mm */ = {isa = PBXBuildFile; fileRef = C4D3AE2D3BACB17F24B02D14; };
+		C85568566165C0394FA0C70E /* WebKit.framework */ = {isa = PBXBuildFile; fileRef = 5C198A70F2EEEC01D3A7FAD7; };
+		C866DED13FD0ECEC4E750507 /* include_juce_audio_formats_flac_2.c */ = {isa = PBXBuildFile; fileRef = 26AF23778D57CBC750C05452; };
+		D2D7950BF0CE4E1D54A082D5 /* CoreMIDI.framework */ = {isa = PBXBuildFile; fileRef = 476AAC683A4AE4F0E2FA2DE9; };
+		D635260CB59878F07BA1897E /* include_juce_audio_formats_flac_1.c */ = {isa = PBXBuildFile; fileRef = A35EB7DC40436436780F441B; };
+		D98D9CC7905CDF5EC82933D3 /* include_juce_audio_formats.mm */ = {isa = PBXBuildFile; fileRef = DEF5D0ABA116D17C931BF321; };
+		DC95684672AC44F5B4C9406B /* include_juce_audio_devices.mm */ = {isa = PBXBuildFile; fileRef = 07CEB3474646923AC5B779FF; };
+		E3FB4C60D6A295E702C83EBF /* QuartzCore.framework */ = {isa = PBXBuildFile; fileRef = 31F64363DD8EB36D154F8686; };
+		E8FBF3CC703A29208B655923 /* include_juce_graphics.mm */ = {isa = PBXBuildFile; fileRef = EB5B516DB5D5F982BE60F8E3; };
+		EE39801ABE9B4B79FF3C2A59 /* DiscRecording.framework */ = {isa = PBXBuildFile; fileRef = 174270FBC539E970CFDE8057; };
+		EFAD445889FD6FF48626B516 /* CoreAudioKit.framework */ = {isa = PBXBuildFile; fileRef = 78389B5ACB99C2874D0494A8; };
+		F3CB5E3FDCDBAC49AC673D2A /* GpuVectorscope.cpp */ = {isa = PBXBuildFile; fileRef = C920DE8B79C59DD125BF847D; };
+		F904D2D6354836BC97AFB64A /* include_juce_dsp.mm */ = {isa = PBXBuildFile; fileRef = A33CD5BF55AAA26C7E6C20A3; };
+		F98EEB008FB8E1BE48D68624 /* Metal.framework */ = {isa = PBXBuildFile; fileRef = 46320752DBCAB74448964F77; settings = { ATTRIBUTES = (Weak, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		023DCFD93BC5C5586DF5A44D /* juce_core */ /* juce_core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_core; path = ../../../JUCE/modules/juce_core; sourceTree = SOURCE_ROOT; };
+		07CEB3474646923AC5B779FF /* include_juce_audio_devices.mm */ /* include_juce_audio_devices.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_devices.mm; path = ../../JuceLibraryCode/include_juce_audio_devices.mm; sourceTree = SOURCE_ROOT; };
+		0EE374782F03BFC8569EAC2E /* BinaryData.cpp */ /* BinaryData.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BinaryData.cpp; path = ../../JuceLibraryCode/BinaryData.cpp; sourceTree = SOURCE_ROOT; };
+		0FE28A98A05090B6A1AE09F7 /* include_juce_audio_plugin_client_VST3.mm */ /* include_juce_audio_plugin_client_VST3.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_plugin_client_VST3.mm; path = ../../JuceLibraryCode/include_juce_audio_plugin_client_VST3.mm; sourceTree = SOURCE_ROOT; };
+		10A5E23B11DB9A29F7A00A6E /* GpuOscilloscope.cpp */ /* GpuOscilloscope.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GpuOscilloscope.cpp; path = "../../../Merlin By Mikshake/Source/GpuOscilloscope.cpp"; sourceTree = SOURCE_ROOT; };
+		12FB532446B9321BB89BD48E /* include_juce_core.mm */ /* include_juce_core.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_core.mm; path = ../../JuceLibraryCode/include_juce_core.mm; sourceTree = SOURCE_ROOT; };
+		13998962F828BD39AC3D1BA8 /* Audiowide-Regular.ttf */ /* Audiowide-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file.ttf; name = "Audiowide-Regular.ttf"; path = "../../../Merlin By Mikshake/Source/Audiowide-Regular.ttf"; sourceTree = SOURCE_ROOT; };
+		13E40C62F43F1629213901FB /* include_juce_core_zlib.c */ /* include_juce_core_zlib.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_core_zlib.c; path = ../../JuceLibraryCode/include_juce_core_zlib.c; sourceTree = SOURCE_ROOT; };
+		162641CFEA5F4A4D516935B0 /* OptionsOverlay.h */ /* OptionsOverlay.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionsOverlay.h; path = "../../../Merlin By Mikshake/Source/OptionsOverlay.h"; sourceTree = SOURCE_ROOT; };
+		171F52B5078861AD9AE5FFD7 /* Cocoa.framework */ /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		17308C601869A184A0E5C1F9 /* juce_audio_processors_headless */ /* juce_audio_processors_headless */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_processors_headless; path = ../../../JUCE/modules/juce_audio_processors_headless; sourceTree = SOURCE_ROOT; };
+		174270FBC539E970CFDE8057 /* DiscRecording.framework */ /* DiscRecording.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DiscRecording.framework; path = System/Library/Frameworks/DiscRecording.framework; sourceTree = SDKROOT; };
+		17B4E26284F14D33BE5A6676 /* GpuSpectrogram.h */ /* GpuSpectrogram.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuSpectrogram.h; path = "../../../Merlin By Mikshake/Source/GpuSpectrogram.h"; sourceTree = SOURCE_ROOT; };
+		183A1899996C7572F76C6CA2 /* juce_events */ /* juce_events */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_events; path = ../../../JUCE/modules/juce_events; sourceTree = SOURCE_ROOT; };
+		1A6BCE21800E1CF3D1EA3398 /* GpuDotSpectrum.h */ /* GpuDotSpectrum.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuDotSpectrum.h; path = "../../../Merlin By Mikshake/Source/GpuDotSpectrum.h"; sourceTree = SOURCE_ROOT; };
+		22BB10748A3128C93A3E8F81 /* include_juce_graphics_lunasvg.c */ /* include_juce_graphics_lunasvg.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_lunasvg.c; path = ../../JuceLibraryCode/include_juce_graphics_lunasvg.c; sourceTree = SOURCE_ROOT; };
+		26AF23778D57CBC750C05452 /* include_juce_audio_formats_flac_2.c */ /* include_juce_audio_formats_flac_2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_audio_formats_flac_2.c; path = ../../JuceLibraryCode/include_juce_audio_formats_flac_2.c; sourceTree = SOURCE_ROOT; };
+		2EB72E854DEAFD7DC3F21BD0 /* PluginProcessor.h */ /* PluginProcessor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PluginProcessor.h; path = "../../../Merlin By Mikshake/Source/PluginProcessor.h"; sourceTree = SOURCE_ROOT; };
+		315EF83B873D382C9D7506FB /* include_juce_audio_processors_headless_lv2_libs.cpp */ /* include_juce_audio_processors_headless_lv2_libs.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_audio_processors_headless_lv2_libs.cpp; path = ../../JuceLibraryCode/include_juce_audio_processors_headless_lv2_libs.cpp; sourceTree = SOURCE_ROOT; };
+		3191D5A1927A3B69FD077C7D /* include_juce_gui_extra.mm */ /* include_juce_gui_extra.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_gui_extra.mm; path = ../../JuceLibraryCode/include_juce_gui_extra.mm; sourceTree = SOURCE_ROOT; };
+		319EF3A81FC493CD2A5AA206 /* include_juce_opengl.mm */ /* include_juce_opengl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_opengl.mm; path = ../../JuceLibraryCode/include_juce_opengl.mm; sourceTree = SOURCE_ROOT; };
+		31F64363DD8EB36D154F8686 /* QuartzCore.framework */ /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		36F58140CD288B25EE75EF7F /* juce_VST3ManifestHelper.cpp */ /* juce_VST3ManifestHelper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = juce_VST3ManifestHelper.cpp; path = ../../../JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp; sourceTree = SOURCE_ROOT; };
+		39B7FD4AF0D2233F9913E997 /* juce_audio_processors */ /* juce_audio_processors */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_processors; path = ../../../JUCE/modules/juce_audio_processors; sourceTree = SOURCE_ROOT; };
+		3B7EAAED8E52C35CEAACF07F /* Info-AU.plist */ /* Info-AU.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info-AU.plist"; path = "Info-AU.plist"; sourceTree = SOURCE_ROOT; };
+		43DE232054C76A376AF0DBA3 /* include_juce_audio_plugin_client_AU_2.mm */ /* include_juce_audio_plugin_client_AU_2.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_plugin_client_AU_2.mm; path = ../../JuceLibraryCode/include_juce_audio_plugin_client_AU_2.mm; sourceTree = SOURCE_ROOT; };
+		456809C7B64BDA1D84F2F22B /* include_juce_gui_basics_2.cpp */ /* include_juce_gui_basics_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_gui_basics_2.cpp; path = ../../JuceLibraryCode/include_juce_gui_basics_2.cpp; sourceTree = SOURCE_ROOT; };
+		46320752DBCAB74448964F77 /* Metal.framework */ /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		476AAC683A4AE4F0E2FA2DE9 /* CoreMIDI.framework */ /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
+		47BEF313D530DA574FAD5F9A /* sidekey_blackbird.png */ /* sidekey_blackbird.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = sidekey_blackbird.png; path = "../../../Merlin By Mikshake/Source/sidekey_blackbird.png"; sourceTree = SOURCE_ROOT; };
+		47C5E9BF17CE74221FE88CFF /* AppMode.h */ /* AppMode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppMode.h; path = "../../../Merlin By Mikshake/Source/AppMode.h"; sourceTree = SOURCE_ROOT; };
+		4A49CB4FB789A6C15418F133 /* include_juce_audio_processors.mm */ /* include_juce_audio_processors.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_processors.mm; path = ../../JuceLibraryCode/include_juce_audio_processors.mm; sourceTree = SOURCE_ROOT; };
+		4B72E7CF562CA5D47D379C83 /* OpenGL.framework */ /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		5553B00B83CBA4A1B9DE29CD /* RecentFilesMenuTemplate.nib */ /* RecentFilesMenuTemplate.nib */ = {isa = PBXFileReference; lastKnownFileType = file.nib; name = RecentFilesMenuTemplate.nib; path = RecentFilesMenuTemplate.nib; sourceTree = SOURCE_ROOT; };
+		56E96AC41B07C10317CA8238 /* include_juce_audio_plugin_client_ARA.cpp */ /* include_juce_audio_plugin_client_ARA.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_audio_plugin_client_ARA.cpp; path = ../../JuceLibraryCode/include_juce_audio_plugin_client_ARA.cpp; sourceTree = SOURCE_ROOT; };
+		5C198A70F2EEEC01D3A7FAD7 /* WebKit.framework */ /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		5EC93BF76CCAC4564BD38E89 /* VST3 */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Merlin Alpha.vst3"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6134D60883AC5D12CE7FC647 /* juce_audio_devices */ /* juce_audio_devices */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_devices; path = ../../../JUCE/modules/juce_audio_devices; sourceTree = SOURCE_ROOT; };
+		64F49553A57086DB20EE5683 /* GpuModule.h */ /* GpuModule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuModule.h; path = "../../../Merlin By Mikshake/Source/GpuModule.h"; sourceTree = SOURCE_ROOT; };
+		66FE33BC84B59EA4DDCBE8CC /* SystemLoopback.h */ /* SystemLoopback.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SystemLoopback.h; path = "../../../Merlin By Mikshake/Source/SystemLoopback.h"; sourceTree = SOURCE_ROOT; };
+		67027D5E734329D5FE080C48 /* translations.tsv */ /* translations.tsv */ = {isa = PBXFileReference; lastKnownFileType = file.tsv; name = translations.tsv; path = "../../../Merlin By Mikshake/Source/translations.tsv"; sourceTree = SOURCE_ROOT; };
+		6D4AFC59F4A03ECFC5622249 /* PluginEditor.cpp */ /* PluginEditor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PluginEditor.cpp; path = "../../../Merlin By Mikshake/Source/PluginEditor.cpp"; sourceTree = SOURCE_ROOT; };
+		6EEF89C29A7C17A4B7262457 /* Security.framework */ /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		701451B7E690EA8A010E84C8 /* JuceHeader.h */ /* JuceHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JuceHeader.h; path = ../../JuceLibraryCode/JuceHeader.h; sourceTree = SOURCE_ROOT; };
+		715631B5AB127748DB0E85F9 /* GpuSurface.h */ /* GpuSurface.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuSurface.h; path = "../../../Merlin By Mikshake/Source/GpuSurface.h"; sourceTree = SOURCE_ROOT; };
+		72FE93E16975EF8A5385B0FD /* AppIcon.icns */ /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = file.icns; name = AppIcon.icns; path = AppIcon.icns; sourceTree = SOURCE_ROOT; };
+		78389B5ACB99C2874D0494A8 /* CoreAudioKit.framework */ /* CoreAudioKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudioKit.framework; path = System/Library/Frameworks/CoreAudioKit.framework; sourceTree = SDKROOT; };
+		78A515CD7552EB3A0565826F /* Lang.h */ /* Lang.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Lang.h; path = "../../../Merlin By Mikshake/Source/Lang.h"; sourceTree = SOURCE_ROOT; };
+		7A45AC98A2D81F49FC25F347 /* juce_audio_basics */ /* juce_audio_basics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_basics; path = ../../../JUCE/modules/juce_audio_basics; sourceTree = SOURCE_ROOT; };
+		805288AD32965F92FAA3D74C /* AU */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Merlin Alpha.component"; sourceTree = BUILT_PRODUCTS_DIR; };
+		82410569B308A27FAE1AEFEC /* juce_opengl */ /* juce_opengl */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_opengl; path = ../../../JUCE/modules/juce_opengl; sourceTree = SOURCE_ROOT; };
+		839BA18685243342AF4EFD97 /* Foundation.framework */ /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		877F1F3A0020DA3C82596628 /* juce_graphics */ /* juce_graphics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_graphics; path = ../../../JUCE/modules/juce_graphics; sourceTree = SOURCE_ROOT; };
+		89092D1DEBDF26244E0020F9 /* GpuOscilloscope.h */ /* GpuOscilloscope.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuOscilloscope.h; path = "../../../Merlin By Mikshake/Source/GpuOscilloscope.h"; sourceTree = SOURCE_ROOT; };
+		89DEE26EAF810F06C568DC5C /* include_juce_graphics_libjpg_3.c */ /* include_juce_graphics_libjpg_3.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_libjpg_3.c; path = ../../JuceLibraryCode/include_juce_graphics_libjpg_3.c; sourceTree = SOURCE_ROOT; };
+		8C8491637087E893862FF2C2 /* PluginProcessor.cpp */ /* PluginProcessor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PluginProcessor.cpp; path = "../../../Merlin By Mikshake/Source/PluginProcessor.cpp"; sourceTree = SOURCE_ROOT; };
+		8D5F9C2ED42730197B668424 /* include_juce_graphics_Sheenbidi.c */ /* include_juce_graphics_Sheenbidi.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_Sheenbidi.c; path = ../../JuceLibraryCode/include_juce_graphics_Sheenbidi.c; sourceTree = SOURCE_ROOT; };
+		8DA4A9499677EA740BEA5286 /* include_juce_graphics_libjpg_2.c */ /* include_juce_graphics_libjpg_2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_libjpg_2.c; path = ../../JuceLibraryCode/include_juce_graphics_libjpg_2.c; sourceTree = SOURCE_ROOT; };
+		90D99B91D49A293FD8D1ACFD /* include_juce_graphics_libjpg_1.c */ /* include_juce_graphics_libjpg_1.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_libjpg_1.c; path = ../../JuceLibraryCode/include_juce_graphics_libjpg_1.c; sourceTree = SOURCE_ROOT; };
+		98A2938A30387EC4C446D457 /* AudioToolbox.framework */ /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		99DA905256FA61B1E8B9B38B /* sidekey_monogram.png */ /* sidekey_monogram.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = sidekey_monogram.png; path = "../../../Merlin By Mikshake/Source/sidekey_monogram.png"; sourceTree = SOURCE_ROOT; };
+		9A42ED8A5DC5431AFE03B077 /* include_juce_core_CompilationTime.cpp */ /* include_juce_core_CompilationTime.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_core_CompilationTime.cpp; path = ../../JuceLibraryCode/include_juce_core_CompilationTime.cpp; sourceTree = SOURCE_ROOT; };
+		9CA44C7501F49F61384FF332 /* include_juce_audio_processors_headless.mm */ /* include_juce_audio_processors_headless.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_processors_headless.mm; path = ../../JuceLibraryCode/include_juce_audio_processors_headless.mm; sourceTree = SOURCE_ROOT; };
+		9D3D62DDC1134BAD8BBFB68C /* CoreAudio.framework */ /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		9F31172410D6E55D9C6A5FCD /* BinaryData.h */ /* BinaryData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = BinaryData.h; path = ../../JuceLibraryCode/BinaryData.h; sourceTree = SOURCE_ROOT; };
+		A1A59317AA5DAF876C38B4BF /* include_juce_graphics_Harfbuzz.cpp */ /* include_juce_graphics_Harfbuzz.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_graphics_Harfbuzz.cpp; path = ../../JuceLibraryCode/include_juce_graphics_Harfbuzz.cpp; sourceTree = SOURCE_ROOT; };
+		A33CD5BF55AAA26C7E6C20A3 /* include_juce_dsp.mm */ /* include_juce_dsp.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_dsp.mm; path = ../../JuceLibraryCode/include_juce_dsp.mm; sourceTree = SOURCE_ROOT; };
+		A35EB7DC40436436780F441B /* include_juce_audio_formats_flac_1.c */ /* include_juce_audio_formats_flac_1.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_audio_formats_flac_1.c; path = ../../JuceLibraryCode/include_juce_audio_formats_flac_1.c; sourceTree = SOURCE_ROOT; };
+		A3B0E55F8C2ABF3752C8BD0D /* PluginEditor.h */ /* PluginEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PluginEditor.h; path = "../../../Merlin By Mikshake/Source/PluginEditor.h"; sourceTree = SOURCE_ROOT; };
+		A50F52274604977605E67D50 /* AudioUnit.framework */ /* AudioUnit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioUnit.framework; path = System/Library/Frameworks/AudioUnit.framework; sourceTree = SDKROOT; };
+		A6EB94707295044A9D769FFA /* include_juce_graphics_libpng.c */ /* include_juce_graphics_libpng.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_libpng.c; path = ../../JuceLibraryCode/include_juce_graphics_libpng.c; sourceTree = SOURCE_ROOT; };
+		AB4FBDB4D5EE280C099F154D /* Accelerate.framework */ /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		ACF8D32645958E3936969047 /* include_juce_gui_basics_5.cpp */ /* include_juce_gui_basics_5.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_gui_basics_5.cpp; path = ../../JuceLibraryCode/include_juce_gui_basics_5.cpp; sourceTree = SOURCE_ROOT; };
+		AD2AA14C678DEF943774AA70 /* Shared Code */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libMerlin Alpha.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3DE3A9F63F3A3B103076D8A /* include_juce_gui_basics.mm */ /* include_juce_gui_basics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_gui_basics.mm; path = ../../JuceLibraryCode/include_juce_gui_basics.mm; sourceTree = SOURCE_ROOT; };
+		BA4E663A0F59CFA40D652EA4 /* include_juce_audio_processors_headless_ara.cpp */ /* include_juce_audio_processors_headless_ara.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_audio_processors_headless_ara.cpp; path = ../../JuceLibraryCode/include_juce_audio_processors_headless_ara.cpp; sourceTree = SOURCE_ROOT; };
+		BDC9B1617F11BF6CEE0006BD /* juce_gui_extra */ /* juce_gui_extra */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_gui_extra; path = ../../../JUCE/modules/juce_gui_extra; sourceTree = SOURCE_ROOT; };
+		BED5B49B72F1A1FD232EC0BB /* JucePluginDefines.h */ /* JucePluginDefines.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JucePluginDefines.h; path = ../../JuceLibraryCode/JucePluginDefines.h; sourceTree = SOURCE_ROOT; };
+		C164EAF52E6D875E215B0D5C /* GpuVectorscope.h */ /* GpuVectorscope.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuVectorscope.h; path = "../../../Merlin By Mikshake/Source/GpuVectorscope.h"; sourceTree = SOURCE_ROOT; };
+		C4D3AE2D3BACB17F24B02D14 /* include_juce_audio_basics.mm */ /* include_juce_audio_basics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_basics.mm; path = ../../JuceLibraryCode/include_juce_audio_basics.mm; sourceTree = SOURCE_ROOT; };
+		C8EED25632CFA9B6F4575002 /* juce_audio_plugin_client */ /* juce_audio_plugin_client */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_plugin_client; path = ../../../JUCE/modules/juce_audio_plugin_client; sourceTree = SOURCE_ROOT; };
+		C920DE8B79C59DD125BF847D /* GpuVectorscope.cpp */ /* GpuVectorscope.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GpuVectorscope.cpp; path = "../../../Merlin By Mikshake/Source/GpuVectorscope.cpp"; sourceTree = SOURCE_ROOT; };
+		CEAE4DDE294CF78738049D8F /* juce_dsp */ /* juce_dsp */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_dsp; path = ../../../JUCE/modules/juce_dsp; sourceTree = SOURCE_ROOT; };
+		CFF99C6D0012371821D8A04C /* Info-VST3_Manifest_Helper.plist */ /* Info-VST3_Manifest_Helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info-VST3_Manifest_Helper.plist"; path = "Info-VST3_Manifest_Helper.plist"; sourceTree = SOURCE_ROOT; };
+		D0B858E0DD30B3A927F3C062 /* include_juce_gui_basics_4.cpp */ /* include_juce_gui_basics_4.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_gui_basics_4.cpp; path = ../../JuceLibraryCode/include_juce_gui_basics_4.cpp; sourceTree = SOURCE_ROOT; };
+		D20C5C253190B5CF4E498031 /* juce_data_structures */ /* juce_data_structures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_data_structures; path = ../../../JUCE/modules/juce_data_structures; sourceTree = SOURCE_ROOT; };
+		D473C2F4739E9C065EDA0359 /* juce_gui_basics */ /* juce_gui_basics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_gui_basics; path = ../../../JUCE/modules/juce_gui_basics; sourceTree = SOURCE_ROOT; };
+		D4CE2C0090FFED22AE675277 /* include_juce_data_structures.mm */ /* include_juce_data_structures.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_data_structures.mm; path = ../../JuceLibraryCode/include_juce_data_structures.mm; sourceTree = SOURCE_ROOT; };
+		D58DE5A8272DE115859BFEC0 /* merle.png */ /* merle.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = merle.png; path = "../../../Merlin By Mikshake/Source/merle.png"; sourceTree = SOURCE_ROOT; };
+		D78267DD3E5FBFF7A9EA2370 /* IOKit.framework */ /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		D8A5A88F94F66C996B41E2CF /* GpuSurface.cpp */ /* GpuSurface.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GpuSurface.cpp; path = "../../../Merlin By Mikshake/Source/GpuSurface.cpp"; sourceTree = SOURCE_ROOT; };
+		DB3219058C2ADCC166E73024 /* juce_audio_formats */ /* juce_audio_formats */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_formats; path = ../../../JUCE/modules/juce_audio_formats; sourceTree = SOURCE_ROOT; };
+		DE2404D846810FF44DF8749A /* SystemLoopback.cpp */ /* SystemLoopback.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SystemLoopback.cpp; path = "../../../Merlin By Mikshake/Source/SystemLoopback.cpp"; sourceTree = SOURCE_ROOT; };
+		DECE8909159B65AC51482AE0 /* include_juce_audio_utils.mm */ /* include_juce_audio_utils.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_utils.mm; path = ../../JuceLibraryCode/include_juce_audio_utils.mm; sourceTree = SOURCE_ROOT; };
+		DEF5D0ABA116D17C931BF321 /* include_juce_audio_formats.mm */ /* include_juce_audio_formats.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_formats.mm; path = ../../JuceLibraryCode/include_juce_audio_formats.mm; sourceTree = SOURCE_ROOT; };
+		DF06E95037822034E4E8067B /* include_juce_events.mm */ /* include_juce_events.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_events.mm; path = ../../JuceLibraryCode/include_juce_events.mm; sourceTree = SOURCE_ROOT; };
+		E18CA3D92FBDC9845657DC63 /* include_juce_audio_plugin_client_AU_1.mm */ /* include_juce_audio_plugin_client_AU_1.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_plugin_client_AU_1.mm; path = ../../JuceLibraryCode/include_juce_audio_plugin_client_AU_1.mm; sourceTree = SOURCE_ROOT; };
+		E2F6ABC2499086D1E1386968 /* MetalKit.framework */ /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		E6A566367082C9668D436D06 /* GpuSpectrogram.cpp */ /* GpuSpectrogram.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GpuSpectrogram.cpp; path = "../../../Merlin By Mikshake/Source/GpuSpectrogram.cpp"; sourceTree = SOURCE_ROOT; };
+		E753E80D4FA4E8334AE63C71 /* GpuModule.cpp */ /* GpuModule.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GpuModule.cpp; path = "../../../Merlin By Mikshake/Source/GpuModule.cpp"; sourceTree = SOURCE_ROOT; };
+		E92D4B454D4C79A044E7268B /* juce_audio_utils */ /* juce_audio_utils */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_utils; path = ../../../JUCE/modules/juce_audio_utils; sourceTree = SOURCE_ROOT; };
+		EB1898525E36807599E564AA /* Info-VST3.plist */ /* Info-VST3.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info-VST3.plist"; path = "Info-VST3.plist"; sourceTree = SOURCE_ROOT; };
+		EB5B516DB5D5F982BE60F8E3 /* include_juce_graphics.mm */ /* include_juce_graphics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_graphics.mm; path = ../../JuceLibraryCode/include_juce_graphics.mm; sourceTree = SOURCE_ROOT; };
+		ECD55D3982DC0A2F748DACA2 /* GpuDotSpectrum.cpp */ /* GpuDotSpectrum.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GpuDotSpectrum.cpp; path = "../../../Merlin By Mikshake/Source/GpuDotSpectrum.cpp"; sourceTree = SOURCE_ROOT; };
+		EEF076F50509FD7E500EA413 /* include_juce_gui_basics_3.cpp */ /* include_juce_gui_basics_3.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_gui_basics_3.cpp; path = ../../JuceLibraryCode/include_juce_gui_basics_3.cpp; sourceTree = SOURCE_ROOT; };
+		FCFDB761F28D76C3CEB55793 /* VST3 Manifest Helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = juce_vst3_helper; sourceTree = BUILT_PRODUCTS_DIR; };
+		FE0387223FC6FB8A47CC3408 /* mikshake_about.png */ /* mikshake_about.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = mikshake_about.png; path = "../../../Merlin By Mikshake/Source/mikshake_about.png"; sourceTree = SOURCE_ROOT; };
+		FE761DC1D834B3F92693B078 /* Lang.cpp */ /* Lang.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Lang.cpp; path = "../../../Merlin By Mikshake/Source/Lang.cpp"; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		443AD287F3D72033DDE7C470 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0D9F642560FCB43CEBA0537,
+				BF3AE7FFAFAA252E7C52C1B4,
+				7F0EAD58ED72A7E6B7774F78,
+				B458A4C1738D58770B7C825C,
+				EFAD445889FD6FF48626B516,
+				D2D7950BF0CE4E1D54A082D5,
+				EE39801ABE9B4B79FF3C2A59,
+				0FF82F51F06FF487C2F5DF4A,
+				0A5E30600C651D9952778843,
+				4A151C0D2CD044EBA09BE056,
+				E3FB4C60D6A295E702C83EBF,
+				6D922ADA78260129B9721B16,
+				C85568566165C0394FA0C70E,
+				F98EEB008FB8E1BE48D68624,
+				62BA932268133EDE0D2E5EA6,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9C4D5DA4BE81EE2E483189AC = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8D3404E4F07A627CC62CD9A0,
+				B0D9F642560FCB43CEBA0537,
+				BF3AE7FFAFAA252E7C52C1B4,
+				7F0EAD58ED72A7E6B7774F78,
+				B458A4C1738D58770B7C825C,
+				EFAD445889FD6FF48626B516,
+				D2D7950BF0CE4E1D54A082D5,
+				EE39801ABE9B4B79FF3C2A59,
+				0FF82F51F06FF487C2F5DF4A,
+				0A5E30600C651D9952778843,
+				4A151C0D2CD044EBA09BE056,
+				E3FB4C60D6A295E702C83EBF,
+				6D922ADA78260129B9721B16,
+				C85568566165C0394FA0C70E,
+				F98EEB008FB8E1BE48D68624,
+				62BA932268133EDE0D2E5EA6,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FF6EACA26F6D7EFABA64B0CC = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0D9F642560FCB43CEBA0537,
+				BF3AE7FFAFAA252E7C52C1B4,
+				7F0EAD58ED72A7E6B7774F78,
+				B458A4C1738D58770B7C825C,
+				EFAD445889FD6FF48626B516,
+				D2D7950BF0CE4E1D54A082D5,
+				EE39801ABE9B4B79FF3C2A59,
+				0FF82F51F06FF487C2F5DF4A,
+				0A5E30600C651D9952778843,
+				4A151C0D2CD044EBA09BE056,
+				E3FB4C60D6A295E702C83EBF,
+				6D922ADA78260129B9721B16,
+				C85568566165C0394FA0C70E,
+				F98EEB008FB8E1BE48D68624,
+				62BA932268133EDE0D2E5EA6,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3A79F4D24A577216FB782A27 /* Source */ = {
+			isa = PBXGroup;
+			children = (
+				8C8491637087E893862FF2C2,
+				2EB72E854DEAFD7DC3F21BD0,
+				6D4AFC59F4A03ECFC5622249,
+				A3B0E55F8C2ABF3752C8BD0D,
+				47C5E9BF17CE74221FE88CFF,
+				E6A566367082C9668D436D06,
+				17B4E26284F14D33BE5A6676,
+				D8A5A88F94F66C996B41E2CF,
+				715631B5AB127748DB0E85F9,
+				E753E80D4FA4E8334AE63C71,
+				64F49553A57086DB20EE5683,
+				ECD55D3982DC0A2F748DACA2,
+				1A6BCE21800E1CF3D1EA3398,
+				C920DE8B79C59DD125BF847D,
+				C164EAF52E6D875E215B0D5C,
+				10A5E23B11DB9A29F7A00A6E,
+				89092D1DEBDF26244E0020F9,
+				DE2404D846810FF44DF8749A,
+				66FE33BC84B59EA4DDCBE8CC,
+				162641CFEA5F4A4D516935B0,
+				FE761DC1D834B3F92693B078,
+				78A515CD7552EB3A0565826F,
+				99DA905256FA61B1E8B9B38B,
+				47BEF313D530DA574FAD5F9A,
+				D58DE5A8272DE115859BFEC0,
+				13998962F828BD39AC3D1BA8,
+				FE0387223FC6FB8A47CC3408,
+				67027D5E734329D5FE080C48,
+			);
+			name = Source;
+			sourceTree = "<group>";
+		};
+		3AB883A85BF977808F6C2020 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				EB1898525E36807599E564AA,
+				3B7EAAED8E52C35CEAACF07F,
+				CFF99C6D0012371821D8A04C,
+				5553B00B83CBA4A1B9DE29CD,
+				72FE93E16975EF8A5385B0FD,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		918A865C9B66172436A14584 /* Source */ = {
+			isa = PBXGroup;
+			children = (
+				E4C5E38B88EF763FC36BE2A2,
+				B48F10021BBDB77D8D966F3F,
+				F54E55D25218083C2E1FCABC,
+				3AB883A85BF977808F6C2020,
+				AD2790F4FD09B7655802E04D,
+				A6DB124E56CCFAB6638A0BC6,
+			);
+			name = Source;
+			sourceTree = "<group>";
+		};
+		A6DB124E56CCFAB6638A0BC6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5EC93BF76CCAC4564BD38E89,
+				805288AD32965F92FAA3D74C,
+				AD2AA14C678DEF943774AA70,
+				FCFDB761F28D76C3CEB55793,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AD2790F4FD09B7655802E04D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A50F52274604977605E67D50,
+				AB4FBDB4D5EE280C099F154D,
+				98A2938A30387EC4C446D457,
+				171F52B5078861AD9AE5FFD7,
+				9D3D62DDC1134BAD8BBFB68C,
+				78389B5ACB99C2874D0494A8,
+				476AAC683A4AE4F0E2FA2DE9,
+				174270FBC539E970CFDE8057,
+				839BA18685243342AF4EFD97,
+				D78267DD3E5FBFF7A9EA2370,
+				4B72E7CF562CA5D47D379C83,
+				31F64363DD8EB36D154F8686,
+				6EEF89C29A7C17A4B7262457,
+				5C198A70F2EEEC01D3A7FAD7,
+				46320752DBCAB74448964F77,
+				E2F6ABC2499086D1E1386968,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B48F10021BBDB77D8D966F3F /* JUCE Modules */ = {
+			isa = PBXGroup;
+			children = (
+				7A45AC98A2D81F49FC25F347,
+				6134D60883AC5D12CE7FC647,
+				DB3219058C2ADCC166E73024,
+				C8EED25632CFA9B6F4575002,
+				39B7FD4AF0D2233F9913E997,
+				17308C601869A184A0E5C1F9,
+				E92D4B454D4C79A044E7268B,
+				023DCFD93BC5C5586DF5A44D,
+				D20C5C253190B5CF4E498031,
+				CEAE4DDE294CF78738049D8F,
+				183A1899996C7572F76C6CA2,
+				877F1F3A0020DA3C82596628,
+				D473C2F4739E9C065EDA0359,
+				BDC9B1617F11BF6CEE0006BD,
+				82410569B308A27FAE1AEFEC,
+			);
+			name = "JUCE Modules";
+			sourceTree = "<group>";
+		};
+		E4C5E38B88EF763FC36BE2A2 /* Merlin Alpha Plugin */ = {
+			isa = PBXGroup;
+			children = (
+				3A79F4D24A577216FB782A27,
+			);
+			name = "Merlin Alpha Plugin";
+			sourceTree = "<group>";
+		};
+		F54E55D25218083C2E1FCABC /* JUCE Library Code */ = {
+			isa = PBXGroup;
+			children = (
+				0EE374782F03BFC8569EAC2E,
+				9F31172410D6E55D9C6A5FCD,
+				C4D3AE2D3BACB17F24B02D14,
+				07CEB3474646923AC5B779FF,
+				DEF5D0ABA116D17C931BF321,
+				A35EB7DC40436436780F441B,
+				26AF23778D57CBC750C05452,
+				56E96AC41B07C10317CA8238,
+				E18CA3D92FBDC9845657DC63,
+				43DE232054C76A376AF0DBA3,
+				0FE28A98A05090B6A1AE09F7,
+				4A49CB4FB789A6C15418F133,
+				9CA44C7501F49F61384FF332,
+				BA4E663A0F59CFA40D652EA4,
+				315EF83B873D382C9D7506FB,
+				DECE8909159B65AC51482AE0,
+				12FB532446B9321BB89BD48E,
+				9A42ED8A5DC5431AFE03B077,
+				13E40C62F43F1629213901FB,
+				D4CE2C0090FFED22AE675277,
+				A33CD5BF55AAA26C7E6C20A3,
+				DF06E95037822034E4E8067B,
+				EB5B516DB5D5F982BE60F8E3,
+				A1A59317AA5DAF876C38B4BF,
+				90D99B91D49A293FD8D1ACFD,
+				8DA4A9499677EA740BEA5286,
+				89DEE26EAF810F06C568DC5C,
+				A6EB94707295044A9D769FFA,
+				22BB10748A3128C93A3E8F81,
+				8D5F9C2ED42730197B668424,
+				B3DE3A9F63F3A3B103076D8A,
+				456809C7B64BDA1D84F2F22B,
+				EEF076F50509FD7E500EA413,
+				D0B858E0DD30B3A927F3C062,
+				ACF8D32645958E3936969047,
+				3191D5A1927A3B69FD077C7D,
+				319EF3A81FC493CD2A5AA206,
+				701451B7E690EA8A010E84C8,
+				BED5B49B72F1A1FD232EC0BB,
+			);
+			name = "JUCE Library Code";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6AB1694667A4B7612C98ABB6 /* Merlin Alpha Plugin - VST3 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B15CC646B7D962BBCB151391;
+			buildPhases = (
+				19D1315BD8CE2F1AAFD8FB83,
+				57FBAAC42C7DB8251E1C99E6,
+				443AD287F3D72033DDE7C470,
+				59C17A6A016B543A54C4DD0C,
+				D4E83FF7D48944EC90632C10,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				50D51AB18AD91E14123EA597,
+				E713A29E783CCA91611E5F78,
+			);
+			name = "Merlin Alpha Plugin - VST3";
+			productName = "Merlin Alpha Plugin";
+			productReference = 5EC93BF76CCAC4564BD38E89;
+			productType = "com.apple.product-type.bundle";
+		};
+		87BFC30028979C04A397B7F0 /* Merlin Alpha Plugin - Shared Code */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 63BE4FCC3B2AFE879B414D61;
+			buildPhases = (
+				2AFDE987AB7FEE75A1A519E2,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Merlin Alpha Plugin - Shared Code";
+			productName = "Merlin Alpha Plugin";
+			productReference = AD2AA14C678DEF943774AA70;
+			productType = "com.apple.product-type.library.static";
+		};
+		C10C2ED6866D0FE8778ABEAB /* Merlin Alpha Plugin - VST3 Manifest Helper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 94931813460AEA4B940EC894;
+			buildPhases = (
+				B5ECA6EC93E92607100A1144,
+				FF6EACA26F6D7EFABA64B0CC,
+				35902FFF49A59D7E7719B17E,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Merlin Alpha Plugin - VST3 Manifest Helper";
+			productName = "Merlin Alpha Plugin";
+			productReference = FCFDB761F28D76C3CEB55793;
+			productType = "com.apple.product-type.tool";
+		};
+		FFF997CC15F6ADF8E324DDB6 /* Merlin Alpha Plugin - AU */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 60389B957ABB72EDCE40CFCC;
+			buildPhases = (
+				4F4D00E8569AD674E3016CB9,
+				A730826BDD2DA624310AECC8,
+				9C4D5DA4BE81EE2E483189AC,
+				5D956E115D75DDE4DFC27D5F,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				065A8A9EDA59E9FCA1A7F167,
+			);
+			name = "Merlin Alpha Plugin - AU";
+			productName = "Merlin Alpha Plugin";
+			productReference = 805288AD32965F92FAA3D74C;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FD69CC19D9A8536EA4077787 = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1340;
+				ORGANIZATIONNAME = "Side Key System";
+				TargetAttributes = {
+					6AB1694667A4B7612C98ABB6 = {
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 0;
+							};
+							com.apple.HardenedRuntime = {
+								enabled = 0;
+							};
+							com.apple.InAppPurchase = {
+								enabled = 0;
+							};
+							com.apple.InterAppAudio = {
+								enabled = 0;
+							};
+							com.apple.Push = {
+								enabled = 0;
+							};
+							com.apple.Sandbox = {
+								enabled = 0;
+							};
+						};
+					};
+					87BFC30028979C04A397B7F0 = {
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 0;
+							};
+							com.apple.HardenedRuntime = {
+								enabled = 0;
+							};
+							com.apple.InAppPurchase = {
+								enabled = 0;
+							};
+							com.apple.InterAppAudio = {
+								enabled = 0;
+							};
+							com.apple.Push = {
+								enabled = 0;
+							};
+							com.apple.Sandbox = {
+								enabled = 0;
+							};
+						};
+					};
+					BB8FFB54DC80D661C9F5106E = {
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 0;
+							};
+							com.apple.HardenedRuntime = {
+								enabled = 0;
+							};
+							com.apple.InAppPurchase = {
+								enabled = 0;
+							};
+							com.apple.InterAppAudio = {
+								enabled = 0;
+							};
+							com.apple.Push = {
+								enabled = 0;
+							};
+							com.apple.Sandbox = {
+								enabled = 0;
+							};
+						};
+					};
+					C10C2ED6866D0FE8778ABEAB = {
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 0;
+							};
+							com.apple.HardenedRuntime = {
+								enabled = 0;
+							};
+							com.apple.InAppPurchase = {
+								enabled = 0;
+							};
+							com.apple.InterAppAudio = {
+								enabled = 0;
+							};
+							com.apple.Push = {
+								enabled = 0;
+							};
+							com.apple.Sandbox = {
+								enabled = 0;
+							};
+						};
+					};
+					FFF997CC15F6ADF8E324DDB6 = {
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 0;
+							};
+							com.apple.HardenedRuntime = {
+								enabled = 0;
+							};
+							com.apple.InAppPurchase = {
+								enabled = 0;
+							};
+							com.apple.InterAppAudio = {
+								enabled = 0;
+							};
+							com.apple.Push = {
+								enabled = 0;
+							};
+							com.apple.Sandbox = {
+								enabled = 0;
+							};
+						};
+					};
+				};
+			};
+			buildConfigurationList = EBFB48B49F2EC14F21A8AF65;
+			compatibilityVersion = "Xcode 3.2";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 918A865C9B66172436A14584;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BB8FFB54DC80D661C9F5106E,
+				6AB1694667A4B7612C98ABB6,
+				FFF997CC15F6ADF8E324DDB6,
+				87BFC30028979C04A397B7F0,
+				C10C2ED6866D0FE8778ABEAB,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		19D1315BD8CE2F1AAFD8FB83 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A7369481958DCC950FE6EAC,
+				87DAFC55E172E556E7D0A5A9,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F4D00E8569AD674E3016CB9 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A7369481958DCC950FE6EAC,
+				87DAFC55E172E556E7D0A5A9,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		35902FFF49A59D7E7719B17E /* Sign Target */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Sign Target";
+			alwaysOutOfDate = 1;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\necho Signing Identity:	${EXPANDED_CODE_SIGN_IDENTITY_NAME:-${CODE_SIGN_IDENTITY}}\n\nentitlementsFile=\"${TARGET_TEMP_DIR}/${FULL_PRODUCT_NAME}.xcent\"\n\nif [[ ! -f \"${entitlementsFile}\" ]]; then\n  entitlementsFile=\"\"\nfi\n\necho Entitlements File:	${entitlementsFile:-None}\necho\necho Running codesign --force --sign \\\"${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY}}\\\" --verbose=4 --timestamp  ${entitlementsFile:+--entitlements \\\"${entitlementsFile}\\\"} --generate-entitlement-der \\\"${CODESIGNING_FOLDER_PATH}\\\"\ncodesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY}}\" --verbose=4 --timestamp  ${entitlementsFile:+--entitlements \"${entitlementsFile}\"} --generate-entitlement-der \"${CODESIGNING_FOLDER_PATH}\"\necho\necho Running codesign --verify --deep --verbose=4 \\\"${CODESIGNING_FOLDER_PATH}\\\"\ncodesign --verify --deep --verbose=4 \"${CODESIGNING_FOLDER_PATH}\"\n";
+		};
+		59C17A6A016B543A54C4DD0C /* Create VST3 Manifest */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Create VST3 Manifest";
+			alwaysOutOfDate = 1;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\necho Running \\\"${CONFIGURATION_BUILD_DIR}/juce_vst3_helper\\\" \\> \\\"${CONFIGURATION_BUILD_DIR}/${WRAPPER_NAME}/Contents/Resources/moduleinfo.json\\\"\n\"${CONFIGURATION_BUILD_DIR}/juce_vst3_helper\" > \"${CONFIGURATION_BUILD_DIR}/${WRAPPER_NAME}/Contents/Resources/moduleinfo.json\"\n";
+		};
+		5D956E115D75DDE4DFC27D5F /* Sign Target */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Sign Target";
+			alwaysOutOfDate = 1;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\necho Signing Identity:	${EXPANDED_CODE_SIGN_IDENTITY_NAME:-${CODE_SIGN_IDENTITY}}\n\nentitlementsFile=\"${TARGET_TEMP_DIR}/${FULL_PRODUCT_NAME}.xcent\"\n\nif [[ ! -f \"${entitlementsFile}\" ]]; then\n  entitlementsFile=\"\"\nfi\n\necho Entitlements File:	${entitlementsFile:-None}\necho\necho Running codesign --force --sign \\\"${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY}}\\\" --verbose=4 --timestamp  ${entitlementsFile:+--entitlements \\\"${entitlementsFile}\\\"} --generate-entitlement-der \\\"${CODESIGNING_FOLDER_PATH}\\\"\ncodesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY}}\" --verbose=4 --timestamp  ${entitlementsFile:+--entitlements \"${entitlementsFile}\"} --generate-entitlement-der \"${CODESIGNING_FOLDER_PATH}\"\necho\necho Running codesign --verify --deep --verbose=4 \\\"${CODESIGNING_FOLDER_PATH}\\\"\ncodesign --verify --deep --verbose=4 \"${CODESIGNING_FOLDER_PATH}\"\n";
+		};
+		D4E83FF7D48944EC90632C10 /* Sign Target */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Sign Target";
+			alwaysOutOfDate = 1;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\necho Signing Identity:	${EXPANDED_CODE_SIGN_IDENTITY_NAME:-${CODE_SIGN_IDENTITY}}\n\nentitlementsFile=\"${TARGET_TEMP_DIR}/${FULL_PRODUCT_NAME}.xcent\"\n\nif [[ ! -f \"${entitlementsFile}\" ]]; then\n  entitlementsFile=\"\"\nfi\n\necho Entitlements File:	${entitlementsFile:-None}\necho\necho Running codesign --force --sign \\\"${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY}}\\\" --verbose=4 --timestamp  ${entitlementsFile:+--entitlements \\\"${entitlementsFile}\\\"} --generate-entitlement-der \\\"${CODESIGNING_FOLDER_PATH}\\\"\ncodesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY}}\" --verbose=4 --timestamp  ${entitlementsFile:+--entitlements \"${entitlementsFile}\"} --generate-entitlement-der \"${CODESIGNING_FOLDER_PATH}\"\necho\necho Running codesign --verify --deep --verbose=4 \\\"${CODESIGNING_FOLDER_PATH}\\\"\ncodesign --verify --deep --verbose=4 \"${CODESIGNING_FOLDER_PATH}\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2AFDE987AB7FEE75A1A519E2 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4A59DD84149FD872AB91AB98,
+				447AA898CFCA676202B698DD,
+				4FF9B9A9405E16C2884DADE8,
+				682EB56E40372B98BA8D30A3,
+				C3D3728310A6CE62931C6C2A,
+				3EBC7E62160A8FC6BF99DAEE,
+				F3CB5E3FDCDBAC49AC673D2A,
+				AFBAD335E920E46F096E07EF,
+				BFC555B0594BD8A37881ACA8,
+				09A545A41DDA327E929398EC,
+				C11EB5E349859DF45E79E2A5,
+				C68465EB25C4A2E0789E9776,
+				DC95684672AC44F5B4C9406B,
+				D98D9CC7905CDF5EC82933D3,
+				D635260CB59878F07BA1897E,
+				C866DED13FD0ECEC4E750507,
+				42C6C51AC93D0429577CD7EA,
+				751406737708D0AADFE78255,
+				ABFDBA45F9A659ADAC0A6123,
+				632E76076D0613A2A4F7E76E,
+				7504F1E18AB9043FAEBA879B,
+				5265291D36C66508CB29FF51,
+				074CF131DB48255BD19A6131,
+				03E1844231509B40DF7D50F8,
+				612177824F14C2F0A2EE79D2,
+				016068A507CA0D357EF3395E,
+				F904D2D6354836BC97AFB64A,
+				1C829B01B32A5AF300DC597E,
+				E8FBF3CC703A29208B655923,
+				09E1C795BACD840E7E3911B6,
+				1EB68BC4E41B905CA5085AAB,
+				2DBD9FE265DCEC98BFCF8217,
+				2F85D55162E66F33495BC97F,
+				73CFA6296C3458A44F1B6F8A,
+				B4E51F5EB759E83BE3146BDB,
+				ABB3E94F0711AEE825FC5119,
+				9D23775D5A4A50C1C59AD435,
+				8F0349C8E656C671F5A6BF3B,
+				A90810EAF9FA0176526586B5,
+				45E04C7BA9C9FFEB4696A5A2,
+				80318DC083A8D5182F35A09F,
+				47BC67B09C2910B579CB9932,
+				36287611AA1B6B5D25C50867,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		57FBAAC42C7DB8251E1C99E6 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				959BFA3DB2A3327AE5CC3D3C,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A730826BDD2DA624310AECC8 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3E1EF022FEE982693033535B,
+				3CC23E4D167BCF6C21531472,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B5ECA6EC93E92607100A1144 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				00436C393BE812166C94C1D9,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		065A8A9EDA59E9FCA1A7F167 = {
+			isa = PBXTargetDependency;
+			target = 87BFC30028979C04A397B7F0;
+		};
+		10062A8C507F5F3A8E96AF7D = {
+			isa = PBXTargetDependency;
+			target = 6AB1694667A4B7612C98ABB6;
+		};
+		50D51AB18AD91E14123EA597 = {
+			isa = PBXTargetDependency;
+			target = 87BFC30028979C04A397B7F0;
+		};
+		7B61205D303ED17A82D90059 = {
+			isa = PBXTargetDependency;
+			target = 87BFC30028979C04A397B7F0;
+		};
+		E68FB364AAF816A2937AFA78 = {
+			isa = PBXTargetDependency;
+			target = C10C2ED6866D0FE8778ABEAB;
+		};
+		E713A29E783CCA91611E5F78 = {
+			isa = PBXTargetDependency;
+			target = C10C2ED6866D0FE8778ABEAB;
+		};
+		F60ABC29958EFEF3D567C95A = {
+			isa = PBXTargetDependency;
+			target = FFF997CC15F6ADF8E324DDB6;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		04B0809A1136E0A752B22E56 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_LINK_OBJC_RUNTIME = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/build/$(CONFIGURATION)";
+				COPY_PHASE_STRIP = NO;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				EXCLUDED_ARCHS = "";
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"_DEBUG=1",
+					"DEBUG=1",
+					"JUCE_PROJUCER_VERSION=0x90001",
+					"JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors_headless=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
+					"JUCE_MODULE_AVAILABLE_juce_core=1",
+					"JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+					"JUCE_MODULE_AVAILABLE_juce_dsp=1",
+					"JUCE_MODULE_AVAILABLE_juce_events=1",
+					"JUCE_MODULE_AVAILABLE_juce_graphics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_extra=1",
+					"JUCE_MODULE_AVAILABLE_juce_opengl=1",
+					"JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION=\\\"1.0.0\\\"",
+					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+					"JUCE_ASIO=0",
+					"JUCE_WASAPI=1",
+					"JUCE_DIRECTSOUND=0",
+					"JUCE_USE_FLAC=0",
+					"JUCE_USE_OGGVORBIS=0",
+					"JUCE_VST3_CAN_REPLACE_VST2=0",
+					"JUCE_PLUGINHOST_VST3=0",
+					"JUCE_PLUGINHOST_AU=0",
+					"JUCE_PLUGINHOST_LADSPA=0",
+					"JUCE_PLUGINHOST_LV2=0",
+					"JUCE_STRICT_REFCOUNTEDPOINTER=1",
+					"JucePlugin_Build_VST=0",
+					"JucePlugin_Build_VST3=0",
+					"JucePlugin_Build_AU=1",
+					"JucePlugin_Build_AUv3=0",
+					"JucePlugin_Build_AAX=0",
+					"JucePlugin_Build_Standalone=0",
+					"JucePlugin_Build_Unity=0",
+					"JucePlugin_Build_LV2=0",
+					"JucePlugin_Enable_IAA=0",
+					"JucePlugin_Enable_ARA=0",
+					"JucePlugin_Name=\\\"Merlin\\ Alpha\\\"",
+					"JucePlugin_Desc=\\\"Advanced\\ Audio\\ Analyzer\\\"",
+					"JucePlugin_Manufacturer=\\\"Side\\ Key\\ System\\\"",
+					"JucePlugin_ManufacturerWebsite=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerEmail=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerCode=0x53644b79",
+					"JucePlugin_PluginCode=0x4d726c61",
+					"JucePlugin_IsSynth=0",
+					"JucePlugin_WantsMidiInput=0",
+					"JucePlugin_ProducesMidiOutput=0",
+					"JucePlugin_IsMidiEffect=0",
+					"JucePlugin_EditorRequiresKeyboardFocus=0",
+					"JucePlugin_Version=1.62.0",
+					"JucePlugin_VersionCode=0x13e00",
+					"JucePlugin_VersionString=\\\"1.62.0\\\"",
+					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
+					"JucePlugin_VSTCategory=kPlugCategEffect",
+					"JucePlugin_LV2PluginClass=Plugin",
+					"JucePlugin_Vst3Category=\\\"Fx|Analyzer\\\"",
+					"JucePlugin_AUMainType=\\'aufx\\'",
+					"JucePlugin_AUSubType=JucePlugin_PluginCode",
+					"JucePlugin_AUExportPrefix=MerlinAlphaPluginAU",
+					"JucePlugin_AUExportPrefixQuoted=\\\"MerlinAlphaPluginAU\\\"",
+					"JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_CFBundleIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_AAXProductId=JucePlugin_PluginCode",
+					"JucePlugin_AAXCategory=0",
+					"JucePlugin_AAXDisableBypass=0",
+					"JucePlugin_AAXDisableMultiMono=0",
+					"JucePlugin_IAAType=0x61757278",
+					"JucePlugin_IAASubType=JucePlugin_PluginCode",
+					"JucePlugin_IAAName=\\\"Side\\ Key\\ System:\\ Merlin\\ Alpha\\\"",
+					"JucePlugin_VSTNumMidiInputs=16",
+					"JucePlugin_VSTNumMidiOutputs=16",
+					"JucePlugin_ARAContentTypes=0",
+					"JucePlugin_ARATransformationFlags=0",
+					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.62.0\\\"",
+					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
+					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
+					"MERLIN_PLUGIN=1",
+					"JUCER_XCODE_MAC_F6D2F4CF=1",
+					"JUCE_APP_VERSION=1.62.0",
+					"JUCE_APP_VERSION_HEX=0x13e00",
+				);
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GENERATE_PKGINFO_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK",
+					"$(SRCROOT)/../../JuceLibraryCode",
+					"$(SRCROOT)/../../../JUCE/modules",
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = Info-AU.plist;
+				INFOPLIST_PREPROCESS = NO;
+				LIBRARY_STYLE = Bundle;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK $(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../JUCE/modules $(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU";
+				OTHER_CFLAGS = "$(inherited)";
+				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = "$(inherited) -bundle -lMerlin\\ Alpha";
+				OTHER_REZFLAGS = "-d ppc_$ppc -d i386_$i386 -d ppc64_$ppc64 -d x86_64_$x86_64 -d arm64_$arm64 -I /System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Versions/A/Headers -I \"$(DEVELOPER_DIR)/Extras/CoreAudio/AudioUnits/AUPublic/AUBase\" -I \"$(DEVELOPER_DIR)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AudioUnit.framework/Headers\"";
+				PRODUCT_BUNDLE_IDENTIFIER = com.SideKeySystem.MerlinAlphaPlugin;
+				PRODUCT_NAME = "Merlin Alpha";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				USE_HEADERMAP = NO;
+				VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS = OpenGL;
+				VALID_ARCHS = "i386 x86_64 arm64 arm64e";
+				WRAPPER_EXTENSION = component;
+			};
+			name = Debug;
+		};
+		2981E79B3D71F8467512E2C7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_LINK_OBJC_RUNTIME = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/build/$(CONFIGURATION)";
+				DEAD_CODE_STRIPPING = YES;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				EXCLUDED_ARCHS = "";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"_NDEBUG=1",
+					"NDEBUG=1",
+					"JUCE_PROJUCER_VERSION=0x90001",
+					"JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors_headless=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
+					"JUCE_MODULE_AVAILABLE_juce_core=1",
+					"JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+					"JUCE_MODULE_AVAILABLE_juce_dsp=1",
+					"JUCE_MODULE_AVAILABLE_juce_events=1",
+					"JUCE_MODULE_AVAILABLE_juce_graphics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_extra=1",
+					"JUCE_MODULE_AVAILABLE_juce_opengl=1",
+					"JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION=\\\"1.0.0\\\"",
+					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+					"JUCE_ASIO=0",
+					"JUCE_WASAPI=1",
+					"JUCE_DIRECTSOUND=0",
+					"JUCE_USE_FLAC=0",
+					"JUCE_USE_OGGVORBIS=0",
+					"JUCE_VST3_CAN_REPLACE_VST2=0",
+					"JUCE_PLUGINHOST_VST3=0",
+					"JUCE_PLUGINHOST_AU=0",
+					"JUCE_PLUGINHOST_LADSPA=0",
+					"JUCE_PLUGINHOST_LV2=0",
+					"JUCE_STRICT_REFCOUNTEDPOINTER=1",
+					"JucePlugin_Build_VST=0",
+					"JucePlugin_Build_VST3=1",
+					"JucePlugin_Build_AU=0",
+					"JucePlugin_Build_AUv3=0",
+					"JucePlugin_Build_AAX=0",
+					"JucePlugin_Build_Standalone=0",
+					"JucePlugin_Build_Unity=0",
+					"JucePlugin_Build_LV2=0",
+					"JucePlugin_Enable_IAA=0",
+					"JucePlugin_Enable_ARA=0",
+					"JucePlugin_Name=\\\"Merlin\\ Alpha\\\"",
+					"JucePlugin_Desc=\\\"Advanced\\ Audio\\ Analyzer\\\"",
+					"JucePlugin_Manufacturer=\\\"Side\\ Key\\ System\\\"",
+					"JucePlugin_ManufacturerWebsite=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerEmail=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerCode=0x53644b79",
+					"JucePlugin_PluginCode=0x4d726c61",
+					"JucePlugin_IsSynth=0",
+					"JucePlugin_WantsMidiInput=0",
+					"JucePlugin_ProducesMidiOutput=0",
+					"JucePlugin_IsMidiEffect=0",
+					"JucePlugin_EditorRequiresKeyboardFocus=0",
+					"JucePlugin_Version=1.62.0",
+					"JucePlugin_VersionCode=0x13e00",
+					"JucePlugin_VersionString=\\\"1.62.0\\\"",
+					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
+					"JucePlugin_VSTCategory=kPlugCategEffect",
+					"JucePlugin_LV2PluginClass=Plugin",
+					"JucePlugin_Vst3Category=\\\"Fx|Analyzer\\\"",
+					"JucePlugin_AUMainType=\\'aufx\\'",
+					"JucePlugin_AUSubType=JucePlugin_PluginCode",
+					"JucePlugin_AUExportPrefix=MerlinAlphaPluginAU",
+					"JucePlugin_AUExportPrefixQuoted=\\\"MerlinAlphaPluginAU\\\"",
+					"JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_CFBundleIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_AAXProductId=JucePlugin_PluginCode",
+					"JucePlugin_AAXCategory=0",
+					"JucePlugin_AAXDisableBypass=0",
+					"JucePlugin_AAXDisableMultiMono=0",
+					"JucePlugin_IAAType=0x61757278",
+					"JucePlugin_IAASubType=JucePlugin_PluginCode",
+					"JucePlugin_IAAName=\\\"Side\\ Key\\ System:\\ Merlin\\ Alpha\\\"",
+					"JucePlugin_VSTNumMidiInputs=16",
+					"JucePlugin_VSTNumMidiOutputs=16",
+					"JucePlugin_ARAContentTypes=0",
+					"JucePlugin_ARATransformationFlags=0",
+					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.62.0\\\"",
+					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
+					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
+					"MERLIN_PLUGIN=1",
+					"JUCER_XCODE_MAC_F6D2F4CF=1",
+					"JUCE_APP_VERSION=1.62.0",
+					"JUCE_APP_VERSION_HEX=0x13e00",
+				);
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GENERATE_PKGINFO_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK",
+					"$(SRCROOT)/../../JuceLibraryCode",
+					"$(SRCROOT)/../../../JUCE/modules",
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = Info-VST3.plist;
+				INFOPLIST_PREPROCESS = NO;
+				LIBRARY_STYLE = Bundle;
+				LLVM_LTO = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK $(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../JUCE/modules $(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU";
+				OTHER_CFLAGS = "$(inherited)";
+				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = "$(inherited) -bundle -lMerlin\\ Alpha";
+				PRODUCT_BUNDLE_IDENTIFIER = com.SideKeySystem.MerlinAlphaPlugin;
+				PRODUCT_NAME = "Merlin Alpha";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				USE_HEADERMAP = NO;
+				VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS = OpenGL;
+				VALID_ARCHS = "i386 x86_64 arm64 arm64e";
+				WRAPPER_EXTENSION = vst3;
+			};
+			name = Release;
+		};
+		36DE58197CA40023FB0086A6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_LINK_OBJC_RUNTIME = NO;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/build/$(CONFIGURATION)";
+				COPY_PHASE_STRIP = NO;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				EXCLUDED_ARCHS = "";
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"_DEBUG=1",
+					"DEBUG=1",
+					"JUCE_PROJUCER_VERSION=0x90001",
+					"JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors_headless=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
+					"JUCE_MODULE_AVAILABLE_juce_core=1",
+					"JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+					"JUCE_MODULE_AVAILABLE_juce_dsp=1",
+					"JUCE_MODULE_AVAILABLE_juce_events=1",
+					"JUCE_MODULE_AVAILABLE_juce_graphics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_extra=1",
+					"JUCE_MODULE_AVAILABLE_juce_opengl=1",
+					"JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION=\\\"1.0.0\\\"",
+					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+					"JUCE_ASIO=0",
+					"JUCE_WASAPI=1",
+					"JUCE_DIRECTSOUND=0",
+					"JUCE_USE_FLAC=0",
+					"JUCE_USE_OGGVORBIS=0",
+					"JUCE_VST3_CAN_REPLACE_VST2=0",
+					"JUCE_PLUGINHOST_VST3=0",
+					"JUCE_PLUGINHOST_AU=0",
+					"JUCE_PLUGINHOST_LADSPA=0",
+					"JUCE_PLUGINHOST_LV2=0",
+					"JUCE_STRICT_REFCOUNTEDPOINTER=1",
+					"JucePlugin_Build_VST=0",
+					"JucePlugin_Build_VST3=0",
+					"JucePlugin_Build_AU=0",
+					"JucePlugin_Build_AUv3=0",
+					"JucePlugin_Build_AAX=0",
+					"JucePlugin_Build_Standalone=0",
+					"JucePlugin_Build_Unity=0",
+					"JucePlugin_Build_LV2=0",
+					"JucePlugin_Enable_IAA=0",
+					"JucePlugin_Enable_ARA=0",
+					"JucePlugin_Name=\\\"Merlin\\ Alpha\\\"",
+					"JucePlugin_Desc=\\\"Advanced\\ Audio\\ Analyzer\\\"",
+					"JucePlugin_Manufacturer=\\\"Side\\ Key\\ System\\\"",
+					"JucePlugin_ManufacturerWebsite=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerEmail=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerCode=0x53644b79",
+					"JucePlugin_PluginCode=0x4d726c61",
+					"JucePlugin_IsSynth=0",
+					"JucePlugin_WantsMidiInput=0",
+					"JucePlugin_ProducesMidiOutput=0",
+					"JucePlugin_IsMidiEffect=0",
+					"JucePlugin_EditorRequiresKeyboardFocus=0",
+					"JucePlugin_Version=1.62.0",
+					"JucePlugin_VersionCode=0x13e00",
+					"JucePlugin_VersionString=\\\"1.62.0\\\"",
+					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
+					"JucePlugin_VSTCategory=kPlugCategEffect",
+					"JucePlugin_LV2PluginClass=Plugin",
+					"JucePlugin_Vst3Category=\\\"Fx|Analyzer\\\"",
+					"JucePlugin_AUMainType=\\'aufx\\'",
+					"JucePlugin_AUSubType=JucePlugin_PluginCode",
+					"JucePlugin_AUExportPrefix=MerlinAlphaPluginAU",
+					"JucePlugin_AUExportPrefixQuoted=\\\"MerlinAlphaPluginAU\\\"",
+					"JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_CFBundleIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_AAXProductId=JucePlugin_PluginCode",
+					"JucePlugin_AAXCategory=0",
+					"JucePlugin_AAXDisableBypass=0",
+					"JucePlugin_AAXDisableMultiMono=0",
+					"JucePlugin_IAAType=0x61757278",
+					"JucePlugin_IAASubType=JucePlugin_PluginCode",
+					"JucePlugin_IAAName=\\\"Side\\ Key\\ System:\\ Merlin\\ Alpha\\\"",
+					"JucePlugin_VSTNumMidiInputs=16",
+					"JucePlugin_VSTNumMidiOutputs=16",
+					"JucePlugin_ARAContentTypes=0",
+					"JucePlugin_ARATransformationFlags=0",
+					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.62.0\\\"",
+					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
+					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
+					"MERLIN_PLUGIN=1",
+					"JUCER_XCODE_MAC_F6D2F4CF=1",
+					"JUCE_APP_VERSION=1.62.0",
+					"JUCE_APP_VERSION_HEX=0x13e00",
+				);
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK",
+					"$(SRCROOT)/../../JuceLibraryCode",
+					"$(SRCROOT)/../../../JUCE/modules",
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = Info-VST3_Manifest_Helper.plist;
+				INFOPLIST_PREPROCESS = NO;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK $(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../JUCE/modules $(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU";
+				OTHER_CFLAGS = "$(inherited)";
+				OTHER_CODE_SIGN_FLAGS = "";
+				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.SideKeySystem.MerlinAlphaPlugin;
+				PRODUCT_NAME = "juce_vst3_helper";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				USE_HEADERMAP = NO;
+				VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS = OpenGL;
+				VALID_ARCHS = "i386 x86_64 arm64 arm64e";
+			};
+			name = Debug;
+		};
+		45C68226D2D2BB1D65243CC7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = NO;
+				GCC_C_LANGUAGE_STANDARD = c11;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_CHECK_SWITCH_STATEMENTS = YES;
+				GCC_WARN_MISSING_PARENTHESES = YES;
+				GCC_WARN_NON_VIRTUAL_DESTRUCTOR = YES;
+				GCC_WARN_TYPECHECK_CALLS_TO_PRINTF = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				OTHER_CODE_SIGN_FLAGS = "--dryrun";
+				PRODUCT_NAME = "Merlin Alpha";
+				SDKROOT = macosx;
+				WARNING_CFLAGS = "-Wreorder";
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+		65FE560BBE0A08CDF51F9508 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_LINK_OBJC_RUNTIME = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/build/$(CONFIGURATION)";
+				COPY_PHASE_STRIP = NO;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				EXCLUDED_ARCHS = "";
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"_DEBUG=1",
+					"DEBUG=1",
+					"JUCE_PROJUCER_VERSION=0x90001",
+					"JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors_headless=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
+					"JUCE_MODULE_AVAILABLE_juce_core=1",
+					"JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+					"JUCE_MODULE_AVAILABLE_juce_dsp=1",
+					"JUCE_MODULE_AVAILABLE_juce_events=1",
+					"JUCE_MODULE_AVAILABLE_juce_graphics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_extra=1",
+					"JUCE_MODULE_AVAILABLE_juce_opengl=1",
+					"JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION=\\\"1.0.0\\\"",
+					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+					"JUCE_ASIO=0",
+					"JUCE_WASAPI=1",
+					"JUCE_DIRECTSOUND=0",
+					"JUCE_USE_FLAC=0",
+					"JUCE_USE_OGGVORBIS=0",
+					"JUCE_VST3_CAN_REPLACE_VST2=0",
+					"JUCE_PLUGINHOST_VST3=0",
+					"JUCE_PLUGINHOST_AU=0",
+					"JUCE_PLUGINHOST_LADSPA=0",
+					"JUCE_PLUGINHOST_LV2=0",
+					"JUCE_STRICT_REFCOUNTEDPOINTER=1",
+					"JucePlugin_Build_VST=0",
+					"JucePlugin_Build_VST3=1",
+					"JucePlugin_Build_AU=1",
+					"JucePlugin_Build_AUv3=0",
+					"JucePlugin_Build_AAX=0",
+					"JucePlugin_Build_Standalone=0",
+					"JucePlugin_Build_Unity=0",
+					"JucePlugin_Build_LV2=0",
+					"JucePlugin_Enable_IAA=0",
+					"JucePlugin_Enable_ARA=0",
+					"JucePlugin_Name=\\\"Merlin\\ Alpha\\\"",
+					"JucePlugin_Desc=\\\"Advanced\\ Audio\\ Analyzer\\\"",
+					"JucePlugin_Manufacturer=\\\"Side\\ Key\\ System\\\"",
+					"JucePlugin_ManufacturerWebsite=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerEmail=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerCode=0x53644b79",
+					"JucePlugin_PluginCode=0x4d726c61",
+					"JucePlugin_IsSynth=0",
+					"JucePlugin_WantsMidiInput=0",
+					"JucePlugin_ProducesMidiOutput=0",
+					"JucePlugin_IsMidiEffect=0",
+					"JucePlugin_EditorRequiresKeyboardFocus=0",
+					"JucePlugin_Version=1.62.0",
+					"JucePlugin_VersionCode=0x13e00",
+					"JucePlugin_VersionString=\\\"1.62.0\\\"",
+					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
+					"JucePlugin_VSTCategory=kPlugCategEffect",
+					"JucePlugin_LV2PluginClass=Plugin",
+					"JucePlugin_Vst3Category=\\\"Fx|Analyzer\\\"",
+					"JucePlugin_AUMainType=\\'aufx\\'",
+					"JucePlugin_AUSubType=JucePlugin_PluginCode",
+					"JucePlugin_AUExportPrefix=MerlinAlphaPluginAU",
+					"JucePlugin_AUExportPrefixQuoted=\\\"MerlinAlphaPluginAU\\\"",
+					"JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_CFBundleIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_AAXProductId=JucePlugin_PluginCode",
+					"JucePlugin_AAXCategory=0",
+					"JucePlugin_AAXDisableBypass=0",
+					"JucePlugin_AAXDisableMultiMono=0",
+					"JucePlugin_IAAType=0x61757278",
+					"JucePlugin_IAASubType=JucePlugin_PluginCode",
+					"JucePlugin_IAAName=\\\"Side\\ Key\\ System:\\ Merlin\\ Alpha\\\"",
+					"JucePlugin_VSTNumMidiInputs=16",
+					"JucePlugin_VSTNumMidiOutputs=16",
+					"JucePlugin_ARAContentTypes=0",
+					"JucePlugin_ARATransformationFlags=0",
+					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.62.0\\\"",
+					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
+					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
+					"MERLIN_PLUGIN=1",
+					"JUCER_XCODE_MAC_F6D2F4CF=1",
+					"JUCE_APP_VERSION=1.62.0",
+					"JUCE_APP_VERSION_HEX=0x13e00",
+					"JUCE_SHARED_CODE=1",
+				);
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK",
+					"$(SRCROOT)/../../JuceLibraryCode",
+					"$(SRCROOT)/../../../JUCE/modules",
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU",
+					"$(inherited)",
+				);
+				INSTALL_PATH = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK $(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../JUCE/modules $(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU";
+				OTHER_CFLAGS = "$(inherited)";
+				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.SideKeySystem.MerlinAlphaPlugin;
+				PRODUCT_NAME = "Merlin Alpha";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SKIP_INSTALL = YES;
+				USE_HEADERMAP = NO;
+				VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS = OpenGL;
+				VALID_ARCHS = "i386 x86_64 arm64 arm64e";
+			};
+			name = Debug;
+		};
+		7826B2F34A03B81C36A6B98E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_LINK_OBJC_RUNTIME = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/build/$(CONFIGURATION)";
+				COPY_PHASE_STRIP = NO;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				EXCLUDED_ARCHS = "";
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"_DEBUG=1",
+					"DEBUG=1",
+					"JUCE_PROJUCER_VERSION=0x90001",
+					"JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors_headless=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
+					"JUCE_MODULE_AVAILABLE_juce_core=1",
+					"JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+					"JUCE_MODULE_AVAILABLE_juce_dsp=1",
+					"JUCE_MODULE_AVAILABLE_juce_events=1",
+					"JUCE_MODULE_AVAILABLE_juce_graphics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_extra=1",
+					"JUCE_MODULE_AVAILABLE_juce_opengl=1",
+					"JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION=\\\"1.0.0\\\"",
+					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+					"JUCE_ASIO=0",
+					"JUCE_WASAPI=1",
+					"JUCE_DIRECTSOUND=0",
+					"JUCE_USE_FLAC=0",
+					"JUCE_USE_OGGVORBIS=0",
+					"JUCE_VST3_CAN_REPLACE_VST2=0",
+					"JUCE_PLUGINHOST_VST3=0",
+					"JUCE_PLUGINHOST_AU=0",
+					"JUCE_PLUGINHOST_LADSPA=0",
+					"JUCE_PLUGINHOST_LV2=0",
+					"JUCE_STRICT_REFCOUNTEDPOINTER=1",
+					"JucePlugin_Build_VST=0",
+					"JucePlugin_Build_VST3=1",
+					"JucePlugin_Build_AU=0",
+					"JucePlugin_Build_AUv3=0",
+					"JucePlugin_Build_AAX=0",
+					"JucePlugin_Build_Standalone=0",
+					"JucePlugin_Build_Unity=0",
+					"JucePlugin_Build_LV2=0",
+					"JucePlugin_Enable_IAA=0",
+					"JucePlugin_Enable_ARA=0",
+					"JucePlugin_Name=\\\"Merlin\\ Alpha\\\"",
+					"JucePlugin_Desc=\\\"Advanced\\ Audio\\ Analyzer\\\"",
+					"JucePlugin_Manufacturer=\\\"Side\\ Key\\ System\\\"",
+					"JucePlugin_ManufacturerWebsite=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerEmail=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerCode=0x53644b79",
+					"JucePlugin_PluginCode=0x4d726c61",
+					"JucePlugin_IsSynth=0",
+					"JucePlugin_WantsMidiInput=0",
+					"JucePlugin_ProducesMidiOutput=0",
+					"JucePlugin_IsMidiEffect=0",
+					"JucePlugin_EditorRequiresKeyboardFocus=0",
+					"JucePlugin_Version=1.62.0",
+					"JucePlugin_VersionCode=0x13e00",
+					"JucePlugin_VersionString=\\\"1.62.0\\\"",
+					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
+					"JucePlugin_VSTCategory=kPlugCategEffect",
+					"JucePlugin_LV2PluginClass=Plugin",
+					"JucePlugin_Vst3Category=\\\"Fx|Analyzer\\\"",
+					"JucePlugin_AUMainType=\\'aufx\\'",
+					"JucePlugin_AUSubType=JucePlugin_PluginCode",
+					"JucePlugin_AUExportPrefix=MerlinAlphaPluginAU",
+					"JucePlugin_AUExportPrefixQuoted=\\\"MerlinAlphaPluginAU\\\"",
+					"JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_CFBundleIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_AAXProductId=JucePlugin_PluginCode",
+					"JucePlugin_AAXCategory=0",
+					"JucePlugin_AAXDisableBypass=0",
+					"JucePlugin_AAXDisableMultiMono=0",
+					"JucePlugin_IAAType=0x61757278",
+					"JucePlugin_IAASubType=JucePlugin_PluginCode",
+					"JucePlugin_IAAName=\\\"Side\\ Key\\ System:\\ Merlin\\ Alpha\\\"",
+					"JucePlugin_VSTNumMidiInputs=16",
+					"JucePlugin_VSTNumMidiOutputs=16",
+					"JucePlugin_ARAContentTypes=0",
+					"JucePlugin_ARATransformationFlags=0",
+					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.62.0\\\"",
+					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
+					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
+					"MERLIN_PLUGIN=1",
+					"JUCER_XCODE_MAC_F6D2F4CF=1",
+					"JUCE_APP_VERSION=1.62.0",
+					"JUCE_APP_VERSION_HEX=0x13e00",
+				);
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GENERATE_PKGINFO_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK",
+					"$(SRCROOT)/../../JuceLibraryCode",
+					"$(SRCROOT)/../../../JUCE/modules",
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = Info-VST3.plist;
+				INFOPLIST_PREPROCESS = NO;
+				LIBRARY_STYLE = Bundle;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK $(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../JUCE/modules $(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU";
+				OTHER_CFLAGS = "$(inherited)";
+				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = "$(inherited) -bundle -lMerlin\\ Alpha";
+				PRODUCT_BUNDLE_IDENTIFIER = com.SideKeySystem.MerlinAlphaPlugin;
+				PRODUCT_NAME = "Merlin Alpha";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				USE_HEADERMAP = NO;
+				VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS = OpenGL;
+				VALID_ARCHS = "i386 x86_64 arm64 arm64e";
+				WRAPPER_EXTENSION = vst3;
+			};
+			name = Debug;
+		};
+		9372243CF97DE0BE86A648BE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		98D37A690AC1E5193B3C0468 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = NO;
+				GCC_C_LANGUAGE_STANDARD = c11;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_CHECK_SWITCH_STATEMENTS = YES;
+				GCC_WARN_MISSING_PARENTHESES = YES;
+				GCC_WARN_NON_VIRTUAL_DESTRUCTOR = YES;
+				GCC_WARN_TYPECHECK_CALLS_TO_PRINTF = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				OTHER_CODE_SIGN_FLAGS = "--dryrun";
+				PRODUCT_NAME = "Merlin Alpha";
+				SDKROOT = macosx;
+				WARNING_CFLAGS = "-Wreorder";
+				ZERO_LINK = NO;
+			};
+			name = Debug;
+		};
+		B05840292A1759B12EC775B7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		C069376A363908B23BD02752 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_LINK_OBJC_RUNTIME = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/build/$(CONFIGURATION)";
+				DEAD_CODE_STRIPPING = YES;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				EXCLUDED_ARCHS = "";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"_NDEBUG=1",
+					"NDEBUG=1",
+					"JUCE_PROJUCER_VERSION=0x90001",
+					"JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors_headless=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
+					"JUCE_MODULE_AVAILABLE_juce_core=1",
+					"JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+					"JUCE_MODULE_AVAILABLE_juce_dsp=1",
+					"JUCE_MODULE_AVAILABLE_juce_events=1",
+					"JUCE_MODULE_AVAILABLE_juce_graphics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_extra=1",
+					"JUCE_MODULE_AVAILABLE_juce_opengl=1",
+					"JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION=\\\"1.0.0\\\"",
+					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+					"JUCE_ASIO=0",
+					"JUCE_WASAPI=1",
+					"JUCE_DIRECTSOUND=0",
+					"JUCE_USE_FLAC=0",
+					"JUCE_USE_OGGVORBIS=0",
+					"JUCE_VST3_CAN_REPLACE_VST2=0",
+					"JUCE_PLUGINHOST_VST3=0",
+					"JUCE_PLUGINHOST_AU=0",
+					"JUCE_PLUGINHOST_LADSPA=0",
+					"JUCE_PLUGINHOST_LV2=0",
+					"JUCE_STRICT_REFCOUNTEDPOINTER=1",
+					"JucePlugin_Build_VST=0",
+					"JucePlugin_Build_VST3=0",
+					"JucePlugin_Build_AU=1",
+					"JucePlugin_Build_AUv3=0",
+					"JucePlugin_Build_AAX=0",
+					"JucePlugin_Build_Standalone=0",
+					"JucePlugin_Build_Unity=0",
+					"JucePlugin_Build_LV2=0",
+					"JucePlugin_Enable_IAA=0",
+					"JucePlugin_Enable_ARA=0",
+					"JucePlugin_Name=\\\"Merlin\\ Alpha\\\"",
+					"JucePlugin_Desc=\\\"Advanced\\ Audio\\ Analyzer\\\"",
+					"JucePlugin_Manufacturer=\\\"Side\\ Key\\ System\\\"",
+					"JucePlugin_ManufacturerWebsite=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerEmail=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerCode=0x53644b79",
+					"JucePlugin_PluginCode=0x4d726c61",
+					"JucePlugin_IsSynth=0",
+					"JucePlugin_WantsMidiInput=0",
+					"JucePlugin_ProducesMidiOutput=0",
+					"JucePlugin_IsMidiEffect=0",
+					"JucePlugin_EditorRequiresKeyboardFocus=0",
+					"JucePlugin_Version=1.62.0",
+					"JucePlugin_VersionCode=0x13e00",
+					"JucePlugin_VersionString=\\\"1.62.0\\\"",
+					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
+					"JucePlugin_VSTCategory=kPlugCategEffect",
+					"JucePlugin_LV2PluginClass=Plugin",
+					"JucePlugin_Vst3Category=\\\"Fx|Analyzer\\\"",
+					"JucePlugin_AUMainType=\\'aufx\\'",
+					"JucePlugin_AUSubType=JucePlugin_PluginCode",
+					"JucePlugin_AUExportPrefix=MerlinAlphaPluginAU",
+					"JucePlugin_AUExportPrefixQuoted=\\\"MerlinAlphaPluginAU\\\"",
+					"JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_CFBundleIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_AAXProductId=JucePlugin_PluginCode",
+					"JucePlugin_AAXCategory=0",
+					"JucePlugin_AAXDisableBypass=0",
+					"JucePlugin_AAXDisableMultiMono=0",
+					"JucePlugin_IAAType=0x61757278",
+					"JucePlugin_IAASubType=JucePlugin_PluginCode",
+					"JucePlugin_IAAName=\\\"Side\\ Key\\ System:\\ Merlin\\ Alpha\\\"",
+					"JucePlugin_VSTNumMidiInputs=16",
+					"JucePlugin_VSTNumMidiOutputs=16",
+					"JucePlugin_ARAContentTypes=0",
+					"JucePlugin_ARATransformationFlags=0",
+					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.62.0\\\"",
+					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
+					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
+					"MERLIN_PLUGIN=1",
+					"JUCER_XCODE_MAC_F6D2F4CF=1",
+					"JUCE_APP_VERSION=1.62.0",
+					"JUCE_APP_VERSION_HEX=0x13e00",
+				);
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GENERATE_PKGINFO_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK",
+					"$(SRCROOT)/../../JuceLibraryCode",
+					"$(SRCROOT)/../../../JUCE/modules",
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = Info-AU.plist;
+				INFOPLIST_PREPROCESS = NO;
+				LIBRARY_STYLE = Bundle;
+				LLVM_LTO = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK $(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../JUCE/modules $(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU";
+				OTHER_CFLAGS = "$(inherited)";
+				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = "$(inherited) -bundle -lMerlin\\ Alpha";
+				OTHER_REZFLAGS = "-d ppc_$ppc -d i386_$i386 -d ppc64_$ppc64 -d x86_64_$x86_64 -d arm64_$arm64 -I /System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Versions/A/Headers -I \"$(DEVELOPER_DIR)/Extras/CoreAudio/AudioUnits/AUPublic/AUBase\" -I \"$(DEVELOPER_DIR)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AudioUnit.framework/Headers\"";
+				PRODUCT_BUNDLE_IDENTIFIER = com.SideKeySystem.MerlinAlphaPlugin;
+				PRODUCT_NAME = "Merlin Alpha";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				USE_HEADERMAP = NO;
+				VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS = OpenGL;
+				VALID_ARCHS = "i386 x86_64 arm64 arm64e";
+				WRAPPER_EXTENSION = component;
+			};
+			name = Release;
+		};
+		D0ECCE1D1B6A4FCB919A04D8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_LINK_OBJC_RUNTIME = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/build/$(CONFIGURATION)";
+				DEAD_CODE_STRIPPING = YES;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				EXCLUDED_ARCHS = "";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"_NDEBUG=1",
+					"NDEBUG=1",
+					"JUCE_PROJUCER_VERSION=0x90001",
+					"JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors_headless=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
+					"JUCE_MODULE_AVAILABLE_juce_core=1",
+					"JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+					"JUCE_MODULE_AVAILABLE_juce_dsp=1",
+					"JUCE_MODULE_AVAILABLE_juce_events=1",
+					"JUCE_MODULE_AVAILABLE_juce_graphics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_extra=1",
+					"JUCE_MODULE_AVAILABLE_juce_opengl=1",
+					"JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION=\\\"1.0.0\\\"",
+					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+					"JUCE_ASIO=0",
+					"JUCE_WASAPI=1",
+					"JUCE_DIRECTSOUND=0",
+					"JUCE_USE_FLAC=0",
+					"JUCE_USE_OGGVORBIS=0",
+					"JUCE_VST3_CAN_REPLACE_VST2=0",
+					"JUCE_PLUGINHOST_VST3=0",
+					"JUCE_PLUGINHOST_AU=0",
+					"JUCE_PLUGINHOST_LADSPA=0",
+					"JUCE_PLUGINHOST_LV2=0",
+					"JUCE_STRICT_REFCOUNTEDPOINTER=1",
+					"JucePlugin_Build_VST=0",
+					"JucePlugin_Build_VST3=1",
+					"JucePlugin_Build_AU=1",
+					"JucePlugin_Build_AUv3=0",
+					"JucePlugin_Build_AAX=0",
+					"JucePlugin_Build_Standalone=0",
+					"JucePlugin_Build_Unity=0",
+					"JucePlugin_Build_LV2=0",
+					"JucePlugin_Enable_IAA=0",
+					"JucePlugin_Enable_ARA=0",
+					"JucePlugin_Name=\\\"Merlin\\ Alpha\\\"",
+					"JucePlugin_Desc=\\\"Advanced\\ Audio\\ Analyzer\\\"",
+					"JucePlugin_Manufacturer=\\\"Side\\ Key\\ System\\\"",
+					"JucePlugin_ManufacturerWebsite=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerEmail=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerCode=0x53644b79",
+					"JucePlugin_PluginCode=0x4d726c61",
+					"JucePlugin_IsSynth=0",
+					"JucePlugin_WantsMidiInput=0",
+					"JucePlugin_ProducesMidiOutput=0",
+					"JucePlugin_IsMidiEffect=0",
+					"JucePlugin_EditorRequiresKeyboardFocus=0",
+					"JucePlugin_Version=1.62.0",
+					"JucePlugin_VersionCode=0x13e00",
+					"JucePlugin_VersionString=\\\"1.62.0\\\"",
+					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
+					"JucePlugin_VSTCategory=kPlugCategEffect",
+					"JucePlugin_LV2PluginClass=Plugin",
+					"JucePlugin_Vst3Category=\\\"Fx|Analyzer\\\"",
+					"JucePlugin_AUMainType=\\'aufx\\'",
+					"JucePlugin_AUSubType=JucePlugin_PluginCode",
+					"JucePlugin_AUExportPrefix=MerlinAlphaPluginAU",
+					"JucePlugin_AUExportPrefixQuoted=\\\"MerlinAlphaPluginAU\\\"",
+					"JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_CFBundleIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_AAXProductId=JucePlugin_PluginCode",
+					"JucePlugin_AAXCategory=0",
+					"JucePlugin_AAXDisableBypass=0",
+					"JucePlugin_AAXDisableMultiMono=0",
+					"JucePlugin_IAAType=0x61757278",
+					"JucePlugin_IAASubType=JucePlugin_PluginCode",
+					"JucePlugin_IAAName=\\\"Side\\ Key\\ System:\\ Merlin\\ Alpha\\\"",
+					"JucePlugin_VSTNumMidiInputs=16",
+					"JucePlugin_VSTNumMidiOutputs=16",
+					"JucePlugin_ARAContentTypes=0",
+					"JucePlugin_ARATransformationFlags=0",
+					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.62.0\\\"",
+					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
+					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
+					"MERLIN_PLUGIN=1",
+					"JUCER_XCODE_MAC_F6D2F4CF=1",
+					"JUCE_APP_VERSION=1.62.0",
+					"JUCE_APP_VERSION_HEX=0x13e00",
+					"JUCE_SHARED_CODE=1",
+				);
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK",
+					"$(SRCROOT)/../../JuceLibraryCode",
+					"$(SRCROOT)/../../../JUCE/modules",
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU",
+					"$(inherited)",
+				);
+				INSTALL_PATH = "@executable_path/../Frameworks";
+				LLVM_LTO = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK $(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../JUCE/modules $(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU";
+				OTHER_CFLAGS = "$(inherited)";
+				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.SideKeySystem.MerlinAlphaPlugin;
+				PRODUCT_NAME = "Merlin Alpha";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SKIP_INSTALL = YES;
+				USE_HEADERMAP = NO;
+				VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS = OpenGL;
+				VALID_ARCHS = "i386 x86_64 arm64 arm64e";
+			};
+			name = Release;
+		};
+		E000D236DECEE379F39BF93E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_LINK_OBJC_RUNTIME = NO;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/build/$(CONFIGURATION)";
+				DEAD_CODE_STRIPPING = YES;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				EXCLUDED_ARCHS = "";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"_NDEBUG=1",
+					"NDEBUG=1",
+					"JUCE_PROJUCER_VERSION=0x90001",
+					"JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_processors_headless=1",
+					"JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
+					"JUCE_MODULE_AVAILABLE_juce_core=1",
+					"JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+					"JUCE_MODULE_AVAILABLE_juce_dsp=1",
+					"JUCE_MODULE_AVAILABLE_juce_events=1",
+					"JUCE_MODULE_AVAILABLE_juce_graphics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
+					"JUCE_MODULE_AVAILABLE_juce_gui_extra=1",
+					"JUCE_MODULE_AVAILABLE_juce_opengl=1",
+					"JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION=\\\"1.0.0\\\"",
+					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+					"JUCE_ASIO=0",
+					"JUCE_WASAPI=1",
+					"JUCE_DIRECTSOUND=0",
+					"JUCE_USE_FLAC=0",
+					"JUCE_USE_OGGVORBIS=0",
+					"JUCE_VST3_CAN_REPLACE_VST2=0",
+					"JUCE_PLUGINHOST_VST3=0",
+					"JUCE_PLUGINHOST_AU=0",
+					"JUCE_PLUGINHOST_LADSPA=0",
+					"JUCE_PLUGINHOST_LV2=0",
+					"JUCE_STRICT_REFCOUNTEDPOINTER=1",
+					"JucePlugin_Build_VST=0",
+					"JucePlugin_Build_VST3=0",
+					"JucePlugin_Build_AU=0",
+					"JucePlugin_Build_AUv3=0",
+					"JucePlugin_Build_AAX=0",
+					"JucePlugin_Build_Standalone=0",
+					"JucePlugin_Build_Unity=0",
+					"JucePlugin_Build_LV2=0",
+					"JucePlugin_Enable_IAA=0",
+					"JucePlugin_Enable_ARA=0",
+					"JucePlugin_Name=\\\"Merlin\\ Alpha\\\"",
+					"JucePlugin_Desc=\\\"Advanced\\ Audio\\ Analyzer\\\"",
+					"JucePlugin_Manufacturer=\\\"Side\\ Key\\ System\\\"",
+					"JucePlugin_ManufacturerWebsite=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerEmail=\\\"https://sidekey.fr\\\"",
+					"JucePlugin_ManufacturerCode=0x53644b79",
+					"JucePlugin_PluginCode=0x4d726c61",
+					"JucePlugin_IsSynth=0",
+					"JucePlugin_WantsMidiInput=0",
+					"JucePlugin_ProducesMidiOutput=0",
+					"JucePlugin_IsMidiEffect=0",
+					"JucePlugin_EditorRequiresKeyboardFocus=0",
+					"JucePlugin_Version=1.62.0",
+					"JucePlugin_VersionCode=0x13e00",
+					"JucePlugin_VersionString=\\\"1.62.0\\\"",
+					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
+					"JucePlugin_VSTCategory=kPlugCategEffect",
+					"JucePlugin_LV2PluginClass=Plugin",
+					"JucePlugin_Vst3Category=\\\"Fx|Analyzer\\\"",
+					"JucePlugin_AUMainType=\\'aufx\\'",
+					"JucePlugin_AUSubType=JucePlugin_PluginCode",
+					"JucePlugin_AUExportPrefix=MerlinAlphaPluginAU",
+					"JucePlugin_AUExportPrefixQuoted=\\\"MerlinAlphaPluginAU\\\"",
+					"JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_CFBundleIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXIdentifier=com.SideKeySystem.MerlinAlphaPlugin",
+					"JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode",
+					"JucePlugin_AAXProductId=JucePlugin_PluginCode",
+					"JucePlugin_AAXCategory=0",
+					"JucePlugin_AAXDisableBypass=0",
+					"JucePlugin_AAXDisableMultiMono=0",
+					"JucePlugin_IAAType=0x61757278",
+					"JucePlugin_IAASubType=JucePlugin_PluginCode",
+					"JucePlugin_IAAName=\\\"Side\\ Key\\ System:\\ Merlin\\ Alpha\\\"",
+					"JucePlugin_VSTNumMidiInputs=16",
+					"JucePlugin_VSTNumMidiOutputs=16",
+					"JucePlugin_ARAContentTypes=0",
+					"JucePlugin_ARATransformationFlags=0",
+					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.62.0\\\"",
+					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
+					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
+					"MERLIN_PLUGIN=1",
+					"JUCER_XCODE_MAC_F6D2F4CF=1",
+					"JUCE_APP_VERSION=1.62.0",
+					"JUCE_APP_VERSION_HEX=0x13e00",
+				);
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK",
+					"$(SRCROOT)/../../JuceLibraryCode",
+					"$(SRCROOT)/../../../JUCE/modules",
+					"$(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = Info-VST3_Manifest_Helper.plist;
+				INFOPLIST_PREPROCESS = NO;
+				LLVM_LTO = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../../JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK $(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../JUCE/modules $(SRCROOT)/../../../JUCE/modules/juce_audio_plugin_client/AU";
+				OTHER_CFLAGS = "$(inherited)";
+				OTHER_CODE_SIGN_FLAGS = "";
+				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.SideKeySystem.MerlinAlphaPlugin;
+				PRODUCT_NAME = "juce_vst3_helper";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				USE_HEADERMAP = NO;
+				VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS = OpenGL;
+				VALID_ARCHS = "i386 x86_64 arm64 arm64e";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		60389B957ABB72EDCE40CFCC = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04B0809A1136E0A752B22E56,
+				C069376A363908B23BD02752,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		63BE4FCC3B2AFE879B414D61 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				65FE560BBE0A08CDF51F9508,
+				D0ECCE1D1B6A4FCB919A04D8,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		94931813460AEA4B940EC894 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36DE58197CA40023FB0086A6,
+				E000D236DECEE379F39BF93E,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B15CC646B7D962BBCB151391 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7826B2F34A03B81C36A6B98E,
+				2981E79B3D71F8467512E2C7,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B847AEF2627338D47A0886B3 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9372243CF97DE0BE86A648BE,
+				B05840292A1759B12EC775B7,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EBFB48B49F2EC14F21A8AF65 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				45C68226D2D2BB1D65243CC7,
+				98D37A690AC1E5193B3C0468,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = FD69CC19D9A8536EA4077787 /* Project object */;
+}

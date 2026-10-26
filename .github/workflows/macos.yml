@@ -1,0 +1,82 @@
+name: macOS build (app + AU + VST3 + pkg)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JUCE 9.0.1
+        run: git clone --depth 1 --branch 9.0.1 https://github.com/juce-framework/JUCE.git JUCE
+
+      - name: Version
+        run: |
+          V=$(grep -o ' version="[0-9]*\.[0-9]*\.[0-9]*"' "Merlin By Mikshake/Merlin By Mikshake.jucer" | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+          echo "Version $V"
+
+      - name: Build app
+        run: |
+          xcodebuild -project "Merlin By Mikshake/Builds/MacOSX/Merlin Alpha.xcodeproj" \
+            -alltargets -configuration Release \
+            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" | tail -n 30
+
+      - name: Build plugins (AU + VST3)
+        run: |
+          xcodebuild -project "Merlin Alpha Plugin/Builds/MacOSX/Merlin Alpha Plugin.xcodeproj" \
+            -alltargets -configuration Release \
+            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" | tail -n 30
+
+      - name: Ad-hoc signing
+        run: |
+          APP="Merlin By Mikshake/Builds/MacOSX/build/Release/Merlin Alpha.app"
+          PLG="Merlin Alpha Plugin/Builds/MacOSX/build/Release"
+          for b in "$APP" "$PLG/Merlin Alpha.component" "$PLG/Merlin Alpha.vst3"; do
+            codesign --force --deep -s - "$b"
+            codesign --verify --verbose "$b"
+            lipo -archs "$b/Contents/MacOS/"* || true
+          done
+
+      - name: AU validation
+        continue-on-error: true
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "Merlin Alpha Plugin/Builds/MacOSX/build/Release/Merlin Alpha.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          auval -v aufx Mrla SdKy
+
+      - name: Package (.pkg)
+        run: |
+          set -e
+          APP="Merlin By Mikshake/Builds/MacOSX/build/Release/Merlin Alpha.app"
+          PLG="Merlin Alpha Plugin/Builds/MacOSX/build/Release"
+          mkdir -p stage/app stage/au stage/vst3 pkgs
+          cp -R "$APP" stage/app/
+          cp -R "$PLG/Merlin Alpha.component" stage/au/
+          cp -R "$PLG/Merlin Alpha.vst3" stage/vst3/
+          chmod +x packaging/scripts/postinstall
+          # bundles non relocalisables : toujours installés à leur place
+          for c in app au vst3; do
+            pkgbuild --analyze --root "stage/$c" "stage/$c.plist"
+            plutil -replace BundleIsRelocatable -bool NO "stage/$c.plist"
+          done
+          pkgbuild --root stage/app  --component-plist stage/app.plist  --install-location /Applications \
+                   --identifier com.SideKeySystem.MerlinAlpha.app  --version "$VERSION" pkgs/app.pkg
+          pkgbuild --root stage/au   --component-plist stage/au.plist   --install-location /Library/Audio/Plug-Ins/Components \
+                   --identifier com.SideKeySystem.MerlinAlpha.au   --version "$VERSION" pkgs/au.pkg
+          pkgbuild --root stage/vst3 --component-plist stage/vst3.plist --install-location /Library/Audio/Plug-Ins/VST3 \
+                   --identifier com.SideKeySystem.MerlinAlpha.vst3 --version "$VERSION" \
+                   --scripts packaging/scripts pkgs/vst3.pkg
+          productbuild --synthesize --package pkgs/app.pkg --package pkgs/au.pkg --package pkgs/vst3.pkg distribution.xml
+          productbuild --distribution distribution.xml --package-path pkgs "MerlinAlpha_macOS_v$VERSION.pkg"
+          ls -la *.pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MerlinAlpha_macOS_v${{ env.VERSION }}
+          path: MerlinAlpha_macOS_v*.pkg

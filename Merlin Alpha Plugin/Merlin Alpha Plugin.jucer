@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="MrlaPg" name="Merlin Alpha Plugin" projectType="audioplug" useAppConfig="0"
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="Side Key System"
+              companyEmail="https://sidekey.fr" companyWebsite="https://sidekey.fr"
+              version="1.62.0" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
+              displaySplashScreen="0" defines="MERLIN_PLUGIN=1"
+              pluginFormats="buildAU,buildVST3" pluginName="Merlin Alpha" pluginDesc="Advanced Audio Analyzer"
+              pluginManufacturer="Side Key System" pluginManufacturerCode="SdKy"
+              pluginCode="Mrla" pluginCharacteristicsValue="" pluginVST3Category="Analyzer,Fx"
+              pluginAUMainType="'aufx'">
+  <MAINGROUP id="MrlaMg" name="Merlin Alpha Plugin">
+    <GROUP id="{9C2E7B41-58A3-4D1F-B6E0-3F4A2C8D7E15}" name="Source">
+      <FILE id="MpProC" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/PluginProcessor.cpp"/>
+      <FILE id="MpProH" name="PluginProcessor.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/PluginProcessor.h"/>
+      <FILE id="MpEdC" name="PluginEditor.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/PluginEditor.cpp"/>
+      <FILE id="MpEdH" name="PluginEditor.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/PluginEditor.h"/>
+      <FILE id="MpModH" name="AppMode.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/AppMode.h"/>
+      <FILE id="MpGpuC" name="GpuSpectrogram.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/GpuSpectrogram.cpp"/>
+      <FILE id="MpGpuH" name="GpuSpectrogram.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/GpuSpectrogram.h"/>
+      <FILE id="MpGSfC" name="GpuSurface.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/GpuSurface.cpp"/>
+      <FILE id="MpGSfH" name="GpuSurface.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/GpuSurface.h"/>
+      <FILE id="MpGMC" name="GpuModule.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/GpuModule.cpp"/>
+      <FILE id="MpGMH" name="GpuModule.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/GpuModule.h"/>
+      <FILE id="MpDotC" name="GpuDotSpectrum.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/GpuDotSpectrum.cpp"/>
+      <FILE id="MpDotH" name="GpuDotSpectrum.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/GpuDotSpectrum.h"/>
+      <FILE id="MpVecC" name="GpuVectorscope.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/GpuVectorscope.cpp"/>
+      <FILE id="MpVecH" name="GpuVectorscope.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/GpuVectorscope.h"/>
+      <FILE id="MpOscC" name="GpuOscilloscope.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/GpuOscilloscope.cpp"/>
+      <FILE id="MpOscH" name="GpuOscilloscope.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/GpuOscilloscope.h"/>
+      <FILE id="MpSysC" name="SystemLoopback.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/SystemLoopback.cpp"/>
+      <FILE id="MpSysH" name="SystemLoopback.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/SystemLoopback.h"/>
+      <FILE id="MpOptH" name="OptionsOverlay.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/OptionsOverlay.h"/>
+      <FILE id="MpLngC" name="Lang.cpp" compile="1" resource="0"
+            file="../Merlin By Mikshake/Source/Lang.cpp"/>
+      <FILE id="MpLngH" name="Lang.h" compile="0" resource="0"
+            file="../Merlin By Mikshake/Source/Lang.h"/>
+      <FILE id="CEh14v" name="sidekey_monogram.png" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/sidekey_monogram.png"/>
+      <FILE id="DUF9WC" name="sidekey_blackbird.png" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/sidekey_blackbird.png"/>
+      <FILE id="z0sYQk" name="merle.png" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/merle.png"/>
+      <FILE id="AwdF0n" name="Audiowide-Regular.ttf" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/Audiowide-Regular.ttf"/>
+      <FILE id="lLoAXi" name="mikshake_about.png" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/mikshake_about.png"/>
+      <FILE id="MbLngT" name="translations.tsv" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/translations.tsv"/>
+    </GROUP>
+  </MAINGROUP>
+  <MODULES>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_processors_headless" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+  </MODULES>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
+               JUCE_ASIO="0" JUCE_WASAPI="1" JUCE_DIRECTSOUND="0" JUCE_USE_FLAC="0"
+               JUCE_USE_OGGVORBIS="0" JUCE_PLUGINHOST_VST3="0" JUCE_PLUGINHOST_AU="0"
+               JUCE_PLUGINHOST_LADSPA="0" JUCE_PLUGINHOST_LV2="0"/>
+  <EXPORTFORMATS>
+    <VS2026 targetFolder="Builds/VisualStudio2026" bigIcon="z0sYQk" smallIcon="z0sYQk">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="Merlin Alpha" enablePluginBinaryCopyStep="0"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="Merlin Alpha" enablePluginBinaryCopyStep="0"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="D:/JUCE/modules"/>
+      </MODULEPATHS>
+    </VS2026>
+    <XCODE_MAC targetFolder="Builds/MacOSX" bigIcon="z0sYQk" smallIcon="z0sYQk">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="Merlin Alpha" macOSDeploymentTarget="11.0"
+                       osxArchitecture="64BitUniversal" enablePluginBinaryCopyStep="0"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="Merlin Alpha" macOSDeploymentTarget="11.0"
+                       osxArchitecture="64BitUniversal" enablePluginBinaryCopyStep="0"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+  </EXPORTFORMATS>
+</JUCERPROJECT>

@@ -1,0 +1,14 @@
+# Liste blanche : seuls les projets Merlin, l'installeur Mac et le workflow
+# sont publiés (pas les notes, les anciennes sources ni les previews)
+/*
+!/.gitignore
+!/.github/
+!/Merlin By Mikshake/
+!/Merlin Alpha Plugin/
+!/packaging/
+
+# builds locaux
+**/Builds/VisualStudio*/
+**/Builds/MacOSX/build/
+*.user
+.DS_Store

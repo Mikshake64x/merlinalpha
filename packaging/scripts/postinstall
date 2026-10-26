@@ -1,0 +1,13 @@
+#!/bin/sh
+# Merlin Alpha : après installation, retire l'attribut de quarantaine de
+# l'appli et des plugins (sinon Gatekeeper les bloque, faute de notarisation),
+# puis relance le registre des Audio Units pour que les DAW voient le plugin.
+for p in "/Applications/Merlin Alpha.app" \
+         "/Library/Audio/Plug-Ins/Components/Merlin Alpha.component" \
+         "/Library/Audio/Plug-Ins/VST3/Merlin Alpha.vst3"; do
+    if [ -e "$p" ]; then
+        xattr -dr com.apple.quarantine "$p" 2>/dev/null
+    fi
+done
+killall -9 AudioComponentRegistrar 2>/dev/null
+exit 0

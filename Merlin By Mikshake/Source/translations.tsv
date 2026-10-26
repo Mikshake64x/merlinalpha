@@ -1,0 +1,229 @@
+# Merlin Alpha : traductions de l'interface (UTF-8 sans BOM, colonnes separees par des tabulations)
+# source	fr	en	de	it	es	pt	ru	ja	zh	ko   (cellule vide = texte source ; 
+ = retour a la ligne)
+Options			Optionen	Opzioni	Opciones	Opções	Параметры	オプション	选项	옵션
+Audio			Audio	Audio	Audio	Áudio	Аудио	オーディオ	音频	오디오
+Image		Graphics	Grafik	Grafica	Imagen	Imagem	Графика	画像	图像	그래픽
+Affichage		Display	Anzeige	Visualizzazione	Visualización	Exibição	Отображение	表示	显示	디스플레이
+Apparence		Appearance	Erscheinungsbild	Aspetto	Apariencia	Aparência	Оформление	外観	外观	모양
+Langue		Language	Sprache	Lingua	Idioma	Idioma	Язык	言語	语言	언어
+Presets		Presets	Presets	Preset	Presets	Presets	Пресеты	プリセット	预设	프리셋
+À propos		About	Info	Informazioni	Acerca de	Sobre	О программе	情報	关于	정보
+Source analysée		Analysed source	Analysierte Quelle	Sorgente analizzata	Fuente analizada	Fonte analisada	Анализируемый источник	解析ソース	分析源	분석 소스
+Automatique : la carte son si elle a une entrée Loopback, sinon ce qui joue sur le PC. La sortie Windows n'entend pas l'ASIO d'Ableton.		Automatic: the audio interface if it has a Loopback input, otherwise whatever plays on the PC. The Windows output can't hear Ableton's ASIO.	Automatisch: das Audio-Interface, wenn es einen Loopback-Eingang hat, sonst das, was auf dem PC läuft. Der Windows-Ausgang hört Abletons ASIO nicht.	Automatico: la scheda audio se ha un ingresso Loopback, altrimenti ciò che suona sul PC. L'uscita di Windows non sente l'ASIO di Ableton.	Automático: la interfaz de audio si tiene una entrada Loopback; si no, lo que suena en el PC. La salida de Windows no oye el ASIO de Ableton.	Automático: a interface de áudio se tiver uma entrada Loopback; senão, o que toca no PC. A saída do Windows não ouve o ASIO do Ableton.	Автоматически: звуковая карта, если у неё есть вход Loopback, иначе то, что звучит на ПК. Выход Windows не слышит ASIO Ableton.	自動：Loopback 入力があればオーディオインターフェース、なければ PC で再生中の音。Windows 出力では Ableton の ASIO は聞こえません。	自动：若声卡有 Loopback 输入则使用声卡，否则使用电脑正在播放的声音。Windows 输出听不到 Ableton 的 ASIO。	자동: 오디오 인터페이스에 Loopback 입력이 있으면 그것을, 없으면 PC에서 재생되는 소리를 사용합니다. Windows 출력으로는 Ableton의 ASIO를 들을 수 없습니다.
+Source		Source	Quelle	Sorgente	Fuente	Fonte	Источник	ソース	音源	소스
+Ce que Merlin mesure		What Merlin measures	Was Merlin misst	Cosa misura Merlin	Lo que mide Merlin	O que o Merlin mede	Что измеряет Merlin	Merlin が測定する信号	Merlin 测量的内容	Merlin이 측정하는 대상
+En cours		Current	Aktuell	In uso	Actual	Atual	Текущий	現在	当前	현재
+Volume de Windows		Windows volume	Windows-Lautstärke	Volume di Windows	Volumen de Windows	Volume do Windows	Громкость Windows	Windows の音量	Windows 音量	Windows 볼륨
+Le même réglage que le curseur de volume de la barre des tâches.		The same setting as the taskbar volume slider.	Dieselbe Einstellung wie der Lautstärkeregler der Taskleiste.	La stessa impostazione del cursore del volume nella barra delle applicazioni.	El mismo ajuste que el control de volumen de la barra de tareas.	A mesma configuração do controle de volume da barra de tarefas.	То же, что ползунок громкости на панели задач.	タスクバーの音量スライダーと同じ設定です。	与任务栏音量滑块是同一个设置。	작업 표시줄 볼륨 슬라이더와 같은 설정입니다.
+Volume		Volume	Lautstärke	Volume	Volumen	Volume	Громкость	音量	音量	볼륨
+Sortie Windows par défaut		Default Windows output	Standardausgabe von Windows	Uscita predefinita di Windows	Salida predeterminada de Windows	Saída padrão do Windows	Выход Windows по умолчанию	Windows の既定の出力	Windows 默认输出	Windows 기본 출력
+Automatique		Automatic	Automatisch	Automatico	Automático	Automático	Авто	自動	自动	자동
+Carte son		Audio interface	Audio-Interface	Scheda audio	Interfaz	Interface	Звуковая карта	オーディオIF	声卡	오디오 인터페이스
+Sortie Windows		Windows output	Windows-Ausgang	Uscita Windows	Salida Windows	Saída do Windows	Выход Windows	Windows 出力	Windows 输出	Windows 출력
+Réglages…		Settings…	Einstellungen…	Impostazioni…	Ajustes…	Ajustes…	Настройки…	設定…	设置…	설정…
+aucune entrée ouverte		no input open	kein Eingang geöffnet	nessun ingresso aperto	ninguna entrada abierta	nenhuma entrada aberta	вход не открыт	入力が開かれていません	未打开输入	열린 입력 없음
+Réglages audio — source analysée		Audio settings — analysed source	Audioeinstellungen — analysierte Quelle	Impostazioni audio — sorgente analizzata	Ajustes de audio — fuente analizada	Configurações de áudio — fonte analisada	Настройки звука — анализируемый источник	オーディオ設定 — 解析ソース	音频设置 — 分析源	오디오 설정 — 분석 소스
+Analyses		Analysis	Analysen	Analisi	Análisis	Análises	Анализ	解析	分析	분석
+Images par seconde		Frames per second	Bilder pro Sekunde	Fotogrammi al secondo	Fotogramas por segundo	Quadros por segundo	Кадров в секунду	フレームレート	每秒帧数	초당 프레임
+30 = CPU léger		30 = light CPU load	30 = geringe CPU-Last	30 = CPU leggera	30 = CPU ligera	30 = CPU leve	30 = низкая нагрузка CPU	30 = CPU 負荷が軽い	30 = 低 CPU 占用	30 = CPU 절약
+Modules GPU		GPU modules	GPU-Module	Moduli GPU	Módulos GPU	Módulos GPU	GPU-модули	GPU モジュール	GPU 模块	GPU 모듈
+L'anticrénelage lisse les contours et l'intérieur des reliefs ; plus il est élevé, plus la carte graphique travaille.		Anti-aliasing smooths the edges and the inside of the reliefs; the higher it is, the harder the graphics card works.	Die Kantenglättung glättet Ränder und das Innere der Reliefs; je höher, desto mehr arbeitet die Grafikkarte.	L'antialiasing smussa i bordi e l'interno dei rilievi; più è alto, più lavora la scheda grafica.	El antialiasing suaviza los bordes y el interior de los relieves; cuanto más alto, más trabaja la tarjeta gráfica.	O anti-aliasing suaviza as bordas e o interior dos relevos; quanto mais alto, mais a placa de vídeo trabalha.	Сглаживание смягчает края и внутренние области рельефа; чем оно выше, тем больше нагрузка на видеокарту.	アンチエイリアスは輪郭とレリーフの内部を滑らかにします。高いほどグラフィックカードの負荷が増えます。	抗锯齿可平滑轮廓和起伏内部；数值越高，显卡负担越重。	안티앨리어싱은 윤곽과 입체 내부를 부드럽게 합니다. 높을수록 그래픽 카드 부하가 커집니다.
+Anticrénelage		Anti-aliasing	Kantenglättung	Antialiasing	Antialiasing	Anti-aliasing	Сглаживание	アンチエイリアス	抗锯齿	안티앨리어싱
+Spectrogrammes et modules OpenGL		Spectrograms and OpenGL modules	Spektrogramme und OpenGL-Module	Spettrogrammi e moduli OpenGL	Espectrogramas y módulos OpenGL	Espectrogramas e módulos OpenGL	Спектрограммы и модули OpenGL	スペクトログラムと OpenGL モジュール	频谱图和 OpenGL 模块	스펙트로그램 및 OpenGL 모듈
+Synchro verticale		Vertical sync	Vertikale Synchronisation	Sincronia verticale	Sincronización vertical	Sincronização vertical	Вертикальная синхронизация	垂直同期	垂直同步	수직 동기화
+Images calées sur l'écran (V-Sync)		Frames locked to the display (V-Sync)	Bilder an den Bildschirm gekoppelt (V-Sync)	Fotogrammi agganciati allo schermo (V-Sync)	Fotogramas sincronizados con la pantalla (V-Sync)	Quadros sincronizados com a tela (V-Sync)	Кадры синхронизированы с экраном (V-Sync)	画面に同期したフレーム (V-Sync)	帧与屏幕同步 (V-Sync)	화면에 맞춘 프레임 (V-Sync)
+Carte graphique		Graphics card	Grafikkarte	Scheda grafica	Tarjeta gráfica	Placa de vídeo	Видеокарта	グラフィックカード	显卡	그래픽 카드
+Détectée à l'ouverture d'un module GPU		Detected when a GPU module opens	Wird erkannt, sobald ein GPU-Modul öffnet	Rilevata all'apertura di un modulo GPU	Se detecta al abrir un módulo GPU	Detectada ao abrir um módulo GPU	Определяется при открытии GPU-модуля	GPU モジュールを開くと検出されます	打开 GPU 模块时检测	GPU 모듈을 열 때 감지됩니다
+Off		Off	Aus	Off	No	Desl.	Выкл	オフ	关	끔
+Fenêtre		Window	Fenster	Finestra	Ventana	Janela	Окно	ウィンドウ	窗口	창
+Plein écran		Full screen	Vollbild	Schermo intero	Pantalla completa	Tela cheia	Полный экран	フルスクリーン	全屏	전체 화면
+F11, Échap pour sortir		F11, Esc to exit	F11, Esc zum Beenden	F11, Esc per uscire	F11, Esc para salir	F11, Esc para sair	F11, Esc для выхода	F11、Esc で終了	F11，Esc 退出	F11, Esc로 종료
+Toujours au premier plan		Always on top	Immer im Vordergrund	Sempre in primo piano	Siempre visible	Sempre visível	Поверх всех окон	常に手前に表示	始终置顶	항상 위에 표시
+Interface		Interface	Oberfläche	Interfaccia	Interfaz	Interface	Интерфейс	インターフェース	界面	인터페이스
+Thème sombre		Dark theme	Dunkles Design	Tema scuro	Tema oscuro	Tema escuro	Тёмная тема	ダークテーマ	深色主题	다크 테마
+Contraste renforcé		High contrast	Hoher Kontrast	Contrasto elevato	Alto contraste	Alto contraste	Высокий контраст	ハイコントラスト	高对比度	고대비
+Modules 3D		3D modules	3D-Module	Moduli 3D	Módulos 3D	Módulos 3D	3D-модули	3D モジュール	3D 模块	3D 모듈
+Spectrum en blocs 3D		Spectrum as 3D blocks	Spektrum als 3D-Blöcke	Spettro a blocchi 3D	Espectro en bloques 3D	Espectro em blocos 3D	Спектр в виде 3D-блоков	スペクトラムを 3D ブロックで表示	频谱以 3D 方块显示	스펙트럼을 3D 블록으로
+Gros texte		Large text	Große Schrift	Testo grande	Texto grande	Texto grande	Крупный текст	大きな文字	大字体	큰 텍스트
+Lecture à distance		Readable from a distance	Aus der Ferne lesbar	Leggibile a distanza	Legible a distancia	Legível à distância	Читается издалека	離れていても読みやすい	远距离可读	멀리서도 읽기 쉽게
+Section master		Master section	Master-Sektion	Sezione master	Sección master	Seção master	Мастер-секция	マスターセクション	主控区	마스터 섹션
+Style du VU master (aussi sous la colonne)		Master meter style (also below the column)	Stil der Master-Anzeige (auch unter der Spalte)	Stile del meter master (anche sotto la colonna)	Estilo del medidor master (también bajo la columna)	Estilo do medidor master (também sob a coluna)	Стиль мастер-индикатора (также под столбцом)	マスターメーターのスタイル（列の下でも切替）	主控表样式（也可在列下方切换）	마스터 미터 스타일 (열 아래에서도 변경)
+Instrument		Instrument	Instrument	Strumento	Instrumento	Instrumento	Инструмент	インストゥルメント	仪器	인스트루먼트
+Console		Console	Konsole	Console	Consola	Console	Консоль	コンソール	控制台	콘솔
+Modules		Modules	Module	Moduli	Módulos	Módulos	Модули	モジュール	模块	모듈
+Oscilloscope		Oscilloscope	Oszilloskop	Oscilloscopio	Osciloscopio	Osciloscópio	Осциллограф	オシロスコープ	示波器	오실로스코프
+Style de l'écran		Screen style	Bildschirmstil	Stile dello schermo	Estilo de pantalla	Estilo da tela	Стиль экрана	画面のスタイル	屏幕样式	화면 스타일
+Cadence de l'oscilloscope		Oscilloscope frame rate	Bildrate des Oszilloskops	Frequenza dell'oscilloscopio	Frecuencia del osciloscopio	Taxa do osciloscópio	Частота кадров осциллографа	オシロスコープのフレームレート	示波器帧率	오실로스코프 프레임 속도
+Images par seconde : moins vite = plus lisible		Frames per second: slower = easier to read	Bilder pro Sekunde: langsamer = besser lesbar	Fotogrammi al secondo: più lento = più leggibile	Fotogramas por segundo: más lento = más legible	Quadros por segundo: mais lento = mais legível	Кадров в секунду: медленнее = читаемее	フレーム数：遅いほど見やすい	每秒帧数：越慢越易读	초당 프레임: 느릴수록 읽기 쉬움
+Rémanence		Persistence	Nachleuchten	Persistenza	Persistencia	Persistência	Послесвечение	残光	余辉	잔상
+Les dernières images s'estompent, comme un écran à phosphore		The last frames fade out, like a phosphor screen	Die letzten Bilder verblassen wie auf einem Phosphorschirm	Gli ultimi fotogrammi sfumano, come uno schermo a fosfori	Los últimos fotogramas se desvanecen, como una pantalla de fósforo	Os últimos quadros esmaecem, como uma tela de fósforo	Последние кадры угасают, как на люминофорном экране	直前のフレームが蛍光スクリーンのように消えていきます	最近几帧逐渐淡出，如荧光屏一般	직전 프레임이 형광 화면처럼 서서히 사라집니다
+Tube		Tube	Röhre	Tubo	Tubo	Tubo	Трубка	ブラウン管	示波管	브라운관
+Numérique		Digital	Digital	Digitale	Digital	Digital	Цифровой	デジタル	数字	디지털
+Vintage		Vintage	Vintage	Vintage	Vintage	Vintage	Винтаж	ヴィンテージ	复古	빈티지
+Deux voies		Dual trace	Zweikanal	Doppia traccia	Doble trazo	Dois canais	Два канала	2チャンネル	双通道	2채널
+Template		Template	Vorlage	Modello	Plantilla	Modelo	Шаблон	テンプレート	模板	템플릿
+Décor autour des écrans		Decor around the screens	Dekor rund um die Bildschirme	Decoro attorno agli schermi	Decorado alrededor de las pantallas	Decoração ao redor das telas	Оформление вокруг экранов	画面まわりの装飾	屏幕周围的装饰	화면 주변 장식
+Galerie des templates		Template gallery	Vorlagengalerie	Galleria dei modelli	Galería de plantillas	Galeria de modelos	Галерея шаблонов	テンプレートギャラリー	模板库	템플릿 갤러리
+Aperçu animé au survol		Animated preview on hover	Animierte Vorschau beim Überfahren	Anteprima animata al passaggio	Vista previa animada al pasar el cursor	Prévia animada ao passar o mouse	Анимированный предпросмотр при наведении	ホバーでアニメーションプレビュー	悬停时显示动画预览	마우스를 올리면 애니메이션 미리보기
+Couleurs		Colours	Farben	Colori	Colores	Cores	Цвета	カラー	颜色	색상
+Les écrans des modules gardent leur fond sombre, en thème clair comme en sombre.		Module screens keep their dark background, in the light and dark themes alike.	Die Modulbildschirme behalten ihren dunklen Hintergrund, im hellen wie im dunklen Design.	Gli schermi dei moduli mantengono lo sfondo scuro, sia con il tema chiaro che con quello scuro.	Las pantallas de los módulos mantienen su fondo oscuro, tanto en el tema claro como en el oscuro.	As telas dos módulos mantêm o fundo escuro, tanto no tema claro quanto no escuro.	Экраны модулей остаются тёмными как в светлой, так и в тёмной теме.	モジュールの画面は、ライト・ダークどちらのテーマでも暗い背景のままです。	无论浅色还是深色主题，模块屏幕都保持深色背景。	모듈 화면은 라이트·다크 테마 모두에서 어두운 배경을 유지합니다.
+Couleur d'accent		Accent colour	Akzentfarbe	Colore d'accento	Color de acento	Cor de destaque	Цвет акцента	アクセントカラー	强调色	강조 색상
+Palettes prêtes à l'emploi		Ready-made palettes	Fertige Paletten	Tavolozze pronte	Paletas listas para usar	Paletas prontas	Готовые палитры	既製のパレット	现成调色板	기본 제공 팔레트
+Accent		Accent	Akzent	Accento	Acento	Destaque	Акцент	アクセント	强调色	강조
+Grille		Grid	Raster	Griglia	Cuadrícula	Grade	Сетка	グリッド	网格	그리드
+Fond des écrans		Screen background	Bildschirmhintergrund	Sfondo degli schermi	Fondo de las pantallas	Fundo das telas	Фон экранов	画面の背景	屏幕背景	화면 배경
+Texte		Text	Text	Testo	Texto	Texto	Текст	テキスト	文本	텍스트
+Canal Side		Side channel	Side-Kanal	Canale Side	Canal Side	Canal Side	Канал Side	Side チャンネル	Side 通道	Side 채널
+Spectrogramme : creux		Spectrogram: valleys	Spektrogramm: Täler	Spettrogramma: valli	Espectrograma: valles	Espectrograma: vales	Спектрограмма: впадины	スペクトログラム：谷	频谱图：低谷	스펙트로그램: 골
+Spectrogramme : milieu		Spectrogram: middle	Spektrogramm: Mitte	Spettrogramma: medio	Espectrograma: medio	Espectrograma: meio	Спектрограмма: середина	スペクトログラム：中間	频谱图：中间	스펙트로그램: 중간
+Spectrogramme : crêtes		Spectrogram: peaks	Spektrogramm: Spitzen	Spettrogramma: picchi	Espectrograma: picos	Espectrograma: picos	Спектрограмма: пики	スペクトログラム：ピーク	频谱图：峰值	스펙트로그램: 피크
+Couleurs d'origine		Original colours	Ursprüngliche Farben	Colori originali	Colores originales	Cores originais	Исходные цвета	元のカラー	原始颜色	기본 색상
+Ouvrir		Open	Öffnen	Apri	Abrir	Abrir	Открыть	開く	打开	열기
+Réinitialiser		Reset	Zurücksetzen	Ripristina	Restablecer	Redefinir	Сбросить	リセット	重置	초기화
+Langue de l'interface		Interface language	Sprache der Oberfläche	Lingua dell'interfaccia	Idioma de la interfaz	Idioma da interface	Язык интерфейса	表示言語	界面语言	인터페이스 언어
+Appliquée tout de suite. Les termes techniques (LUFS, True Peak, RMS, dB, Hz…) restent en anglais.		Applied instantly. Technical terms (LUFS, True Peak, RMS, dB, Hz…) stay in English.	Wird sofort übernommen. Fachbegriffe (LUFS, True Peak, RMS, dB, Hz…) bleiben auf Englisch.	Applicata subito. I termini tecnici (LUFS, True Peak, RMS, dB, Hz…) restano in inglese.	Se aplica al instante. Los términos técnicos (LUFS, True Peak, RMS, dB, Hz…) quedan en inglés.	Aplicado na hora. Os termos técnicos (LUFS, True Peak, RMS, dB, Hz…) ficam em inglês.	Применяется сразу. Технические термины (LUFS, True Peak, RMS, dB, Hz…) остаются на английском.	すぐに反映されます。技術用語（LUFS、True Peak、RMS、dB、Hz…）は英語のままです。	立即生效。技术术语（LUFS、True Peak、RMS、dB、Hz…）保留英文。	즉시 적용됩니다. 기술 용어(LUFS, True Peak, RMS, dB, Hz…)는 영어로 유지됩니다.
+Français		French	Französisch	Francese	Francés	Francês	Французский	フランス語	法语	프랑스어
+Anglais		English	Englisch	Inglese	Inglés	Inglês	Английский	英語	英语	영어
+Allemand		German	Deutsch	Tedesco	Alemán	Alemão	Немецкий	ドイツ語	德语	독일어
+Italien		Italian	Italienisch	Italiano	Italiano	Italiano	Итальянский	イタリア語	意大利语	이탈리아어
+Espagnol		Spanish	Spanisch	Spagnolo	Español	Espanhol	Испанский	スペイン語	西班牙语	스페인어
+Portugais (Brésil)		Portuguese (Brazil)	Portugiesisch (Brasilien)	Portoghese (Brasile)	Portugués (Brasil)	Português (Brasil)	Португальский (Бразилия)	ポルトガル語（ブラジル）	葡萄牙语（巴西）	포르투갈어(브라질)
+Russe		Russian	Russisch	Russo	Ruso	Russo	Русский	ロシア語	俄语	러시아어
+Japonais		Japanese	Japanisch	Giapponese	Japonés	Japonês	Японский	日本語	日语	일본어
+Chinois simplifié		Simplified Chinese	Vereinfachtes Chinesisch	Cinese semplificato	Chino simplificado	Chinês simplificado	Упрощённый китайский	簡体字中国語	简体中文	중국어 간체
+Coréen		Korean	Koreanisch	Coreano	Coreano	Coreano	Корейский	韓国語	韩语	한국어
+Un preset garde la disposition, les réglages des modules et l'apparence (pas la cadence ni les réglages GPU). Rappel par le menu PRESET.		A preset keeps the layout, the module settings and the appearance (not the frame rate or the GPU settings). Recall it from the PRESET menu.	Ein Preset speichert Layout, Moduleinstellungen und Erscheinungsbild (nicht die Bildrate und die GPU-Einstellungen). Abruf über das Menü PRESET.	Un preset conserva disposizione, impostazioni dei moduli e aspetto (non la frequenza né le impostazioni GPU). Si richiama dal menu PRESET.	Un preset guarda la disposición, los ajustes de los módulos y la apariencia (no la frecuencia ni los ajustes GPU). Se recupera desde el menú PRESET.	Um preset guarda o layout, os ajustes dos módulos e a aparência (não a taxa de quadros nem os ajustes de GPU). Carregue-o pelo menu PRESET.	Пресет хранит раскладку, настройки модулей и оформление (но не частоту кадров и настройки GPU). Вызов через меню ПРЕСЕТ.	プリセットにはレイアウト、モジュール設定、外観が保存されます（フレームレートと GPU 設定は除く）。プリセットメニューから呼び出せます。	预设保存布局、模块设置和外观（不含帧率和 GPU 设置）。可从“预设”菜单调用。	프리셋에는 배치, 모듈 설정, 모양이 저장됩니다(프레임 속도와 GPU 설정 제외). 프리셋 메뉴에서 불러옵니다.
+Enregistrer le preset		Save preset	Preset speichern	Salva preset	Guardar preset	Salvar preset	Сохранить пресет	プリセットを保存	保存预设	프리셋 저장
+Dossier des presets		Presets folder	Preset-Ordner	Cartella dei preset	Carpeta de presets	Pasta de presets	Папка пресетов	プリセットフォルダー	预设文件夹	프리셋 폴더
+Copier, renommer ou partager des presets		Copy, rename or share presets	Presets kopieren, umbenennen oder teilen	Copia, rinomina o condividi i preset	Copiar, renombrar o compartir presets	Copiar, renomear ou compartilhar presets	Копировать, переименовать или передать пресеты	プリセットのコピー・名前変更・共有	复制、重命名或分享预设	프리셋 복사, 이름 변경, 공유
+Disposition		Layout	Layout	Disposizione	Disposición	Layout	Раскладка	レイアウト	布局	배치
+Disposition des slots		Slot layout	Slot-Layout	Disposizione degli slot	Disposición de los slots	Layout dos slots	Раскладка слотов	スロットの配置	插槽布局	슬롯 배치
+Revenir à la disposition d'origine		Back to the original layout	Zurück zum ursprünglichen Layout	Torna alla disposizione originale	Volver a la disposición original	Voltar ao layout original	Вернуть исходную раскладку	元の配置に戻す	恢复原始布局	원래 배치로 되돌리기
+Preset en cours : {0}		Current preset: {0}	Aktuelles Preset: {0}	Preset attuale: {0}	Preset actual: {0}	Preset atual: {0}	Текущий пресет: {0}	現在のプリセット：{0}	当前预设：{0}	현재 프리셋: {0}
+Disposition, réglages des modules et apparence		Layout, module settings and appearance	Layout, Moduleinstellungen und Erscheinungsbild	Disposizione, impostazioni dei moduli e aspetto	Disposición, ajustes de módulos y apariencia	Layout, ajustes dos módulos e aparência	Раскладка, настройки модулей и оформление	レイアウト・モジュール設定・外観	布局、模块设置和外观	배치, 모듈 설정 및 모양
+Enregistrer…		Save…	Speichern…	Salva…	Guardar…	Salvar…	Сохранить…	保存…	保存…	저장…
+Version		Version	Version	Versione	Versión	Versão	Версия	バージョン	版本	버전
+VECTORSCOPE			VEKTORSKOP	VETTORSCOPIO	VECTORSCOPIO	VETORSCÓPIO	ВЕКТОРСКОП	ベクトルスコープ	矢量示波器	벡터스코프
+MULTIBAND VECTORSCOPE			MULTIBAND-VEKTORSKOP	VETTORSCOPIO MULTIBANDA	VECTORSCOPIO MULTIBANDA	VETORSCÓPIO MULTIBANDA	МНОГОПОЛОСНЫЙ ВЕКТОРСКОП	マルチバンド・ベクトルスコープ	多频段矢量示波器	멀티밴드 벡터스코프
+LOW			TIEF	BASSI	GRAVES	GRAVES	НЧ	低域	低频	저역
+MID|band			MITTE	MEDI	MEDIOS	MÉDIOS	СЧ	中域	中频	중역
+HIGH			HOCH	ALTI	AGUDOS	AGUDOS	ВЧ	高域	高频	고역
+TIME			ZEIT	TEMPO	TIEMPO	TEMPO	ВРЕМЯ	時間	时间	시간
+SPECTROGRAM 3D - LINES			SPEKTROGRAMM 3D - LINIEN	SPETTROGRAMMA 3D - LINEE	ESPECTROGRAMA 3D - LÍNEAS	ESPECTROGRAMA 3D - LINHAS	СПЕКТРОГРАММА 3D - ЛИНИИ	スペクトログラム 3D - ライン	3D 频谱图 - 线条	스펙트로그램 3D - 라인
+SPECTROGRAM 3D - SURFACE			SPEKTROGRAMM 3D - FLÄCHE	SPETTROGRAMMA 3D - SUPERFICIE	ESPECTROGRAMA 3D - SUPERFICIE	ESPECTROGRAMA 3D - SUPERFÍCIE	СПЕКТРОГРАММА 3D - ПОВЕРХНОСТЬ	スペクトログラム 3D - サーフェス	3D 频谱图 - 曲面	스펙트로그램 3D - 서피스
+SPECTROGRAM GPU - TERRAIN			SPEKTROGRAMM GPU - TERRAIN	SPETTROGRAMMA GPU - TERRAIN	ESPECTROGRAMA GPU - TERRAIN	ESPECTROGRAMA GPU - TERRAIN	СПЕКТРОГРАММА GPU - TERRAIN	スペクトログラム GPU - TERRAIN	GPU 频谱图 - TERRAIN	스펙트로그램 GPU - TERRAIN
+SPECTROGRAM GPU - NEON			SPEKTROGRAMM GPU - NEON	SPETTROGRAMMA GPU - NEON	ESPECTROGRAMA GPU - NEON	ESPECTROGRAMA GPU - NEON	СПЕКТРОГРАММА GPU - NEON	スペクトログラム GPU - NEON	GPU 频谱图 - NEON	스펙트로그램 GPU - NEON
+SPECTROGRAM GPU - CRYSTAL			SPEKTROGRAMM GPU - CRYSTAL	SPETTROGRAMMA GPU - CRYSTAL	ESPECTROGRAMA GPU - CRYSTAL	ESPECTROGRAMA GPU - CRYSTAL	СПЕКТРОГРАММА GPU - CRYSTAL	スペクトログラム GPU - CRYSTAL	GPU 频谱图 - CRYSTAL	스펙트로그램 GPU - CRYSTAL
+DOT SPECTRUM - CHROMA			PUNKTSPEKTRUM - CHROMA	SPETTRO A PUNTI - CHROMA	ESPECTRO DE PUNTOS - CHROMA	ESPECTRO DE PONTOS - CHROMA	ТОЧЕЧНЫЙ СПЕКТР - CHROMA	ドットスペクトラム - CHROMA	点阵频谱 - CHROMA	도트 스펙트럼 - CHROMA
+DOT SPECTRUM - NEBULA			PUNKTSPEKTRUM - NEBULA	SPETTRO A PUNTI - NEBULA	ESPECTRO DE PUNTOS - NEBULA	ESPECTRO DE PONTOS - NEBULA	ТОЧЕЧНЫЙ СПЕКТР - NEBULA	ドットスペクトラム - NEBULA	点阵频谱 - NEBULA	도트 스펙트럼 - NEBULA
+PANORAMA - CHROMA			PANORAMA - CHROMA	PANORAMA - CHROMA	PANORAMA - CHROMA	PANORAMA - CHROMA	ПАНОРАМА - CHROMA	パノラマ - CHROMA	声像 - CHROMA	파노라마 - CHROMA
+VECTORSCOPE - PHOSPHOR			VEKTORSKOP - PHOSPHOR	VETTORSCOPIO - PHOSPHOR	VECTORSCOPIO - PHOSPHOR	VETORSCÓPIO - PHOSPHOR	ВЕКТОРСКОП - PHOSPHOR	ベクトルスコープ - PHOSPHOR	矢量示波器 - PHOSPHOR	벡터스코프 - PHOSPHOR
+VECTORSCOPE - DENSITY			VEKTORSKOP - DENSITY	VETTORSCOPIO - DENSITY	VECTORSCOPIO - DENSITY	VETORSCÓPIO - DENSITY	ВЕКТОРСКОП - DENSITY	ベクトルスコープ - DENSITY	矢量示波器 - DENSITY	벡터스코프 - DENSITY
+TRANSIENT			TRANSIENTEN	TRANSIENTI	TRANSITORIOS	TRANSIENTES	ТРАНЗИЕНТЫ	トランジェント	瞬态	트랜지언트
+LISTEN			ABHÖREN	ASCOLTO	ESCUCHA	ESCUTA	СЛУШАЮ	試聴中	监听	듣는 중
+click = listen			Klick = abhören	clic = ascolta	clic = escuchar	clique = ouvir	клик = слушать	クリックで試聴	点击 = 监听	클릭 = 듣기
+CREST FACTOR			CREST-FAKTOR	FATTORE DI CRESTA	FACTOR DE CRESTA	FATOR DE CRISTA	ПИК-ФАКТОР	クレストファクター	峰值因数	크레스트 팩터
+LOUDNESS			LAUTHEIT	LOUDNESS	SONORIDAD	LOUDNESS	ГРОМКОСТЬ	ラウドネス	响度	라우드니스
+INTEGRATED			INTEGRIERT	INTEGRATO	INTEGRADO	INTEGRADO	ИНТЕГРАЛЬНАЯ	インテグレーテッド	综合	통합
+SHORT TERM			KURZZEIT	BREVE TERMINE	CORTO PLAZO	CURTO PRAZO	КРАТКОВРЕМЕННАЯ	ショートターム	短期	단기
+MOMENTARY			MOMENTAN	MOMENTANEO	MOMENTÁNEO	MOMENTÂNEO	МГНОВЕННАЯ	モーメンタリー	瞬时	순간
+LOUDNESS RANGE			LAUTHEITSBEREICH	GAMMA DI LOUDNESS	RANGO DE SONORIDAD	FAIXA DE LOUDNESS	ДИАПАЗОН ГРОМКОСТИ	ラウドネスレンジ	响度范围	라우드니스 범위
+SPECTRUM			SPEKTRUM	SPETTRO	ESPECTRO	ESPECTRO	СПЕКТР	スペクトラム	频谱	스펙트럼
+VU METER			VU-METER	VU METER	VÚMETRO	VU METER	VU-МЕТР	VU メーター	VU 表	VU 미터
+dBFS METER			dBFS-METER	dBFS METER	MEDIDOR dBFS	MEDIDOR dBFS	dBFS-МЕТР	dBFS メーター	dBFS 表	dBFS 미터
+MULTIBAND CORRELATOR			MULTIBAND-KORRELATOR	CORRELATORE MULTIBANDA	CORRELADOR MULTIBANDA	CORRELACIONADOR MULTIBANDA	МНОГОПОЛОСНЫЙ КОРРЕЛЯТОР	マルチバンド・コリレーター	多频段相关表	멀티밴드 코릴레이터
+PANORAMA			PANORAMA	PANORAMA	PANORAMA	PANORAMA	ПАНОРАМА	パノラマ	声像	파노라마
+PANORAMA LED			PANORAMA LED	PANORAMA LED	PANORAMA LED	PANORAMA LED	ПАНОРАМА LED	パノラマ LED	声像 LED	파노라마 LED
+SPECTRAL DENSITY (PSD)			SPEKTRALDICHTE (PSD)	DENSITÀ SPETTRALE (PSD)	DENSIDAD ESPECTRAL (PSD)	DENSIDADE ESPECTRAL (PSD)	СПЕКТРАЛЬНАЯ ПЛОТНОСТЬ (PSD)	スペクトル密度 (PSD)	功率谱密度 (PSD)	스펙트럼 밀도 (PSD)
+OSCILLOSCOPE			OSZILLOSKOP	OSCILLOSCOPIO	OSCILOSCOPIO	OSCILOSCÓPIO	ОСЦИЛЛОГРАФ	オシロスコープ	示波器	오실로스코프
+LINE			LINIE	LINEA	LÍNEA	LINHA	ЛИНИЯ	ライン	线条	라인
+OpenGL 3.2 indisponible sur cette carte graphique		OpenGL 3.2 is not available on this graphics card	OpenGL 3.2 ist auf dieser Grafikkarte nicht verfügbar	OpenGL 3.2 non disponibile su questa scheda grafica	OpenGL 3.2 no está disponible en esta tarjeta gráfica	OpenGL 3.2 não está disponível nesta placa de vídeo	OpenGL 3.2 недоступен на этой видеокарте	このグラフィックカードでは OpenGL 3.2 を利用できません	此显卡不支持 OpenGL 3.2	이 그래픽 카드에서는 OpenGL 3.2를 사용할 수 없습니다
+PEAK HOLD			PEAK HOLD	PEAK HOLD	PEAK HOLD	PEAK HOLD	ПИК-ХОЛД	ピークホールド	峰值保持	피크 홀드
+RANGE			BEREICH	GAMMA	RANGO	FAIXA	ДИАПАЗОН	レンジ	范围	범위
+VIEW			ANSICHT	VISTA	VISTA	VISTA	ВИД	表示	视图	보기
+PC VOLUME			PC-LAUTSTÄRKE	VOLUME PC	VOLUMEN PC	VOLUME DO PC	ГРОМКОСТЬ ПК	PC 音量	电脑音量	PC 볼륨
+RESET			RESET	RESET	RESET	RESET	СБРОС	リセット	重置	리셋
+PRESET			PRESET	PRESET	PRESET	PRESET	ПРЕСЕТ	プリセット	预设	프리셋
+FACTORY			WERK	FABBRICA	FÁBRICA	FÁBRICA	ЗАВОДСКИЕ	ファクトリー	出厂	팩토리
+MIXING			MIXING	MIXAGGIO	MEZCLA	MIXAGEM	СВЕДЕНИЕ	ミキシング	混音	믹싱
+MASTERING			MASTERING	MASTERING	MASTERIZACIÓN	MASTERIZAÇÃO	МАСТЕРИНГ	マスタリング	母带处理	마스터링
+SOUND DESIGN			SOUNDDESIGN	SOUND DESIGN	DISEÑO SONORO	DESIGN DE SOM	САУНД-ДИЗАЙН	サウンドデザイン	声音设计	사운드 디자인
+MY PRESETS			MEINE PRESETS	I MIEI PRESET	MIS PRESETS	MEUS PRESETS	МОИ ПРЕСЕТЫ	マイプリセット	我的预设	내 프리셋
+Enregistrer le preset…		Save preset…	Preset speichern…	Salva preset…	Guardar preset…	Salvar preset…	Сохранить пресет…	プリセットを保存…	保存预设…	프리셋 저장…
+Supprimer « {0} »		Delete “{0}”	„{0}“ löschen	Elimina «{0}»	Eliminar «{0}»	Excluir “{0}”	Удалить «{0}»	「{0}」を削除	删除“{0}”	'{0}' 삭제
+Ouvrir le dossier des presets		Open the presets folder	Preset-Ordner öffnen	Apri la cartella dei preset	Abrir la carpeta de presets	Abrir a pasta de presets	Открыть папку пресетов	プリセットフォルダーを開く	打开预设文件夹	프리셋 폴더 열기
+ADVANCED AUDIO ANALYZER			ERWEITERTER AUDIO-ANALYZER	ANALIZZATORE AUDIO AVANZATO	ANALIZADOR DE AUDIO AVANZADO	ANALISADOR DE ÁUDIO AVANÇADO	ПРОДВИНУТЫЙ АУДИОАНАЛИЗАТОР	アドバンスト・オーディオ・アナライザー	高级音频分析仪	고급 오디오 분석기
+Dark / light theme			Dunkles / helles Design	Tema scuro / chiaro	Tema oscuro / claro	Tema escuro / claro	Тёмная / светлая тема	ダーク / ライトテーマ	深色 / 浅色主题	다크 / 라이트 테마
+High contrast			Hoher Kontrast	Contrasto elevato	Alto contraste	Alto contraste	Высокий контраст	ハイコントラスト	高对比度	고대비
+3D modules			3D-Module	Moduli 3D	Módulos 3D	Módulos 3D	3D-модули	3D モジュール	3D 模块	3D 모듈
+Large text			Große Schrift	Testo grande	Texto grande	Texto grande	Крупный текст	大きな文字	大字体	큰 텍스트
+Master meter: Instrument / Console			Master-Anzeige: Instrument / Konsole	Meter master: Strumento / Console	Medidor master: Instrumento / Consola	Medidor master: Instrumento / Console	Мастер-индикатор: Инструмент / Консоль	マスターメーター：インストゥルメント / コンソール	主控表：仪器 / 控制台	마스터 미터: 인스트루먼트 / 콘솔
+Full screen (F11)			Vollbild (F11)	Schermo intero (F11)	Pantalla completa (F11)	Tela cheia (F11)	Полный экран (F11)	フルスクリーン (F11)	全屏 (F11)	전체 화면 (F11)
+Clavier : Merlin (cliquer pour le rendre à Ableton)		Keyboard: Merlin (click to give it back to Ableton)	Tastatur: Merlin (klicken, um sie an Ableton zurückzugeben)	Tastiera: Merlin (clic per restituirla ad Ableton)	Teclado: Merlin (clic para devolverlo a Ableton)	Teclado: Merlin (clique para devolvê-lo ao Ableton)	Клавиатура: Merlin (щёлкните, чтобы вернуть её Ableton)	キーボード：Merlin（クリックで Ableton に戻す）	键盘：Merlin（点击交还给 Ableton）	키보드: Merlin (클릭하면 Ableton으로 돌려줌)
+Clavier : Ableton (cliquer pour le donner à Merlin)		Keyboard: Ableton (click to give it to Merlin)	Tastatur: Ableton (klicken, um sie Merlin zu geben)	Tastiera: Ableton (clic per darla a Merlin)	Teclado: Ableton (clic para dárselo a Merlin)	Teclado: Ableton (clique para passá-lo ao Merlin)	Клавиатура: Ableton (щёлкните, чтобы отдать её Merlin)	キーボード：Ableton（クリックで Merlin に渡す）	键盘：Ableton（点击交给 Merlin）	키보드: Ableton (클릭하면 Merlin에 넘김)
+Disposition des modules, leurs réglages et l'apparence.\nUn nom existant est remplacé.		Module layout, their settings and the appearance.\nAn existing name is replaced.	Modul-Layout, ihre Einstellungen und das Erscheinungsbild.\nEin vorhandener Name wird ersetzt.	Disposizione dei moduli, le loro impostazioni e l'aspetto.\nUn nome esistente viene sostituito.	Disposición de los módulos, sus ajustes y la apariencia.\nUn nombre existente se reemplaza.	Layout dos módulos, seus ajustes e a aparência.\nUm nome existente é substituído.	Раскладка модулей, их настройки и оформление.\nСуществующее имя будет заменено.	モジュールの配置、その設定と外観。\n同じ名前があれば置き換えられます。	模块布局、模块设置和外观。\n同名预设将被替换。	모듈 배치, 모듈 설정과 모양.\n같은 이름이 있으면 덮어씁니다.
+Mon preset		My preset	Mein Preset	Il mio preset	Mi preset	Meu preset	Мой пресет	マイプリセット	我的预设	내 프리셋
+Nom		Name	Name	Nome	Nombre	Nome	Имя	名前	名称	이름
+Enregistrer		Save	Speichern	Salva	Guardar	Salvar	Сохранить	保存	保存	저장
+Annuler		Cancel	Abbrechen	Annulla	Cancelar	Cancelar	Отмена	キャンセル	取消	취소
+Supprimer le preset		Delete preset	Preset löschen	Elimina preset	Eliminar preset	Excluir preset	Удалить пресет	プリセットを削除	删除预设	프리셋 삭제
+Supprimer « {0} » ?		Delete “{0}”?	„{0}“ löschen?	Eliminare «{0}»?	¿Eliminar «{0}»?	Excluir “{0}”?	Удалить «{0}»?	「{0}」を削除しますか？	删除“{0}”？	'{0}'을(를) 삭제할까요?
+Supprimer		Delete	Löschen	Elimina	Eliminar	Excluir	Удалить	削除	删除	삭제
+Spectre		Spectrum	Spektrum	Spettro	Espectro	Espectro	Спектр	スペクトラム	频谱	스펙트럼
+Spectrogramme		Spectrogram	Spektrogramm	Spettrogramma	Espectrograma	Espectrograma	Спектрограмма	スペクトログラム	频谱图	스펙트로그램
+Stéréo		Stereo	Stereo	Stereo	Estéreo	Estéreo	Стерео	ステレオ	立体声	스테레오
+Niveau & temps		Level & time	Pegel & Zeit	Livello e tempo	Nivel y tiempo	Nível e tempo	Уровень и время	レベルと時間	电平与时间	레벨 및 시간
+Spectrum			Spektrum	Spettro	Espectro	Espectro	Спектр	スペクトラム	频谱	스펙트럼
+Spectral Density			Spektraldichte	Densità spettrale	Densidad espectral	Densidade espectral	Спектральная плотность	スペクトル密度	功率谱密度	스펙트럼 밀도
+Dot Spectrum Chroma			Punktspektrum Chroma	Spettro a punti Chroma	Espectro de puntos Chroma	Espectro de pontos Chroma	Точечный спектр Chroma	ドットスペクトラム Chroma	点阵频谱 Chroma	도트 스펙트럼 Chroma
+Dot Spectrum Nebula			Punktspektrum Nebula	Spettro a punti Nebula	Espectro de puntos Nebula	Espectro de pontos Nebula	Точечный спектр Nebula	ドットスペクトラム Nebula	点阵频谱 Nebula	도트 스펙트럼 Nebula
+Spectrogram Lines			Spektrogramm Linien	Spettrogramma linee	Espectrograma líneas	Espectrograma linhas	Спектрограмма линии	スペクトログラム ライン	频谱图 线条	스펙트로그램 라인
+Spectrogram Surface			Spektrogramm Fläche	Spettrogramma superficie	Espectrograma superficie	Espectrograma superfície	Спектрограмма поверхность	スペクトログラム サーフェス	频谱图 曲面	스펙트로그램 서피스
+Spectrogram Terrain			Spektrogramm Terrain	Spettrogramma Terrain	Espectrograma Terrain	Espectrograma Terrain	Спектрограмма Terrain	スペクトログラム Terrain	频谱图 Terrain	스펙트로그램 Terrain
+Spectrogram Neon			Spektrogramm Neon	Spettrogramma Neon	Espectrograma Neon	Espectrograma Neon	Спектрограмма Neon	スペクトログラム Neon	频谱图 Neon	스펙트로그램 Neon
+Spectrogram Crystal			Spektrogramm Crystal	Spettrogramma Crystal	Espectrograma Crystal	Espectrograma Crystal	Спектрограмма Crystal	スペクトログラム Crystal	频谱图 Crystal	스펙트로그램 Crystal
+Vectorscope			Vektorskop	Vettorscopio	Vectorscopio	Vetorscópio	Векторскоп	ベクトルスコープ	矢量示波器	벡터스코프
+Vectorscope Phosphor			Vektorskop Phosphor	Vettorscopio Phosphor	Vectorscopio Phosphor	Vetorscópio Phosphor	Векторскоп Phosphor	ベクトルスコープ Phosphor	矢量示波器 Phosphor	벡터스코프 Phosphor
+Vectorscope Density			Vektorskop Density	Vettorscopio Density	Vectorscopio Density	Vetorscópio Density	Векторскоп Density	ベクトルスコープ Density	矢量示波器 Density	벡터스코프 Density
+Multiband Vectorscope			Multiband-Vektorskop	Vettorscopio multibanda	Vectorscopio multibanda	Vetorscópio multibanda	Многополосный векторскоп	マルチバンド・ベクトルスコープ	多频段矢量示波器	멀티밴드 벡터스코프
+Panorama			Panorama	Panorama	Panorama	Panorama	Панорама	パノラマ	声像	파노라마
+Panorama LED			Panorama LED	Panorama LED	Panorama LED	Panorama LED	Панорама LED	パノラマ LED	声像 LED	파노라마 LED
+Dot Panorama Chroma			Punktpanorama Chroma	Panorama a punti Chroma	Panorama de puntos Chroma	Panorama de pontos Chroma	Точечная панорама Chroma	ドットパノラマ Chroma	点阵声像 Chroma	도트 파노라마 Chroma
+Multiband Correlator			Multiband-Korrelator	Correlatore multibanda	Correlador multibanda	Correlacionador multibanda	Многополосный коррелятор	マルチバンド・コリレーター	多频段相关表	멀티밴드 코릴레이터
+Needle VU Meter			Zeiger-VU-Meter	VU meter ad ago	Vúmetro de aguja	VU meter de ponteiro	Стрелочный VU-метр	針式 VU メーター	指针 VU 表	바늘 VU 미터
+Transient			Transienten	Transienti	Transitorios	Transientes	Транзиенты	トランジェント	瞬态	트랜지언트
+Vide		Empty	Leer	Vuoto	Vacío	Vazio	Пусто	空	空	비어 있음
+SLOT {0}			SLOT {0}	SLOT {0}	SLOT {0}	SLOT {0}	СЛОТ {0}	スロット {0}	插槽 {0}	슬롯 {0}
+Vider le slot		Clear slot	Slot leeren	Svuota lo slot	Vaciar el slot	Esvaziar o slot	Очистить слот	スロットを空にする	清空插槽	슬롯 비우기
+ACTIVE			AKTIV	ATTIVO	ACTIVO	ATIVO	АКТИВЕН	使用中	当前	사용 중
+TEMPLATES			VORLAGEN	MODELLI	PLANTILLAS	MODELOS	ШАБЛОНЫ	テンプレート	模板	템플릿
+Hover to preview, click to apply			Überfahren = Vorschau, Klick = anwenden	Passa sopra per l'anteprima, clic per applicare	Pasa el cursor para previsualizar, clic para aplicar	Passe o mouse para ver, clique para aplicar	Наведите для предпросмотра, щёлкните для применения	ホバーでプレビュー、クリックで適用	悬停预览，点击应用	마우스를 올리면 미리보기, 클릭하면 적용
+SETTINGS			EINSTELLUNGEN	IMPOSTAZIONI	AJUSTES	CONFIGURAÇÕES	НАСТРОЙКИ	設定	设置	설정
+ACCENT COLOUR			AKZENTFARBE	COLORE D'ACCENTO	COLOR DE ACENTO	COR DE DESTAQUE	ЦВЕТ АКЦЕНТА	アクセントカラー	强调色	강조 색상
+CUSTOM COLOURS			EIGENE FARBEN	COLORI PERSONALIZZATI	COLORES PERSONALIZADOS	CORES PERSONALIZADAS	СВОИ ЦВЕТА	カスタムカラー	自定义颜色	사용자 색상
+ACCENT			AKZENT	ACCENTO	ACENTO	DESTAQUE	АКЦЕНТ	アクセント	强调色	강조
+GRID			RASTER	GRIGLIA	CUADRÍCULA	GRADE	СЕТКА	グリッド	网格	그리드
+BACKGROUND			HINTERGRUND	SFONDO	FONDO	FUNDO	ФОН	背景	背景	배경
+TEXT			TEXT	TESTO	TEXTO	TEXTO	ТЕКСТ	テキスト	文本	텍스트
+SIDE CHANNEL			SIDE-KANAL	CANALE SIDE	CANAL SIDE	CANAL SIDE	КАНАЛ SIDE	SIDE チャンネル	SIDE 通道	SIDE 채널
+SPECTRO VALLEY			SPEKTRO TAL	SPETTRO VALLE	ESPECTRO VALLE	ESPECTRO VALE	СПЕКТРО ВПАДИНЫ	スペクトロ 谷	频谱图 低谷	스펙트로 골
+SPECTRO MID			SPEKTRO MITTE	SPETTRO MEDIO	ESPECTRO MEDIO	ESPECTRO MÉDIO	СПЕКТРО СЕРЕДИНА	スペクトロ 中間	频谱图 中间	스펙트로 중간
+SPECTRO PEAK			SPEKTRO SPITZE	SPETTRO PICCO	ESPECTRO PICO	ESPECTRO PICO	СПЕКТРО ПИКИ	スペクトロ ピーク	频谱图 峰值	스펙트로 피크
+RESET COLOURS			FARBEN ZURÜCKSETZEN	RIPRISTINA COLORI	RESTABLECER COLORES	REDEFINIR CORES	СБРОСИТЬ ЦВЕТА	色をリセット	重置颜色	색상 초기화
+PERFORMANCE			LEISTUNG	PRESTAZIONI	RENDIMIENTO	DESEMPENHO	ПРОИЗВОДИТЕЛЬНОСТЬ	パフォーマンス	性能	성능
+LIGHT CPU MODE (30 FPS)			CPU-SPARMODUS (30 FPS)	MODALITÀ CPU LEGGERA (30 FPS)	MODO CPU LIGERO (30 FPS)	MODO CPU LEVE (30 FPS)	ЩАДЯЩИЙ РЕЖИМ CPU (30 FPS)	軽量 CPU モード (30 FPS)	轻量 CPU 模式 (30 FPS)	저전력 CPU 모드 (30 FPS)
+Reduces analysis refresh rate to lighten CPU/GPU load			Senkt die Bildrate der Analysen, um CPU/GPU zu entlasten	Riduce la frequenza di aggiornamento per alleggerire CPU/GPU	Reduce la frecuencia de refresco para aligerar CPU/GPU	Reduz a taxa de atualização para aliviar CPU/GPU	Снижает частоту обновления, разгружая CPU/GPU	解析の更新頻度を下げて CPU/GPU の負荷を軽減	降低分析刷新率以减轻 CPU/GPU 负载	분석 갱신 빈도를 낮춰 CPU/GPU 부하를 줄입니다
+RESET SLOT LAYOUT			SLOT-LAYOUT ZURÜCKSETZEN	RIPRISTINA DISPOSIZIONE SLOT	RESTABLECER DISPOSICIÓN	REDEFINIR LAYOUT DOS SLOTS	СБРОСИТЬ РАСКЛАДКУ	スロット配置をリセット	重置插槽布局	슬롯 배치 초기화
+Click outside this panel to close			Zum Schließen außerhalb des Fensters klicken	Clicca fuori dal pannello per chiudere	Haz clic fuera del panel para cerrar	Clique fora do painel para fechar	Щёлкните вне панели, чтобы закрыть	パネルの外をクリックすると閉じます	点击面板外部即可关闭	패널 밖을 클릭하면 닫힙니다
+© 2026 Side Key System. All rights reserved.			© 2026 Side Key System. Alle Rechte vorbehalten.	© 2026 Side Key System. Tutti i diritti riservati.	© 2026 Side Key System. Todos los derechos reservados.	© 2026 Side Key System. Todos os direitos reservados.	© 2026 Side Key System. Все права защищены.	© 2026 Side Key System. 無断転載を禁じます。	© 2026 Side Key System. 保留所有权利。	© 2026 Side Key System. 모든 권리 보유.
+ABOUT MERLIN MTR 2			ÜBER MERLIN MTR 2	INFORMAZIONI SU MERLIN MTR 2	ACERCA DE MERLIN MTR 2	SOBRE O MERLIN MTR 2	О ПРОГРАММЕ MERLIN MTR 2	MERLIN MTR 2 について	关于 MERLIN MTR 2	MERLIN MTR 2 정보
+Every frequency, revealed.			Jede Frequenz, sichtbar gemacht.	Ogni frequenza, rivelata.	Cada frecuencia, al descubierto.	Cada frequência, revelada.	Каждая частота — как на ладони.	すべての周波数を、あらわに。	每一个频率，尽收眼底。	모든 주파수를 드러내다.
+Merlin MTR 2 is a six-slot, fully reconfigurable audio analyzer built for engineers who want every measurement they need, arranged exactly the way they work.			Merlin MTR 2 ist ein vollständig konfigurierbarer Audio-Analyzer mit sechs Slots – für Toningenieure, die jede benötigte Messung genau so angeordnet haben wollen, wie sie arbeiten.	Merlin MTR 2 è un analizzatore audio a sei slot completamente riconfigurabile, pensato per i tecnici che vogliono ogni misura di cui hanno bisogno, disposta esattamente come lavorano.	Merlin MTR 2 es un analizador de audio de seis slots totalmente reconfigurable, creado para ingenieros que quieren todas las mediciones que necesitan, organizadas tal como trabajan.	Merlin MTR 2 é um analisador de áudio de seis slots totalmente reconfigurável, feito para engenheiros que querem todas as medições de que precisam, organizadas do jeito que trabalham.	Merlin MTR 2 — полностью настраиваемый аудиоанализатор на шесть слотов для инженеров, которым нужны все необходимые измерения, расположенные именно так, как им удобно работать.	Merlin MTR 2 は 6 スロットで自由に構成できるオーディオアナライザーです。必要な測定を、自分の作業スタイルどおりに並べたいエンジニアのために作られました。	Merlin MTR 2 是一款六槽位、可完全重新配置的音频分析仪，专为希望按自己的工作方式排列所需全部测量的工程师打造。	Merlin MTR 2는 6개 슬롯을 자유롭게 구성할 수 있는 오디오 분석기로, 필요한 모든 측정을 작업 방식 그대로 배치하고 싶은 엔지니어를 위해 만들어졌습니다.
+Any module can be assigned to any slot with a right-click, and factory presets instantly reconfigure the whole layout for mixing, mastering or sound design. From spectrum and loudness to stereo field and transient content, Merlin MTR 2 keeps the full picture visible at a glance.			Jedes Modul lässt sich per Rechtsklick jedem Slot zuweisen, und Werkspresets stellen das ganze Layout sofort für Mixing, Mastering oder Sounddesign um. Von Spektrum und Lautheit bis zu Stereobild und Transienten zeigt Merlin MTR 2 das Gesamtbild auf einen Blick.	Ogni modulo può essere assegnato a qualsiasi slot con un clic destro, e i preset di fabbrica riconfigurano all'istante l'intera disposizione per mixaggio, mastering o sound design. Dallo spettro e dalla loudness al campo stereo e ai transienti, Merlin MTR 2 mostra il quadro completo a colpo d'occhio.	Cualquier módulo se puede asignar a cualquier slot con un clic derecho, y los presets de fábrica reconfiguran al instante toda la disposición para mezcla, masterización o diseño sonoro. Del espectro y la sonoridad al campo estéreo y los transitorios, Merlin MTR 2 muestra el panorama completo de un vistazo.	Qualquer módulo pode ser atribuído a qualquer slot com um clique direito, e os presets de fábrica reconfiguram na hora todo o layout para mixagem, masterização ou design de som. Do espectro e loudness ao campo estéreo e transientes, o Merlin MTR 2 mostra o quadro completo num relance.	Любой модуль назначается в любой слот правым щелчком, а заводские пресеты мгновенно перестраивают всю раскладку для сведения, мастеринга или саунд-дизайна. От спектра и громкости до стереобазы и транзиентов — Merlin MTR 2 показывает всю картину с первого взгляда.	右クリックで任意のモジュールを任意のスロットに割り当てられ、ファクトリープリセットでミキシング、マスタリング、サウンドデザイン向けにレイアウト全体を即座に切り替えられます。スペクトラムやラウドネスからステレオ音場、トランジェントまで、Merlin MTR 2 は全体像をひと目で示します。	右键即可将任意模块放入任意槽位，出厂预设可一键为混音、母带处理或声音设计重新配置整个布局。从频谱、响度到立体声场和瞬态，Merlin MTR 2 让全貌一目了然。	마우스 오른쪽 클릭으로 어떤 모듈이든 어떤 슬롯에나 배치할 수 있고, 팩토리 프리셋은 믹싱, 마스터링, 사운드 디자인에 맞게 전체 배치를 즉시 바꿉니다. 스펙트럼과 라우드니스부터 스테레오 이미지와 트랜지언트까지, Merlin MTR 2는 전체 그림을 한눈에 보여 줍니다.
+A complete analysis toolkit, built into a single streamlined window:			Ein komplettes Analyse-Werkzeug in einem einzigen, aufgeräumten Fenster:	Un kit di analisi completo, racchiuso in un'unica finestra essenziale:	Un conjunto completo de análisis, reunido en una sola ventana depurada:	Um kit completo de análise, reunido numa única janela enxuta:	Полный набор инструментов анализа в одном лаконичном окне:	完全な解析ツール一式を、ひとつのシンプルなウィンドウに:	完整的分析工具集，集成在一个简洁的窗口中：	완전한 분석 도구 모음을 하나의 간결한 창에 담았습니다:
+Real-Time Spectrum Analyzer • EBU R128 Loudness Metering • Vectorscope & Oscilloscope • Multiband Correlation • Stereo Panorama • Transient Detection • Power Spectral Density • Configurable Presets			Echtzeit-Spektrumanalyse • EBU-R128-Lautheitsmessung • Vektorskop & Oszilloskop • Multiband-Korrelation • Stereo-Panorama • Transientenerkennung • Spektrale Leistungsdichte • Konfigurierbare Presets	Analizzatore di spettro in tempo reale • Misura della loudness EBU R128 • Vettorscopio e oscilloscopio • Correlazione multibanda • Panorama stereo • Rilevamento dei transienti • Densità spettrale di potenza • Preset configurabili	Analizador de espectro en tiempo real • Medición de sonoridad EBU R128 • Vectorscopio y osciloscopio • Correlación multibanda • Panorama estéreo • Detección de transitorios • Densidad espectral de potencia • Presets configurables	Analisador de espectro em tempo real • Medição de loudness EBU R128 • Vetorscópio e osciloscópio • Correlação multibanda • Panorama estéreo • Detecção de transientes • Densidade espectral de potência • Presets configuráveis	Анализатор спектра в реальном времени • Измерение громкости EBU R128 • Векторскоп и осциллограф • Многополосная корреляция • Стереопанорама • Обнаружение транзиентов • Спектральная плотность мощности • Настраиваемые пресеты	リアルタイム・スペクトラムアナライザー • EBU R128 ラウドネス測定 • ベクトルスコープとオシロスコープ • マルチバンド相関 • ステレオパノラマ • トランジェント検出 • パワースペクトル密度 • カスタマイズ可能なプリセット	实时频谱分析 • EBU R128 响度测量 • 矢量示波器与示波器 • 多频段相关 • 立体声声像 • 瞬态检测 • 功率谱密度 • 可配置预设	실시간 스펙트럼 분석기 • EBU R128 라우드니스 측정 • 벡터스코프 및 오실로스코프 • 멀티밴드 상관 • 스테레오 파노라마 • 트랜지언트 감지 • 파워 스펙트럼 밀도 • 사용자 설정 프리셋
+The Side Key System Philosophy			Die Philosophie von Side Key System	La filosofia di Side Key System	La filosofía de Side Key System	A filosofia da Side Key System	Философия Side Key System	Side Key System の哲学	Side Key System 的理念	Side Key System의 철학
+At Side Key System, calibration is not a final adjustment. It is part of the engineering process itself.			Bei Side Key System ist Kalibrierung kein letzter Feinschliff. Sie ist Teil des Entwicklungsprozesses selbst.	In Side Key System la calibrazione non è una regolazione finale. È parte integrante del processo di progettazione.	En Side Key System, la calibración no es un ajuste final. Forma parte del propio proceso de ingeniería.	Na Side Key System, a calibração não é um ajuste final. Ela faz parte do próprio processo de engenharia.	В Side Key System калибровка — не финальная подстройка, а часть самого инженерного процесса.	Side Key System にとって、キャリブレーションは最後の調整ではありません。それは設計プロセスそのものの一部です。	在 Side Key System，校准不是最后的微调，而是工程流程本身的一部分。	Side Key System에서 캘리브레이션은 마지막 조정이 아닙니다. 그것은 엔지니어링 과정 그 자체의 일부입니다.
+Every tool is carefully designed, measured, tested and calibrated with meticulous attention to precision, stability and measurement consistency. Every reading is meant to be trusted, whether working on a single track or a full mastering session.			Jedes Werkzeug wird sorgfältig entworfen, vermessen, getestet und kalibriert – mit größter Sorgfalt bei Präzision, Stabilität und Messkonsistenz. Jedem Messwert soll man vertrauen können, ob bei einer einzelnen Spur oder einer kompletten Mastering-Session.	Ogni strumento è progettato, misurato, testato e calibrato con meticolosa attenzione a precisione, stabilità e coerenza delle misure. Ogni lettura è fatta per essere affidabile, che si lavori su una singola traccia o su un'intera sessione di mastering.	Cada herramienta se diseña, mide, prueba y calibra con meticulosa atención a la precisión, la estabilidad y la coherencia de la medición. Cada lectura está pensada para ser fiable, ya sea en una sola pista o en una sesión de masterización completa.	Cada ferramenta é cuidadosamente projetada, medida, testada e calibrada com atenção meticulosa à precisão, à estabilidade e à consistência das medições. Cada leitura foi feita para ser confiável, seja numa única faixa ou numa sessão de masterização completa.	Каждый инструмент тщательно спроектирован, измерен, протестирован и откалиброван с особым вниманием к точности, стабильности и согласованности измерений. Каждому показанию можно доверять — будь то одна дорожка или целая сессия мастеринга.	すべてのツールは、精度・安定性・測定の一貫性に細心の注意を払って設計、測定、テスト、キャリブレーションされています。1 トラックの作業でもマスタリングセッション全体でも、すべての数値を信頼できるように。	每一款工具都经过精心设计、测量、测试和校准，对精度、稳定性和测量一致性一丝不苟。无论处理单条音轨还是完整的母带工程，每个读数都值得信赖。	모든 도구는 정밀도, 안정성, 측정 일관성에 세심한 주의를 기울여 설계, 측정, 테스트, 캘리브레이션됩니다. 단일 트랙 작업이든 마스터링 세션 전체든, 모든 수치를 믿을 수 있도록.
+The objective is simple: give engineers instruments they can rely on, where every reading has a purpose and every decision serves the music.			Das Ziel ist einfach: Toningenieuren Instrumente zu geben, auf die sie sich verlassen können – bei denen jeder Messwert einen Zweck hat und jede Entscheidung der Musik dient.	L'obiettivo è semplice: dare ai tecnici strumenti su cui contare, dove ogni lettura ha uno scopo e ogni decisione è al servizio della musica.	El objetivo es simple: dar a los ingenieros instrumentos en los que puedan confiar, donde cada lectura tiene un propósito y cada decisión está al servicio de la música.	O objetivo é simples: dar aos engenheiros instrumentos em que possam confiar, onde cada leitura tem um propósito e cada decisão serve à música.	Цель проста: дать инженерам инструменты, на которые можно положиться, где у каждого показания есть смысл, а каждое решение служит музыке.	目的はシンプルです。すべての数値に意味があり、すべての判断が音楽のためになる——エンジニアが頼れる道具を届けること。	目标很简单：为工程师提供值得信赖的工具，让每个读数都有意义，每个决定都服务于音乐。	목표는 간단합니다. 모든 수치에 목적이 있고 모든 결정이 음악을 위한, 엔지니어가 믿고 쓸 수 있는 도구를 만드는 것입니다.
