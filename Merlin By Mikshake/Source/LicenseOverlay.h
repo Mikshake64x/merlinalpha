@@ -33,7 +33,7 @@ public:
         }
         keyEdit.setInputRestrictions (64);
 
-        for (auto* b : { &buyButton, &demoButton, &activateButton, &okButton })
+        for (auto* b : { &buyButton, &demoButton, &activateButton, &okButton, &deactivateButton })
         {
             addAndMakeVisible (*b);
             b->setMouseCursor (juce::MouseCursor::PointingHandCursor);
@@ -42,6 +42,14 @@ public:
         demoButton.onClick     = [this] { manager.startDemo(); };
         activateButton.onClick = [this] { activate(); };
         okButton.onClick       = [this] { dismiss(); };
+        // deux temps : le premier clic demande confirmation
+        deactivateButton.onClick = [this]
+        {
+            if (! confirmDeactivate) { confirmDeactivate = true; refresh(); return; }
+            confirmDeactivate = false;
+            showError = true;
+            manager.deactivate();
+        };
 
         manager.addChangeListener (this);
         refresh();
@@ -86,6 +94,13 @@ public:
         licensed = s == LicenseManager::Status::licensed;
         activateButton.setButtonText (s == LicenseManager::Status::activating ? TR ("Activation…") : TR ("Activer"));
         activateButton.setEnabled (s != LicenseManager::Status::activating);
+
+        if (! licensed) confirmDeactivate = false;
+        deactivateButton.setButtonText (manager.isDeactivating() ? TR ("Désactivation…")
+                                        : confirmDeactivate ? TR ("Confirmer la désactivation")
+                                                            : TR ("Désactiver sur cet ordinateur"));
+        deactivateButton.setEnabled (! manager.isDeactivating());
+        deactivateButton.setVisible (licensed);
 
         for (auto* e : { &keyEdit, &firstEdit, &lastEdit, &emailEdit })
             e->setVisible (! licensed);
@@ -190,6 +205,7 @@ public:
         place (activateButton, 96.0f);
         place (demoButton, 128.0f);
         buyButton.setBounds (buttons.withWidth (juce::jmin (buttons.getWidth(), 150.0f)).toNearestInt());
+        deactivateButton.setBounds (buttons.withWidth (juce::jmin (buttons.getWidth(), 220.0f)).toNearestInt());
     }
 
     bool keyPressed (const juce::KeyPress& k) override
@@ -232,7 +248,9 @@ private:
     OptionsUi::LookAndFeel laf;
     juce::TextEditor keyEdit, firstEdit, lastEdit, emailEdit;
     SheetButton buyButton { SheetButton::link }, demoButton { SheetButton::secondary },
-                activateButton { SheetButton::primary }, okButton { SheetButton::primary };
+                activateButton { SheetButton::primary }, okButton { SheetButton::primary },
+                deactivateButton { SheetButton::secondary };
+    bool confirmDeactivate = false;
     juce::Rectangle<float> sheet, brandArea, titleArea, textArea, groupArea, errorArea;
     bool licensed = false;
     bool showError = false;   // erreur affichée seulement après une tentative
@@ -280,7 +298,8 @@ private:
         using S = LicenseManager::Status;
         switch (manager.getStatus())
         {
-            case S::licensed:     return TR ("Merlin α est activé sur cet ordinateur et fonctionne hors ligne.");
+            case S::licensed:     return TR ("Merlin α est activé sur cet ordinateur et fonctionne hors ligne. "
+                                             "Pour le passer sur un autre ordinateur, désactivez-le ici.");
             case S::trialExpired: return TR ("Merci d'avoir essayé Merlin α. Entrez votre clé de licence pour continuer à l'utiliser.");
             case S::revoked:      return TR ("Cette licence a été révoquée. Contactez Side Key System ou entrez une autre clé.");
             case S::trial:        return TR ("Démo : {0} jours restants. Entrez votre clé de licence pour activer Merlin α.")
@@ -291,12 +310,18 @@ private:
 
     juce::String errorText() const
     {
-        if (! showError || manager.getStatus() != LicenseManager::Status::invalid)
+        const auto st = manager.getStatus();
+        if (! showError || ! (st == LicenseManager::Status::invalid || st == LicenseManager::Status::licensed))
             return {};
         const auto e = manager.getLastError();
+        if (e.isEmpty())
+            return {};
+        if (st == LicenseManager::Status::licensed && e == "network_error")   // désactivation hors ligne
+            return TR ("Connexion internet nécessaire pour désactiver Merlin α.");
         if (e == "invalid_license" || e == "wrong_product") return TR ("Cette clé n'est pas valide pour Merlin α.");
         if (e == "revoked")                                return TR ("Cette licence a été révoquée.");
-        if (e == "machine_limit_reached")                  return TR ("Cette licence est déjà activée sur 2 ordinateurs.");
+        if (e == "machine_limit_reached")                  return TR ("Cette licence est déjà activée sur {0} ordinateurs. Désactivez-la sur l'un d'eux.")
+                                                                      .replace ("{0}", juce::String (manager.getMaxMachines()));
         if (e == "network_error")                          return TR ("Impossible de joindre le serveur. Vérifiez votre connexion internet.");
         return TR ("Activation impossible pour le moment. Réessayez plus tard.");
     }

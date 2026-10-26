@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="MrlnBM" name="Merlin Alpha" projectType="guiapp" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="Side Key System"
-              companyEmail="https://sidekey.fr" version="1.63.2" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
+              companyEmail="https://sidekey.fr" version="1.64.0" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
               displaySplashScreen="0">
   <MAINGROUP id="MbmGrp" name="Merlin Alpha">
     <GROUP id="{6B1F2C7A-3D4E-4F50-9A61-7C8D9E0F1A2B}" name="Source">
@@ -18,6 +18,8 @@
       <FILE id="uDTzVW" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="z0sYQk" name="merle.png" compile="0" resource="1" file="Source/merle.png"/>
+      <FILE id="MaIcoB" name="merlin_alpha_icon_big.png" compile="0" resource="0" file="Source/merlin_alpha_icon_big.png"/>
+      <FILE id="MaIcoS" name="merlin_alpha_icon_small.png" compile="0" resource="0" file="Source/merlin_alpha_icon_small.png"/>
       <FILE id="AwdF0n" name="Audiowide-Regular.ttf" compile="0" resource="1"
             file="Source/Audiowide-Regular.ttf"/>
       <FILE id="lLoAXi" name="mikshake_about.png" compile="0" resource="1"
@@ -83,7 +85,7 @@
                JUCE_PLUGINHOST_VST3="0" JUCE_PLUGINHOST_AU="0" JUCE_PLUGINHOST_LADSPA="0"
                JUCE_PLUGINHOST_LV2="0"/>
   <EXPORTFORMATS>
-    <VS2026 targetFolder="Builds/VisualStudio2026" bigIcon="z0sYQk" smallIcon="z0sYQk">
+    <VS2026 targetFolder="Builds/VisualStudio2026" bigIcon="MaIcoB" smallIcon="MaIcoS">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="Merlin Alpha"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="Merlin Alpha"/>
@@ -106,8 +108,8 @@
         <MODULEPATH id="juce_gui_extra" path="D:/JUCE/modules"/>
       </MODULEPATHS>
     </VS2026>
-    <XCODE_MAC targetFolder="Builds/MacOSX" xcodeValidArchs="x86_64,arm64" bigIcon="z0sYQk"
-               smallIcon="z0sYQk" applicationCategory="public.app-category.music"
+    <XCODE_MAC targetFolder="Builds/MacOSX" xcodeValidArchs="x86_64,arm64" bigIcon="MaIcoB"
+               smallIcon="MaIcoS" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" microphonePermissionsText="Merlin analyse le signal de votre interface audio (entr&#233;e Loopback).">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="Merlin Alpha" macOSDeploymentTarget="11.0"/>

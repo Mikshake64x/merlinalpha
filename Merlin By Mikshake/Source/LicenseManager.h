@@ -94,11 +94,54 @@ public:
                     m->status = Status::invalid;
                     m->lastError = r.ok ? juce::String ("bad_certificate")
                                         : (r.networkError ? juce::String ("network_error") : r.error);
+                    if (m->lastError == "machine_limit_reached")
+                        m->maxMachines = (int) r.json.getProperty ("max", m->maxMachines);
                 }
                 m->notify();
             });
         });
     }
+
+    // « Désactiver sur cet ordinateur » : libère la place sur le DRM (en ligne)
+    // pour réactiver la licence ailleurs ; la licence locale est effacée.
+    void deactivate()
+    {
+        if (status.load() != Status::licensed || deactivating)
+            return;
+        deactivating = true;
+        notify();
+
+        juce::Thread::launch ([self = juce::WeakReference<LicenseManager> (this), key = storedKey, mid = machineId]
+        {
+            auto r = postJson ("/v1/deactivate", { { "license_key", key }, { "machine_id", mid } });
+
+            juce::MessageManager::callAsync ([self, r]
+            {
+                auto* m = self.get();
+                if (m == nullptr)
+                    return;
+                m->deactivating = false;
+                if (r.ok)
+                {
+                    m->storedKey = {};
+                    m->certificate = {};
+                    m->status = Status::unlicensed;
+                    m->lastError = {};
+                    if (m->trialStart != juce::Time())
+                        m->recomputeTrial();
+                    m->save();
+                }
+                else
+                {
+                    m->lastError = r.networkError ? juce::String ("network_error") : r.error;   // reste activée
+                }
+                m->notify();
+            });
+        });
+    }
+
+    bool isDeactivating() const { return deactivating; }
+    int getMaxMachines() const  { return maxMachines; }   // renvoyé par le serveur quand la limite est atteinte
 
     // « Essayer 15 jours » : une seule fois par machine
     void startDemo()
@@ -151,6 +194,8 @@ private:
     std::atomic<Status> status { Status::unlicensed };
     juce::Time trialStart;
     int bonusDays = 0;
+    int maxMachines = 5;
+    bool deactivating = false;
     double sessionStart = 0.0;
 
     // les éditeurs (appli, instances du plugin) écoutent en ChangeListener
