@@ -1267,8 +1267,14 @@ public:
     // de l'éditeur, repris une fois la nouvelle fenêtre peinte
     void beginWindowSwap() { ++windowSwaps; updateGpuSuspension(); }
     void endWindowSwap()   { if(windowSwaps>0) --windowSwaps; updateGpuSuspension(); }
-    void setKeyboardState(bool b)   { topBar.setKeyboardState(b); }
-    void setAlwaysOnTopState(bool b){ topBar.setAlwaysOnTopState(b); }
+    void setKeyboardState(bool b);   // bouton clavier : aussi appliqué aux modules détachés
+    void setAlwaysOnTopState(bool b)
+    {
+        topBar.setAlwaysOnTopState(b);
+        alwaysOnTopState=b;
+        for(auto& w : detached)   // les modules détachés suivent la fenêtre principale
+            if(w!=nullptr) w->setAlwaysOnTop(b);
+    }
     void mouseDown(const juce::MouseEvent&) override;
 
     // Fonctions de la fenêtre (Main.cpp) reprises par le menu Options
@@ -1411,6 +1417,8 @@ private:
     int  dragSlot { -1 };                 // titre de module cliqué : candidat au détachement
     juce::Point<int> dragStart, dragGrab; // départ (écran) / prise dans le module
     bool dragFollowing { false };         // fenêtre détachée qui suit la souris
+    bool alwaysOnTopState { false };      // « Toujours au premier plan » de l'appli, repris par les fenêtres détachées
+    bool keyboardState { false };         // clavier à Merlin (sinon un clic ne l'enlève pas à Ableton)
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
     bool isOwnMouseEvent(const juce::MouseEvent& e) const { return e.eventComponent==this || isParentOf(e.eventComponent); }

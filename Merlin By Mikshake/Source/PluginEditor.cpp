@@ -5706,6 +5706,9 @@ void LeakEditor::detachSlot(int s)
     w.setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab);
     comp->setVisible(true);
     w.addToDesktop();
+    w.setAlwaysOnTop(alwaysOnTopState);   // même règle que la fenêtre principale
+    if(auto* peer=w.getPeer())
+        WindowsDisplay::setNoActivate(peer->getNativeHandle(), !keyboardState);   // ne prend pas le clavier à Ableton
     w.setVisible(true);
     w.toFront(true);
 
@@ -5745,6 +5748,16 @@ void LeakEditor::reattachSlot(int s)
     juce::Timer::callAfterDelay(150, [sp=juce::Component::SafePointer<LeakEditor>(this)]{
         if(sp!=nullptr) sp->endWindowSwap();
     });
+}
+
+void LeakEditor::setKeyboardState(bool b)
+{
+    topBar.setKeyboardState(b);
+    keyboardState=b;
+    for(auto& w : detached)
+        if(w!=nullptr)
+            if(auto* peer=w->getPeer())
+                WindowsDisplay::setNoActivate(peer->getNativeHandle(), !b);
 }
 
 void LeakEditor::reattachAll()
