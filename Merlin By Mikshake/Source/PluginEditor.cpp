@@ -3314,9 +3314,34 @@ void TopBar::paint(juce::Graphics& g)
     }
 
     if(hasSubtitle){
-        g.setFont(Ui::iceland((juce::jlimit(7.f,9.5f,(float)H*0.16f))).withExtraKerningFactor(0.22f));
+        // sous-titre + petit écran LCD de la fréquence d'échantillonnage (affichage seul)
+        const auto sf=Ui::iceland((juce::jlimit(7.f,9.5f,(float)H*0.16f))).withExtraKerningFactor(0.22f);
+        const auto sub=TR("ADVANCED AUDIO ANALYZER");
+        const float subW=juce::GlyphArrangement::getStringWidth(sf, sub);
+        const float lineY=(float)H*0.68f, lineH=(float)H*0.28f;
+        const juce::Font lf(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), sf.getHeight()*1.05f, juce::Font::bold));
+        const juce::String srText=sampleRate>0.0 ? juce::String(sampleRate/1000.0, 1)+" kHz" : juce::String("-- kHz");
+        const float lcdW=juce::GlyphArrangement::getStringWidth(lf, srText)+12.f, lcdH=lf.getHeight()+4.f;
+        const float gap=10.f, x0=((float)W-(subW+gap+lcdW))*0.5f;
+        g.setFont(sf);
         g.setColour(Neu::textDim);
-        g.drawFittedText(TR("ADVANCED AUDIO ANALYZER"),0,(int)((float)H*0.68f),W,(int)((float)H*0.28f),juce::Justification::centred,1,0.7f);
+        g.drawText(sub, juce::Rectangle<float>(x0, lineY, subW+6.f, lineH), juce::Justification::centredLeft, false);
+
+        // écran creusé : fond noir, ombre interne en haut, liseré clair autour
+        const juce::Rectangle<float> lcd(x0+subW+gap, lineY+lineH*0.5f-lcdH*0.5f, lcdW, lcdH);
+        g.setColour(juce::Colour(0xff0b0e11));
+        g.fillRoundedRectangle(lcd, 4.f);
+        g.setColour(juce::Colours::black.withAlpha(0.6f));
+        g.drawLine(lcd.getX()+3.f, lcd.getY()+0.75f, lcd.getRight()-3.f, lcd.getY()+0.75f, 1.f);
+        g.setColour(Neu::shadowLight);
+        g.drawRoundedRectangle(lcd.expanded(0.5f), 4.5f, 0.8f);
+        // chiffres verts avec un léger halo
+        g.setFont(lf);
+        g.setColour(juce::Colour(0xff2fe0a8).withAlpha(0.22f));
+        for(float d : { -0.8f, 0.8f })
+            g.drawText(srText, lcd.translated(d, 0.f), juce::Justification::centred, false);
+        g.setColour(juce::Colour(0xff2fe0a8));
+        g.drawText(srText, lcd, juce::Justification::centred, false);
     }
 
     // Logo Side Key (monogramme) — coin haut-droit (clic → About)
@@ -5331,6 +5356,7 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
 LeakEditor::~LeakEditor()
 {
     stopTimer();
+    for(auto& w : detached) w.reset();   // fenêtres détachées fermées (les modules restent à l'éditeur)
     license->removeChangeListener(this);
     aboutOverlay.removeComponentListener(this);
     settingsOverlay.removeComponentListener(this);
@@ -5482,6 +5508,7 @@ void LeakEditor::loadUserPreset(const juce::String& name)
 // GPU et faisait planter l'appli)
 void LeakEditor::reloadFromProcessor()
 {
+    reattachAll();   // preset rappelé : disposition d'origine, modules dans l'éditeur
     // apparence
     Theme::applyCustom({audioProcessor.customAccentColor, audioProcessor.customGridColor,
                          audioProcessor.customBgColor, audioProcessor.customTextColor,
@@ -5566,6 +5593,8 @@ void LeakEditor::timerCallback()
     }
     vuMeter.update();
     loudnessPanel.update();
+    topBar.setSampleRate(audioProcessor.getCurrentSampleRate());   // LCD sous le titre
+    followDetachDrag();   // module qu'on est en train de détacher : la fenêtre suit la souris
     // le Spectrum caché ne calcule plus : seul son état visible compte
     topBar.setGlitch(vuMeter.isClipping() || (spectrum.isVisible() && spectrum.isGlobalClipping()));
 }
@@ -5611,14 +5640,25 @@ int LeakEditor::hitTestSlot(juce::Point<int> pt) const
 
 void LeakEditor::mouseDown(const juce::MouseEvent& e)
 {
+    if(!isOwnMouseEvent(e)) return;   // module détaché : sa fenêtre n'est plus dans l'éditeur
     const auto pt = e.getEventRelativeTo(this).getPosition();
     if(!e.mods.isRightButtonDown()){
         if(rcCollapseHandle.contains(pt)){
             startCollapseAnimation(!controlsCollapsed);
             return;
         }
-        // slot vide : le clic gauche ouvre aussi le menu des modules
         const int slot = hitTestSlot(pt);
+        // emplacement d'un module détaché : le clic le ramène
+        if(isDetached(slot)){ reattachSlot(slot); return; }
+        // titre d'un module (bande du haut) : candidat au détachement, si on tire
+        if(!AppMode::isPlugin && slot>=0 && slot!=5 && e.eventComponent!=this
+           && getComponentForModule(audioProcessor.slotModule[slot])!=nullptr
+           && pt.y < rcSlot[slot].getY()+juce::roundToInt(22.f*Ui::textScale)){
+            dragSlot=slot;
+            dragStart=e.getScreenPosition();
+            dragGrab=pt-rcSlot[slot].getPosition();
+        }
+        // slot vide : le clic gauche ouvre aussi le menu des modules
         if(slot >= 0 && slot != 5 && getComponentForModule(audioProcessor.slotModule[slot]) == nullptr)
             showModuleMenu(slot, e.getScreenPosition());
         return;
@@ -5626,6 +5666,121 @@ void LeakEditor::mouseDown(const juce::MouseEvent& e)
     const int slot = hitTestSlot(pt);
     // Slot F (VU master) fixe ; les autres, Loudness compris, se changent au clic droit
     if(slot >= 0 && slot != 5) showModuleMenu(slot, e.getScreenPosition());
+}
+
+//==============================================================================
+// Modules détachés (appli seulement)
+//==============================================================================
+namespace { juce::String slotModuleName(int id); }   // défini plus bas, avec le menu des modules
+
+void LeakEditor::mouseDrag(const juce::MouseEvent& e)
+{
+    if(dragSlot<0 || dragFollowing || !isOwnMouseEvent(e)) return;
+    if(e.getScreenPosition().getDistanceFrom(dragStart) < 14) return;
+    // hors de l'événement en cours : le module quitte l'éditeur pendant son propre clic
+    dragFollowing=true;
+    juce::MessageManager::callAsync([sp=juce::Component::SafePointer<LeakEditor>(this), s=dragSlot]{
+        if(sp!=nullptr) sp->detachSlot(s);
+    });
+}
+
+void LeakEditor::mouseUp(const juce::MouseEvent&)
+{
+    if(!dragFollowing) dragSlot=-1;
+}
+
+void LeakEditor::detachSlot(int s)
+{
+    auto* comp=getComponentForModule(audioProcessor.slotModule[s]);
+    if(comp==nullptr || isDetached(s) || s==5){ dragFollowing=false; dragSlot=-1; return; }
+
+    beginWindowSwap();   // contextes OpenGL lâchés pendant le transfert, comme pour le plein écran
+    removeChildComponent(comp);
+    const auto title=juce::String(juce::CharPointer_UTF8("Merlin \xce\xb1 \xc2\xb7 "))+slotModuleName(audioProcessor.slotModule[s]);
+    detached[(size_t)s]=std::make_unique<DetachedWindow>(title, *comp,
+        [sp=juce::Component::SafePointer<LeakEditor>(this), s]{
+            // fermeture : retour à l'emplacement (hors du rappel de la fenêtre qui va disparaître)
+            juce::MessageManager::callAsync([sp, s]{ if(sp!=nullptr) sp->reattachSlot(s); });
+        });
+    auto& w=*detached[(size_t)s];
+    w.setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab);
+    comp->setVisible(true);
+    w.addToDesktop();
+    w.setVisible(true);
+    w.toFront(true);
+
+    layoutDirty=true;   // l'écran laisse place au creux
+    updateLayout();
+    juce::Timer::callAfterDelay(150, [sp=juce::Component::SafePointer<LeakEditor>(this)]{
+        if(sp!=nullptr) sp->endWindowSwap();
+    });
+}
+
+// la fenêtre détachée suit la souris tant que le bouton reste enfoncé (timer de l'éditeur)
+void LeakEditor::followDetachDrag()
+{
+    if(!dragFollowing) return;
+    auto* w=isDetached(dragSlot) ? detached[(size_t)dragSlot].get() : nullptr;
+    if(!juce::ModifierKeys::getCurrentModifiersRealtime().isLeftButtonDown()){
+        dragFollowing=false;
+        dragSlot=-1;
+        return;
+    }
+    if(w!=nullptr)
+        w->setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab);
+}
+
+void LeakEditor::reattachSlot(int s)
+{
+    if(!isDetached(s)) return;
+    if(dragSlot==s){ dragFollowing=false; dragSlot=-1; }
+    beginWindowSwap();
+    detached[(size_t)s]->clearContentComponent();
+    detached[(size_t)s].reset();
+    if(auto* comp=getComponentForModule(audioProcessor.slotModule[s]))
+        addChildComponent(comp, getIndexOfChildComponent(&overlayLayer));   // sous le calque des bords et les panneaux
+    layoutDirty=true;
+    updateLayout();
+    repaint();
+    juce::Timer::callAfterDelay(150, [sp=juce::Component::SafePointer<LeakEditor>(this)]{
+        if(sp!=nullptr) sp->endWindowSwap();
+    });
+}
+
+void LeakEditor::reattachAll()
+{
+    for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
+        reattachSlot(s);
+}
+
+// emplacement d'un module détaché : creux de la plaque + rappel cliquable
+void LeakEditor::drawDetachedSlot(juce::Graphics& g, int s)
+{
+    const auto r=rcSlot[s].toFloat();
+    Neu::drawInset(g, r, kScreenRadius, 3.f);
+
+    const float sc=Ui::textScale;
+    const auto c=r.getCentre();
+    // pictogramme « fenêtre » (deux fenêtres + flèche vers l'extérieur), viewBox 24
+    static const juce::Path icon=[]{
+        juce::Path p=juce::Drawable::parseSVGPath("M8 7V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-3M14 10l5-5M15 5h4v4");
+        p.addRoundedRectangle(3.f, 7.f, 13.f, 12.f, 2.f);
+        return p;
+    }();
+    const float k=30.f*sc/24.f;
+    auto ic=icon;
+    ic.applyTransform(juce::AffineTransform::scale(k).translated(c.x-12.f*k, c.y-34.f*sc));
+    g.setColour(Neu::textDim);
+    g.strokePath(ic, juce::PathStrokeType(1.6f*k, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+    g.setColour(Neu::text);
+    g.setFont(Ui::iceland(13.f).withExtraKerningFactor(0.12f));
+    g.drawText(slotModuleName(audioProcessor.slotModule[s]).toUpperCase(),
+               juce::Rectangle<float>(r.getX(), c.y+2.f*sc, r.getWidth(), 18.f*sc), juce::Justification::centred, true);
+    g.setColour(Neu::textDim);
+    g.setFont(Ui::plain(11.f));
+    g.drawText(TR("dans une fenêtre · cliquer pour le ramener"),
+               juce::Rectangle<float>(r.getX()+8.f, c.y+22.f*sc, r.getWidth()-16.f, 16.f*sc), juce::Justification::centred, true);
 }
 
 //==============================================================================
@@ -6021,6 +6176,7 @@ static std::unique_ptr<juce::Drawable> makeModuleIcon(int moduleId)
 
 void LeakEditor::showModuleMenu(int slot, juce::Point<int> screenPos)
 {
+    reattachAll();   // un module ne change de place que s'il est dans l'éditeur
     // Design A "liste sectionnée" : en-tête (slot + module en place), modules
     // rangés par famille avec badges GPU / 3D, "Vider le slot" à part en bas.
     juce::PopupMenu m;
@@ -6165,6 +6321,7 @@ void LeakEditor::updateLayout()
         if(!used) c->setVisible(false);
     }
     for(int s : configurableSlots){
+        if(isDetached(s)) continue;   // le module vit dans sa propre fenêtre
         if(auto* comp=getComponentForModule(audioProcessor.slotModule[s])){
             comp->setBounds(rcSlot[s]);
             comp->setVisible(true);
@@ -6400,7 +6557,7 @@ void LeakEditor::rebuildChassisCaches(float pxScale, bool withDynamic)
 
     juce::Array<juce::Rectangle<float>> screens;   // écrans des modules
     for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
-        if(!rcSlot[s].isEmpty() && (withDynamic || !isDynamicSlot(s))) screens.add(rcSlot[s].toFloat());
+        if(!rcSlot[s].isEmpty() && !isDetached(s) && (withDynamic || !isDynamicSlot(s))) screens.add(rcSlot[s].toFloat());
 
     // ── 1) Châssis opaque : décor, plaque, cartes en saillie, creux ─────────
     chassisCache=juce::Image(juce::Image::RGB,pw,ph,false);
@@ -6434,8 +6591,10 @@ void LeakEditor::rebuildChassisCaches(float pxScale, bool withDynamic)
 
         // une carte en saillie par écran, l'écran étant posé dans un creux
         for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
-            if(!rcSlot[s].isEmpty() && (withDynamic || !isDynamicSlot(s)))
-                drawScreenCard(g, rcSlot[s].toFloat());
+            if(!rcSlot[s].isEmpty() && (withDynamic || !isDynamicSlot(s))){
+                if(isDetached(s)) drawDetachedSlot(g, s);   // module dans sa fenêtre : creux cliquable
+                else              drawScreenCard(g, rcSlot[s].toFloat());
+            }
 
         // slots configurables vides : un "+" en relief au centre (clic = menu des modules)
         for(int s : { 0, 1, 2, 3, 4 })
@@ -6523,7 +6682,7 @@ void LeakEditor::paintChassisOverlay(juce::Graphics& g)
     g.drawImage(overlayCache,getLocalBounds().toFloat());
     if(collapseAnimating)
         for(int s : { 4, 5 })
-            if(!rcSlot[s].isEmpty()) drawScreenCaps(g, rcSlot[s].toFloat());
+            if(!rcSlot[s].isEmpty() && !isDetached(s)) drawScreenCaps(g, rcSlot[s].toFloat());
 }
 
 // slot configurable vide : "+" en relief au centre
@@ -6577,7 +6736,10 @@ void LeakEditor::drawControlsCardAndHandle(juce::Graphics& g, float collapse, fl
 void LeakEditor::paintDynamicChassis(juce::Graphics& g)
 {
     for(int s : { 4, 5 })
-        if(!rcSlot[s].isEmpty()) drawScreenCard(g, rcSlot[s].toFloat());
+        if(!rcSlot[s].isEmpty()){
+            if(isDetached(s)) drawDetachedSlot(g, s);
+            else              drawScreenCard(g, rcSlot[s].toFloat());
+        }
     drawEmptySlotPlus(g, 4);
     drawControlsCardAndHandle(g, collapseAnim, handlePulse);
 }

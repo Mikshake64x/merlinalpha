@@ -1048,6 +1048,8 @@ public:
     }
     // pastille « DÉMO · X JOURS » à droite du logotype (vide = masquée)
     void setDemoBadge(const juce::String& t) { if(t!=demoText){ demoText=t; repaint(); } }
+    // fréquence d'échantillonnage affichée sous le titre (0 = pas d'audio)
+    void setSampleRate(double sr) { if(sr!=sampleRate){ sampleRate=sr; repaint(); } }
     std::function<void()>    onDemoClicked;
     std::function<void()>    onAboutClicked;
     std::function<void()>    onTitleClicked;
@@ -1096,6 +1098,7 @@ private:
     juce::Image   blackbirdImage;
     juce::Rectangle<float> logoBounds, blackbirdBounds, titleBounds, demoBounds;
     juce::String     demoText;
+    double           sampleRate { 0.0 };
     NeuLookAndFeel   laf;
     KebabButton      gearBtn;   // menu d'options (trois points, comme Sevenpack Alpha)
     FullScreenButton fullScreenBtn;
@@ -1377,6 +1380,40 @@ private:
     void changeListenerCallback(juce::ChangeBroadcaster*) override { updateLicenseUi(); }
     void updateLicenseUi();
     void openLicence();
+
+    // Modules détachés (appli) : titre tiré hors de l'emplacement → fenêtre à
+    // part qui suit la souris ; l'emplacement devient un creux cliquable qui le
+    // ramène. Pas mémorisé d'un lancement à l'autre.
+    struct DetachedWindow : public juce::DocumentWindow
+    {
+        // fenêtre native créée une seule fois, une fois taillée (sinon la barre de
+        // titre Windows recréait la fenêtre et sa partie droite n'était pas dessinée)
+        DetachedWindow(const juce::String& name, juce::Component& content, std::function<void()> close)
+            : juce::DocumentWindow(name, Col::bg, juce::DocumentWindow::minimiseButton | juce::DocumentWindow::closeButton, false),
+              onClose(std::move(close))
+        {
+            setUsingNativeTitleBar(true);
+            setContentNonOwned(&content, true);
+            setResizable(true, false);
+            setResizeLimits(220, 140, 6000, 4000);
+        }
+        ~DetachedWindow() override { clearContentComponent(); }   // le module appartient à l'éditeur
+        void closeButtonPressed() override { if(onClose) onClose(); }
+        std::function<void()> onClose;
+    };
+    std::array<std::unique_ptr<DetachedWindow>, LeakAudioProcessor::NUM_SLOTS> detached;
+    bool isDetached(int s) const { return s>=0 && s<LeakAudioProcessor::NUM_SLOTS && detached[(size_t)s]!=nullptr; }
+    void detachSlot(int s);
+    void reattachSlot(int s);
+    void reattachAll();
+    void followDetachDrag();
+    void drawDetachedSlot(juce::Graphics&, int s);
+    int  dragSlot { -1 };                 // titre de module cliqué : candidat au détachement
+    juce::Point<int> dragStart, dragGrab; // départ (écran) / prise dans le module
+    bool dragFollowing { false };         // fenêtre détachée qui suit la souris
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
+    bool isOwnMouseEvent(const juce::MouseEvent& e) const { return e.eventComponent==this || isParentOf(e.eventComponent); }
 
     void setupOptions();
     void openOptions();
