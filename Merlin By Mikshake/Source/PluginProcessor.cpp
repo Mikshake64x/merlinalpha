@@ -886,7 +886,7 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("oscStyle", oscStyle);
     xml.setAttribute("oscFps", oscFps);
     xml.setAttribute("oscPersist", oscPersist);
-    xml.setAttribute("oscLineWidth", oscLineWidth);
+    xml.setAttribute("oscLineW", oscLineWidth);
     xml.setAttribute("oscTraceMode", oscTraceMode);
     xml.setAttribute("vecReleaseAlpha", (double)vecReleaseAlpha);
     xml.setAttribute("mbVecReleaseAlpha", (double)mbVecReleaseAlpha);
@@ -1117,7 +1117,12 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             oscStyle    = juce::jlimit(0, 3, xml->getIntAttribute("oscStyle", 0));
             oscFps      = juce::jlimit(10, 144, xml->getIntAttribute("oscFps", 30));
             oscPersist  = xml->getBoolAttribute("oscPersist", true);
-            oscLineWidth= juce::jlimit(0, 3, xml->getIntAttribute("oscLineWidth", 1));
+            {   // curseur 0..100 (v1.69) ; avant : 4 niveaux 0..3 (v1.67-1.68)
+                static const int fromLevel[]={ 10, 20, 40, 65 };
+                oscLineWidth = xml->hasAttribute("oscLineW") ? juce::jlimit(0, 100, xml->getIntAttribute("oscLineW", 20))
+                             : xml->hasAttribute("oscLineWidth") ? fromLevel[juce::jlimit(0, 3, xml->getIntAttribute("oscLineWidth", 1))]
+                             : 20;
+            }
             oscTraceMode= juce::jlimit(0, 1, xml->getIntAttribute("oscTraceMode", 0));
             vecReleaseAlpha = (float)xml->getDoubleAttribute("vecReleaseAlpha", 0.72);
             mbVecReleaseAlpha = (float)xml->getDoubleAttribute("mbVecReleaseAlpha", 0.90);

@@ -1166,7 +1166,7 @@ public:
         bool dark = true, contrast = false, modules3D = false, largeText = false, masterConsole = false;
         int oscStyle = 0;                   // 0 tube, 1 numérique, 2 vintage, 3 deux voies
         int oscFps = 30;                    // 24, 30 ou 60
-        int oscLineWidth = 1;               // 0 fin … 3 très épais
+        int oscLineWidth = 20;              // curseur 0..100 (0 = le plus fin)
         int oscTraceMode = 0;               // 0 précis, 1 classique
         bool oscPersist = true;
         int uiTemplate = 0;
@@ -1260,7 +1260,8 @@ public:
         masterSeg.setSelected (s.masterConsole ? 1 : 0);
         oscStyleSeg.setSelected (juce::jlimit (0, 3, s.oscStyle));
         oscFpsSeg.setSelected (s.oscFps <= 24 ? 0 : s.oscFps <= 30 ? 1 : 2);
-        oscWidthSeg.setSelected (juce::jlimit (0, 3, s.oscLineWidth));
+        if (! oscWidthSlider.isMouseButtonDown (true))
+            oscWidthSlider.setValue (juce::jlimit (0, 100, s.oscLineWidth));
         oscTraceSeg.setSelected (juce::jlimit (0, 1, s.oscTraceMode));
         oscPersistSwitch.setOn (s.oscPersist);
 
@@ -1409,7 +1410,7 @@ public:
                                 onModules3DChanged, onLargeTextChanged, onMasterConsoleChanged;
     std::function<void (int)>   onOscStyleSelected;      // 0 tube, 1 numérique, 2 vintage, 3 deux voies
     std::function<void (int)>   onOscFpsSelected;        // 24, 30, 60
-    std::function<void (int)>   onOscLineWidthSelected;  // 0 fin … 3 très épais
+    std::function<void (int)>   onOscLineWidthChanged;   // curseur 0..100
     std::function<void (int)>   onOscTraceModeSelected;  // 0 précis, 1 classique
     std::function<void (bool)>  onOscPersistChanged;
     // Apparence
@@ -1541,13 +1542,13 @@ private:
                   &oscFpsSeg, oscFpsSeg.getIdealWidth());
         p.addRow (Icon::glass, juce::Colour (0xff30b0c7), TR ("Rémanence"), TR ("Les dernières images s'estompent, comme un écran à phosphore"),
                   &oscPersistSwitch, 44, 26);
-        oscWidthSeg.setLabels ({ TR ("Fin"), TR ("Normal"), TR ("Épais"), TR ("Très épais") });
+        oscWidthSlider.setDefault (20.0);
         oscTraceSeg.setLabels ({ TR ("Précis"), TR ("Classique") });
-        p.addRow (Icon::phase, juce::Colour (0xff30b0c7), TR ("Épaisseur du trait"), TR ("Trace de l'oscilloscope"),
-                  &oscWidthSeg, oscWidthSeg.getIdealWidth());
+        p.addRow (Icon::phase, juce::Colour (0xff30b0c7), TR ("Épaisseur du trait"), TR ("0 = le plus fin · double-clic : valeur d'origine"),
+                  &oscWidthSlider, 260);
         p.addRow (Icon::phase, juce::Colour (0xff30b0c7), TR ("Tracé"), TR ("Précis : chaque échantillon · Classique : trait lissé"),
                   &oscTraceSeg, oscTraceSeg.getIdealWidth());
-        oscWidthSeg.onChange = [this] (int i) { if (onOscLineWidthSelected) onOscLineWidthSelected (i); };
+        oscWidthSlider.onValueChange = [this] { if (onOscLineWidthChanged) onOscLineWidthChanged (juce::roundToInt (oscWidthSlider.getValue())); };
         oscTraceSeg.onChange = [this] (int i) { if (onOscTraceModeSelected) onOscTraceModeSelected (i); };
         oscStyleSeg.onChange = [this] (int i) { if (onOscStyleSelected) onOscStyleSelected (i); };
         static const int oscFpsValues[] = { 24, 30, 60 };
@@ -1654,7 +1655,7 @@ private:
     OptionsUi::Segmented masterSeg { { "Instrument", "Console" } };
     OptionsUi::Segmented oscStyleSeg { juce::StringArray { juce::String ("Tube"), TR ("Numérique"), juce::String ("Vintage"), juce::String ("Deux voies") } };
     OptionsUi::Segmented oscFpsSeg { { "24", "30", "60" } };
-    OptionsUi::Segmented oscWidthSeg { { "Fin", "Normal", juce::String (juce::CharPointer_UTF8 ("\xc3\x89pais")), juce::String (juce::CharPointer_UTF8 ("Tr\xc3\xa8s \xc3\xa9pais")) } };
+    OptionsUi::ValueSlider oscWidthSlider;   // épaisseur du trait de l'oscilloscope, 0..100
     OptionsUi::Segmented oscTraceSeg { { juce::String (juce::CharPointer_UTF8 ("Pr\xc3\xa9" "cis")), "Classique" } };
     OptionsUi::Switch oscPersistSwitch;
     // Apparence

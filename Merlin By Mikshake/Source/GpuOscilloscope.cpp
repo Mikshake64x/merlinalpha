@@ -137,8 +137,8 @@ void GpuOscilloscopeDisplay::syncFromProcessor()
     styleA=juce::jlimit(0, 3, processor.oscStyle);
     monoA=processor.oscMono;
     persistA=processor.oscPersist;
-    static const float widthMul[]={ 0.45f, 0.75f, 1.2f, 1.9f };   // fin, normal, épais, très épais (v1.68 : plus fins)
-    widthMulA=widthMul[juce::jlimit(0, 3, processor.oscLineWidth)];
+    // curseur 0..100 → ×0,12 (trait d'un pixel) à ×2,52 ; 20 par défaut (×0,6)
+    widthMulA=0.12f+0.024f*(float)juce::jlimit(0, 100, processor.oscLineWidth);
     classicTraceA=processor.oscTraceMode==1;
     refreshFaders();
     rebuildBackgroundIfNeeded();
@@ -715,8 +715,9 @@ void GpuOscilloscopeDisplay::renderOpenGL()
                 colourUniform(*lineShader, c, 0.22f*halo*alpha);
                 glDrawArrays(GL_LINE_STRIP, 0, nv);
             }
-            // marge de lissage des bords : 0,6 px (0,9 avant, trait trop large)
-            lineShader->setUniform("halfW", width*0.5f+0.6f);
+            // marge de lissage des bords : 0,6 px, réduite pour les traits fins
+            // (0,9 avant v1.68.1, trait trop large)
+            lineShader->setUniform("halfW", width*0.5f+0.35f+0.25f*juce::jmin(1.f, widthMul));
             lineShader->setUniform("sharp", 3.f);
             colourUniform(*lineShader, c, alpha);
             glDrawArrays(GL_LINE_STRIP, 0, nv);

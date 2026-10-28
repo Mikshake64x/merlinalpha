@@ -24,7 +24,7 @@ namespace BinaryData
     const int            mikshake_about_pngSize = 68539;
 
     extern const char*   translations_tsv;
-    const int            translations_tsvSize = 77951;
+    const int            translations_tsvSize = 78441;
 
     // Number of elements in the namedResourceList and originalFileNames arrays.
     const int namedResourceListSize = 6;

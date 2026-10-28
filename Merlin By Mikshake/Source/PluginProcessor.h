@@ -181,7 +181,7 @@ public:
     int   oscStyle        { 0 };      // oscilloscope : 0 tube cathodique, 1 numérique, 2 vintage, 3 deux voies
     int   oscFps          { 30 };     // oscilloscope : images/s (24, 30 ou 60) — plus lisible que 60
     bool  oscPersist      { true };   // oscilloscope : rémanence des deux images précédentes
-    int   oscLineWidth    { 1 };      // oscilloscope : épaisseur du trait (0 fin, 1 normal, 2 épais, 3 très épais)
+    int   oscLineWidth    { 20 };     // oscilloscope : épaisseur du trait, curseur 0..100 (0 = le plus fin)
     int   oscTraceMode    { 0 };      // oscilloscope : 0 précis (tous les échantillons), 1 classique (enveloppe min / max)
     float vecReleaseAlpha { 0.72f };  // persistance du trail du Vectorscope
     float mbVecReleaseAlpha { 0.90f };  // persistance du trail du Vectorscope multi-bande

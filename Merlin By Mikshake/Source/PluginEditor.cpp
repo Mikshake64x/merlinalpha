@@ -5429,10 +5429,12 @@ void LeakEditor::openOptions()
     if(!AppMode::isPlugin){
         // appli : fenêtre à part, déplaçable (autre écran possible) ; Merlin et
         // ses modules GPU restent visibles et actifs derrière
+        // la fenêtre existe AVANT que le panneau devienne visible : sinon le
+        // changement de visibilité suspendait les modules GPU (panneau cru
+        // posé sur l'éditeur) et rien ne les relançait — oscillo figé
         removeChildComponent(&optionsOverlay);
         optionsOverlay.setWindowed(true);
         optionsOverlay.setSize(1000, 640);
-        optionsOverlay.setVisible(true);
         optionsWindow=std::make_unique<DetachedWindow>(juce::String(juce::CharPointer_UTF8("Merlin \xce\xb1 \xc2\xb7 "))+TR("Options"), optionsOverlay,
             [sp=juce::Component::SafePointer<LeakEditor>(this)]{
                 juce::MessageManager::callAsync([sp]{ if(sp!=nullptr) sp->closeOptions(); });
@@ -5444,8 +5446,10 @@ void LeakEditor::openOptions()
         w.setAlwaysOnTop(alwaysOnTopState);   // comme la fenêtre principale
         if(auto* peer=w.getPeer())
             WindowsDisplay::setNoActivate(peer->getNativeHandle(), !keyboardState);
+        optionsOverlay.setVisible(true);
         w.setVisible(true);
         w.toFront(true);
+        updateGpuSuspension();   // modules GPU actifs derrière la fenêtre des Options
         return;
     }
     optionsOverlay.setVisible(true);
@@ -5463,6 +5467,7 @@ void LeakEditor::closeOptions()
         addChildComponent(&optionsOverlay, getIndexOfChildComponent(&licenseOverlay));   // sous l'écran de licence
         optionsOverlay.setBounds(getLocalBounds());
     }
+    updateGpuSuspension();
 }
 
 void LeakEditor::setupOptions()
@@ -5490,7 +5495,7 @@ void LeakEditor::setupOptions()
     o.onLargeTextChanged = [this](bool on){ audioProcessor.largeText=on; applyTextScale(); syncTopBarLook(); };
     o.onOscStyleSelected = [this](int i){ audioProcessor.oscStyle=juce::jlimit(0, 3, i); oscilloscope.syncFromProcessor(); };
     o.onOscFpsSelected   = [this](int fps){ audioProcessor.oscFps=fps; oscilloscope.syncFromProcessor(); };
-    o.onOscLineWidthSelected = [this](int w){ audioProcessor.oscLineWidth=w; oscilloscope.syncFromProcessor(); };
+    o.onOscLineWidthChanged  = [this](int w){ audioProcessor.oscLineWidth=w; oscilloscope.syncFromProcessor(); };   // curseur, en direct
     o.onOscTraceModeSelected = [this](int m){ audioProcessor.oscTraceMode=m; oscilloscope.syncFromProcessor(); };
     o.onOscPersistChanged= [this](bool on){ audioProcessor.oscPersist=on; oscilloscope.syncFromProcessor(); };
     o.onMasterConsoleChanged = [this](bool on){
