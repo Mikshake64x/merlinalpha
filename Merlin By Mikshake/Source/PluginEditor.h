@@ -1279,6 +1279,7 @@ public:
         alwaysOnTopState=b;
         for(auto& w : detached)   // les modules détachés suivent la fenêtre principale
             if(w!=nullptr) w->setAlwaysOnTop(b);
+        if(optionsWindow!=nullptr) optionsWindow->setAlwaysOnTop(b);   // la fenêtre des Options aussi
     }
     void mouseDown(const juce::MouseEvent&) override;
 
@@ -1413,6 +1414,9 @@ private:
         std::function<void()> onClose;
     };
     std::array<std::unique_ptr<DetachedWindow>, LeakAudioProcessor::NUM_SLOTS> detached;
+    // Options (appli) : fenêtre à part, déplaçable ; Merlin reste visible et actif
+    std::unique_ptr<DetachedWindow> optionsWindow;
+    void closeOptions();
     bool isDetached(int s) const { return s>=0 && s<LeakAudioProcessor::NUM_SLOTS && detached[(size_t)s]!=nullptr; }
     void detachSlot(int s);
     void reattachSlot(int s);

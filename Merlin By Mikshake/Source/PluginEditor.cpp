@@ -5235,7 +5235,7 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     };
     settingsOverlay.onTemplateSelected = [this](int t){ setTemplate((LeakAudioProcessor::UiTemplate)t); };
 
-    topBar.onAboutClicked    = [this]{ settingsOverlay.setVisible(false); optionsOverlay.setVisible(false); aboutOverlay.setVisible(!aboutOverlay.isVisible()); };
+    topBar.onAboutClicked    = [this]{ settingsOverlay.setVisible(false); closeOptions(); aboutOverlay.setVisible(!aboutOverlay.isVisible()); };
     topBar.onTitleClicked    = [this]{
         // Duplique exactement l'action du bouton RESET de la barre de contrôles.
         audioProcessor.resetLoudness();
@@ -5358,6 +5358,7 @@ LeakEditor::~LeakEditor()
 {
     stopTimer();
     for(auto& w : detached) w.reset();   // fenêtres détachées fermées (les modules restent à l'éditeur)
+    optionsWindow.reset();               // idem pour la fenêtre des Options
     license->removeChangeListener(this);
     aboutOverlay.removeComponentListener(this);
     settingsOverlay.removeComponentListener(this);
@@ -5419,13 +5420,49 @@ OptionsOverlay::State LeakEditor::optionsState() const
 
 void LeakEditor::openOptions()
 {
-    if(optionsOverlay.isVisible()){ optionsOverlay.setVisible(false); return; }
+    if(optionsOverlay.isVisible()){ closeOptions(); return; }
     aboutOverlay.setVisible(false);
     settingsOverlay.setVisible(false);
     optionsOverlay.refreshTheme(audioProcessor.lightTint);
     optionsOverlay.setState(optionsState());
+
+    if(!AppMode::isPlugin){
+        // appli : fenêtre à part, déplaçable (autre écran possible) ; Merlin et
+        // ses modules GPU restent visibles et actifs derrière
+        removeChildComponent(&optionsOverlay);
+        optionsOverlay.setWindowed(true);
+        optionsOverlay.setSize(1000, 640);
+        optionsOverlay.setVisible(true);
+        optionsWindow=std::make_unique<DetachedWindow>(juce::String(juce::CharPointer_UTF8("Merlin \xce\xb1 \xc2\xb7 "))+TR("Options"), optionsOverlay,
+            [sp=juce::Component::SafePointer<LeakEditor>(this)]{
+                juce::MessageManager::callAsync([sp]{ if(sp!=nullptr) sp->closeOptions(); });
+            });
+        auto& w=*optionsWindow;
+        w.setResizeLimits(760, 480, 2400, 1600);
+        w.centreAroundComponent(this, w.getWidth(), w.getHeight());
+        w.addToDesktop();
+        w.setAlwaysOnTop(alwaysOnTopState);   // comme la fenêtre principale
+        if(auto* peer=w.getPeer())
+            WindowsDisplay::setNoActivate(peer->getNativeHandle(), !keyboardState);
+        w.setVisible(true);
+        w.toFront(true);
+        return;
+    }
     optionsOverlay.setVisible(true);
     optionsOverlay.toFront(true);
+}
+
+// Ferme les Options (fenêtre de l'appli ou panneau du plugin) ; le panneau
+// revient, masqué, dans l'éditeur pour la prochaine ouverture
+void LeakEditor::closeOptions()
+{
+    optionsOverlay.setVisible(false);
+    if(optionsWindow!=nullptr){
+        optionsWindow.reset();   // ne détruit pas le panneau (contenu non possédé)
+        optionsOverlay.setWindowed(false);
+        addChildComponent(&optionsOverlay, getIndexOfChildComponent(&licenseOverlay));   // sous l'écran de licence
+        optionsOverlay.setBounds(getLocalBounds());
+    }
 }
 
 void LeakEditor::setupOptions()
@@ -5435,7 +5472,7 @@ void LeakEditor::setupOptions()
     auto refreshSoon=[sp]{   // nom de la source connu une fois la capture ouverte
         juce::Timer::callAfterDelay(700, [sp]{ if(sp!=nullptr && sp->optionsOverlay.isVisible()) sp->optionsOverlay.setState(sp->optionsState()); });
     };
-    o.onDismiss = [this]{ optionsOverlay.setVisible(false); };
+    o.onDismiss = [this]{ closeOptions(); };
     // Audio
     o.onAudioSourceSelected  = [this, refreshSoon](int i){ if(host.setAudioSource) host.setAudioSource(i); optionsOverlay.setState(optionsState()); refreshSoon(); };
     o.onOpenAudioSettings    = [this]{ if(host.openAudioSettings) host.openAudioSettings(); };
@@ -5462,7 +5499,7 @@ void LeakEditor::setupOptions()
     };
     // Apparence (mêmes actions que le panneau des templates)
     o.onTemplateSelected    = [this](int t){ setTemplate((LeakAudioProcessor::UiTemplate)t); };
-    o.onOpenTemplateGallery = [this]{ optionsOverlay.setVisible(false); settingsOverlay.setVisible(true); };
+    o.onOpenTemplateGallery = [this]{ closeOptions(); settingsOverlay.setVisible(true); };
     o.onAccentSelected      = [this](int i){ if(settingsOverlay.onAccentSelected) settingsOverlay.onAccentSelected(i); optionsOverlay.setState(optionsState()); };
     o.onColourRoleChanged   = [this](int r, juce::Colour c){
         if(settingsOverlay.onColorRoleChanged) settingsOverlay.onColorRoleChanged(r, c);
@@ -5473,8 +5510,8 @@ void LeakEditor::setupOptions()
     // Presets / à propos
     o.onSavePreset       = [this]{ askSavePreset(); };
     o.onOpenPresetFolder = []{ auto f=LeakAudioProcessor::getPresetFolder(); f.createDirectory(); f.startAsProcess(); };
-    o.onResetLayout      = [this]{ if(settingsOverlay.onResetLayout) settingsOverlay.onResetLayout(); optionsOverlay.setVisible(false); };
-    o.onOpenAbout        = [this]{ optionsOverlay.setVisible(false); aboutOverlay.setVisible(true); };
+    o.onResetLayout      = [this]{ if(settingsOverlay.onResetLayout) settingsOverlay.onResetLayout(); closeOptions(); };
+    o.onOpenAbout        = [this]{ closeOptions(); aboutOverlay.setVisible(true); };
     o.onOpenLicence      = [this]{ openLicence(); };
     // ligne Version : pastille α de Merlin au format des pictogrammes (carré arrondi 28 px)
     o.drawAppBadge = [](juce::Graphics& g, juce::Rectangle<float> r){
@@ -5763,6 +5800,9 @@ void LeakEditor::setKeyboardState(bool b)
         if(w!=nullptr)
             if(auto* peer=w->getPeer())
                 WindowsDisplay::setNoActivate(peer->getNativeHandle(), !b);
+    if(optionsWindow!=nullptr)
+        if(auto* peer=optionsWindow->getPeer())
+            WindowsDisplay::setNoActivate(peer->getNativeHandle(), !b);
 }
 
 void LeakEditor::reattachAll()
@@ -6363,7 +6403,8 @@ void LeakEditor::updateLayout()
     overlayLayer   .setBounds(getLocalBounds());
     aboutOverlay   .setBounds(getLocalBounds());
     settingsOverlay.setBounds(getLocalBounds());
-    optionsOverlay .setBounds(getLocalBounds());
+    if(optionsWindow==nullptr)   // sinon le panneau suit sa propre fenêtre
+        optionsOverlay.setBounds(getLocalBounds());
     licenseOverlay .setBounds(getLocalBounds());
 
     applyFrameRate(audioProcessor.uiFps);   // modules cachés à l'arrêt
@@ -6443,14 +6484,16 @@ void LeakEditor::openLicence()
 {
     aboutOverlay.setVisible(false);
     settingsOverlay.setVisible(false);
-    optionsOverlay.setVisible(false);
+    closeOptions();
     OptionsUi::lightTheme()=audioProcessor.lightTint;   // feuille au thème de Merlin
     licenseOverlay.open();
 }
 
 void LeakEditor::updateGpuSuspension()
 {
-    const bool covered=aboutOverlay.isVisible() || settingsOverlay.isVisible() || optionsOverlay.isVisible()
+    // Options dans leur propre fenêtre (appli) : rien ne recouvre les modules
+    const bool optionsOver=optionsOverlay.isVisible() && optionsWindow==nullptr;
+    const bool covered=aboutOverlay.isVisible() || settingsOverlay.isVisible() || optionsOver
                        || licenseOverlay.isVisible() || windowSwaps>0;
     for(auto* g : gpuModules())
         g->setSuspended(covered);

@@ -1292,11 +1292,22 @@ public:
         repaint (titleArea);
     }
 
+    // Appli : les Options vivent dans leur propre fenêtre (déplaçable, Merlin
+    // reste visible et actif derrière) ; la feuille occupe alors toute la
+    // fenêtre, sans voile ni ombre. Plugin : panneau posé sur l'éditeur.
+    void setWindowed (bool shouldBeWindowed)
+    {
+        windowed = shouldBeWindowed;
+        resized();
+        repaint();
+    }
+
     void resized() override
     {
         const auto bounds = getLocalBounds().toFloat();
-        sheetBounds = bounds.withSizeKeepingCentre (juce::jmin (1000.0f, bounds.getWidth() - 40.0f),
-                                                    juce::jmin (640.0f, bounds.getHeight() - 40.0f));
+        sheetBounds = windowed ? bounds
+                               : bounds.withSizeKeepingCentre (juce::jmin (1000.0f, bounds.getWidth() - 40.0f),
+                                                               juce::jmin (640.0f, bounds.getHeight() - 40.0f));
         auto sheet = sheetBounds;
         sidebarBounds = sheet.removeFromLeft (kSidebarWidth);
 
@@ -1318,17 +1329,22 @@ public:
         for (auto& p : pages)
             p.layout (viewport.getWidth() - viewport.getScrollBarThickness());
 
-        rebuildShadow();
+        if (! windowed)
+            rebuildShadow();
     }
 
     void paint (juce::Graphics& g) override
     {
         const auto th = OptionsUi::Theme::current();
-        g.fillAll (juce::Colours::black.withAlpha (0.5f));   // voile
-        g.drawImageAt (shadowImage, shadowOrigin.x, shadowOrigin.y);
+        if (! windowed)
+        {
+            g.fillAll (juce::Colours::black.withAlpha (0.5f));   // voile
+            g.drawImageAt (shadowImage, shadowOrigin.x, shadowOrigin.y);
+        }
 
         juce::Path sheet;
-        sheet.addRoundedRectangle (sheetBounds, 14.0f);
+        if (windowed) sheet.addRectangle (sheetBounds);   // la fenêtre fait le cadre
+        else          sheet.addRoundedRectangle (sheetBounds, 14.0f);
         g.setColour (th.bg);
         g.fillPath (sheet);
         {
@@ -1339,8 +1355,11 @@ public:
             g.setColour (th.sep);
             g.fillRect (sidebarBounds.withLeft (sidebarBounds.getRight() - 1.0f));
         }
-        g.setColour (th.edge);
-        g.strokePath (sheet, juce::PathStrokeType (1.0f));
+        if (! windowed)
+        {
+            g.setColour (th.edge);
+            g.strokePath (sheet, juce::PathStrokeType (1.0f));
+        }
 
         // Marque : pastille engrenage, "Options", version
         auto brand = brandBounds.reduced (8.0f, 6.0f);
@@ -1362,7 +1381,7 @@ public:
 
     void mouseDown (const juce::MouseEvent& e) override
     {
-        if (! sheetBounds.contains (e.position) && onDismiss)
+        if (! windowed && ! sheetBounds.contains (e.position) && onDismiss)
             onDismiss();
     }
 
@@ -1659,6 +1678,7 @@ private:
     int currentCategory = 0;
 
     juce::Rectangle<float> sheetBounds, sidebarBounds, brandBounds;
+    bool windowed = false;   // dans sa propre fenêtre (appli)
     juce::Rectangle<int> titleArea;
     juce::Image shadowImage;
     juce::Point<int> shadowOrigin;
