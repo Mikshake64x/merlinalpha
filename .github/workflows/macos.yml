@@ -5,6 +5,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# actions: write — pour supprimer les anciens artefacts (quota de stockage)
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   build:
     runs-on: macos-14
@@ -73,7 +78,21 @@ jobs:
           productbuild --distribution distribution.xml --package-path pkgs "MerlinAlpha_macOS_v$VERSION.pkg"
           ls -la *.pkg
 
+      # Chaque build stockait un .pkg de ~22 Mo pendant 90 jours : quota plein
+      # (upload refusé depuis la v1.66.0). On ne garde que le nouveau .pkg.
+      - name: Free artifact storage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ids=$(gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" --jq '.artifacts[].id')
+          n=0
+          for id in $ids; do
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id" && n=$((n+1)) || true
+          done
+          echo "::notice::anciens artefacts supprimés : $n"
+
       - uses: actions/upload-artifact@v4
         with:
           name: MerlinAlpha_macOS_v${{ env.VERSION }}
           path: MerlinAlpha_macOS_v*.pkg
+          retention-days: 14
