@@ -5394,6 +5394,8 @@ OptionsOverlay::State LeakEditor::optionsState() const
     s.oscStyle   = audioProcessor.oscStyle;
     s.oscFps     = audioProcessor.oscFps;
     s.oscPersist = audioProcessor.oscPersist;
+    s.oscLineWidth = audioProcessor.oscLineWidth;
+    s.oscTraceMode = audioProcessor.oscTraceMode;
     s.uiTemplate = (int)audioProcessor.uiTemplate;
     for(int i=0;i<Theme::NUM_PALETTES;++i){
         s.accentPalette.add(juce::Colour(Theme::palettes[i].accent));
@@ -5451,6 +5453,8 @@ void LeakEditor::setupOptions()
     o.onLargeTextChanged = [this](bool on){ audioProcessor.largeText=on; applyTextScale(); syncTopBarLook(); };
     o.onOscStyleSelected = [this](int i){ audioProcessor.oscStyle=juce::jlimit(0, 3, i); oscilloscope.syncFromProcessor(); };
     o.onOscFpsSelected   = [this](int fps){ audioProcessor.oscFps=fps; oscilloscope.syncFromProcessor(); };
+    o.onOscLineWidthSelected = [this](int w){ audioProcessor.oscLineWidth=w; oscilloscope.syncFromProcessor(); };
+    o.onOscTraceModeSelected = [this](int m){ audioProcessor.oscTraceMode=m; oscilloscope.syncFromProcessor(); };
     o.onOscPersistChanged= [this](bool on){ audioProcessor.oscPersist=on; oscilloscope.syncFromProcessor(); };
     o.onMasterConsoleChanged = [this](bool on){
         audioProcessor.masterConsole=on; vuMeter.setConsoleStyle(on);

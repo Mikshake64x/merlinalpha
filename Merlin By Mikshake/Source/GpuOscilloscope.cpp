@@ -137,6 +137,9 @@ void GpuOscilloscopeDisplay::syncFromProcessor()
     styleA=juce::jlimit(0, 3, processor.oscStyle);
     monoA=processor.oscMono;
     persistA=processor.oscPersist;
+    static const float widthMul[]={ 0.6f, 1.f, 1.6f, 2.4f };   // fin, normal, épais, très épais
+    widthMulA=widthMul[juce::jlimit(0, 3, processor.oscLineWidth)];
+    classicTraceA=processor.oscTraceMode==1;
     refreshFaders();
     rebuildBackgroundIfNeeded();
     refreshFrameRate();
@@ -666,12 +669,16 @@ void GpuOscilloscopeDisplay::renderOpenGL()
         // pixel réel : l'enveloppe min / max par colonne, utilisée dès 2 par
         // pixel, découpait la courbe en marches (aliasing visible à 25 ms).
         // Au-delà (très longues fenêtres) : min / max par colonne PHYSIQUE.
+        // Tracé « classique » (Options) : l'enveloppe d'avant la v1.66.3, dès
+        // 2 échantillons par pixel logique — trait plus net, moins de détail.
+        const bool classic=classicTraceA.load();
+        const float widthMul=widthMulA.load();
         auto build=[&](const float* buf, juce::Rectangle<float> r, bool area){
             verts.clear();
             const float cy=r.getCentreY(), amp=r.getHeight()*0.46f;
             auto add=[&](float x, float y){ verts.push_back(x); verts.push_back(y); if(area){ verts.push_back(x); verts.push_back(cy); } };
-            const int cols=juce::jmax(1, (int)(r.getWidth()*scale));
-            if(n>cols*12){
+            const int cols=juce::jmax(1, classic ? (int)r.getWidth() : (int)(r.getWidth()*scale));
+            if(n>cols*(classic ? 2 : 12)){
                 float prevY=cy;
                 for(int c=0;c<cols;++c){
                     const int i0=c*n/cols, i1=juce::jmax(i0+1, (c+1)*n/cols);
@@ -694,6 +701,7 @@ void GpuOscilloscopeDisplay::renderOpenGL()
             prog.setUniform("col", c.getFloatRed()*a, c.getFloatGreen()*a, c.getFloatBlue()*a, a);
         };
         auto line=[&](const float* buf, juce::Rectangle<float> r, juce::Colour c, float alpha, float width, float halo){
+            width*=widthMul;   // Options : épaisseur du trait
             const int nv=build(buf, r, false);
             if(nv<2) return;
             lineShader->use();

@@ -69,6 +69,8 @@ private:
     std::atomic<bool>  triggerMode { true };
     std::atomic<int>   styleA { 0 };
     std::atomic<bool>  monoA { false }, persistA { true };
+    std::atomic<float> widthMulA { 1.f };      // Options : épaisseur du trait
+    std::atomic<bool>  classicTraceA { false }; // Options : tracé classique (enveloppe dès 2 échantillons / pixel)
     std::atomic<int>   viewW { 1 }, viewH { 1 };
 
     // fond : image (résolution physique) envoyée en texture

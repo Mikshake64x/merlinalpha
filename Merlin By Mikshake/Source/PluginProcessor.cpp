@@ -886,6 +886,8 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("oscStyle", oscStyle);
     xml.setAttribute("oscFps", oscFps);
     xml.setAttribute("oscPersist", oscPersist);
+    xml.setAttribute("oscLineWidth", oscLineWidth);
+    xml.setAttribute("oscTraceMode", oscTraceMode);
     xml.setAttribute("vecReleaseAlpha", (double)vecReleaseAlpha);
     xml.setAttribute("mbVecReleaseAlpha", (double)mbVecReleaseAlpha);
     xml.setAttribute("vecLineMode", vecLineMode);
@@ -1115,6 +1117,8 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             oscStyle    = juce::jlimit(0, 3, xml->getIntAttribute("oscStyle", 0));
             oscFps      = juce::jlimit(10, 144, xml->getIntAttribute("oscFps", 30));
             oscPersist  = xml->getBoolAttribute("oscPersist", true);
+            oscLineWidth= juce::jlimit(0, 3, xml->getIntAttribute("oscLineWidth", 1));
+            oscTraceMode= juce::jlimit(0, 1, xml->getIntAttribute("oscTraceMode", 0));
             vecReleaseAlpha = (float)xml->getDoubleAttribute("vecReleaseAlpha", 0.72);
             mbVecReleaseAlpha = (float)xml->getDoubleAttribute("mbVecReleaseAlpha", 0.90);
             vecLineMode = xml->getBoolAttribute("vecLineMode", true);
