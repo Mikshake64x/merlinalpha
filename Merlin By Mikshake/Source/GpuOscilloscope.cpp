@@ -137,7 +137,7 @@ void GpuOscilloscopeDisplay::syncFromProcessor()
     styleA=juce::jlimit(0, 3, processor.oscStyle);
     monoA=processor.oscMono;
     persistA=processor.oscPersist;
-    static const float widthMul[]={ 0.6f, 1.f, 1.6f, 2.4f };   // fin, normal, épais, très épais
+    static const float widthMul[]={ 0.45f, 0.75f, 1.2f, 1.9f };   // fin, normal, épais, très épais (v1.68 : plus fins)
     widthMulA=widthMul[juce::jlimit(0, 3, processor.oscLineWidth)];
     classicTraceA=processor.oscTraceMode==1;
     refreshFaders();
@@ -709,13 +709,14 @@ void GpuOscilloscopeDisplay::renderOpenGL()
             glBindVertexArray(vaoLines);
             glBindBuffer(GL_ARRAY_BUFFER, vboLines);
             glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size()*sizeof(float)), verts.data(), GL_STREAM_DRAW);
-            if(halo>0.f){   // halo serré (tube, vintage)
-                lineShader->setUniform("halfW", width*0.5f+2.4f);
+            if(halo>0.f){   // halo serré (tube, vintage), proportionné à l'épaisseur choisie
+                lineShader->setUniform("halfW", width*0.5f+2.4f*juce::jmin(1.f, widthMul));
                 lineShader->setUniform("sharp", 1.3f);
                 colourUniform(*lineShader, c, 0.22f*halo*alpha);
                 glDrawArrays(GL_LINE_STRIP, 0, nv);
             }
-            lineShader->setUniform("halfW", width*0.5f+0.9f);
+            // marge de lissage des bords : 0,6 px (0,9 avant, trait trop large)
+            lineShader->setUniform("halfW", width*0.5f+0.6f);
             lineShader->setUniform("sharp", 3.f);
             colourUniform(*lineShader, c, alpha);
             glDrawArrays(GL_LINE_STRIP, 0, nv);
