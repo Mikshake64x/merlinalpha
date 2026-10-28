@@ -373,6 +373,18 @@ public:
                 w += frame->getLeftAndRight();
                 h += frame->getTopAndBottom();
             }
+        // fenêtre masquée (plein écran) : limites enregistrées sans repositionner
+        // la fenêtre — setResizeLimits la recalait, et une fenêtre mémorisée
+        // agrandie était alors restaurée et RÉAFFICHÉE, vide et noire, derrière
+        // le plein écran (v1.59 → v1.69.1)
+        if (! isVisible())
+        {
+            if (auto* c = getConstrainer())
+            {
+                c->setSizeLimits (w, h, 16384, 16384);
+                return;
+            }
+        }
         setResizeLimits (w, h, 16384, 16384);
     }
 
