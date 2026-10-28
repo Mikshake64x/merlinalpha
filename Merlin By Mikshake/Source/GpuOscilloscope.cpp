@@ -227,9 +227,14 @@ void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool 
                                                juce::Colours::transparentBlack, W*1.2f, H*0.55f, true));
         g.fillAll();
         scopeGraticule(g, pr, juce::Colour::fromRGBA(90,220,255,41), false, true);
-        if(mono) label("L+R", pr.getX(), pr.getBottom()+3.f, juce::Colour(0xFF8FF6FF));
-        else   { label("CH1 L", pr.getX(), pr.getBottom()+3.f, juce::Colour(0xFF8FF6FF));
-                 label("CH2 R", pr.getX()+42.f, pr.getBottom()+3.f, juce::Colour(0xFF4AA3FF)); }
+        // légendes placées selon leur largeur réelle ; la base de temps (« 2.50
+        // ms/div », calque 2D, à droite) garde sa place : sinon « L » / « R »
+        auto tw=[&](const juce::String& t){ return juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), t); };
+        const float gap=6.f*Ui::textScale, perDivW=tw("00.00 ms/div")+8.f;
+        const bool roomy=pr.getWidth() >= tw("CH1 L")+gap+tw("CH2 R")+perDivW;
+        const juce::String l1=mono ? "L+R" : (roomy ? "CH1 L" : "L"), l2=roomy ? "CH2 R" : "R";
+        label(l1, pr.getX(), pr.getBottom()+3.f, juce::Colour(0xFF8FF6FF));
+        if(!mono) label(l2, pr.getX()+tw(l1)+gap, pr.getBottom()+3.f, juce::Colour(0xFF4AA3FF));
     }
     else if(style==1){       // numérique (DSO)
         g.fillAll(juce::Colour(0xFF050607));
@@ -656,14 +661,17 @@ void GpuOscilloscopeDisplay::renderOpenGL()
         const auto pr=plotAreaFor(style, (float)w, (float)h);
         const float gain=ampGain.load();
 
-        // trace -> sommets (px logiques) ; au-delà de 2 points par pixel :
-        // min / max par colonne (aucun échantillon sauté, tracé léger)
+        // trace -> sommets (px logiques). Tous les échantillons sont reliés à
+        // leur abscisse exacte (sous-pixel) tant qu'il y en a moins de 12 par
+        // pixel réel : l'enveloppe min / max par colonne, utilisée dès 2 par
+        // pixel, découpait la courbe en marches (aliasing visible à 25 ms).
+        // Au-delà (très longues fenêtres) : min / max par colonne PHYSIQUE.
         auto build=[&](const float* buf, juce::Rectangle<float> r, bool area){
             verts.clear();
             const float cy=r.getCentreY(), amp=r.getHeight()*0.46f;
             auto add=[&](float x, float y){ verts.push_back(x); verts.push_back(y); if(area){ verts.push_back(x); verts.push_back(cy); } };
-            const int cols=juce::jmax(1, (int)r.getWidth());
-            if(n>cols*2){
+            const int cols=juce::jmax(1, (int)(r.getWidth()*scale));
+            if(n>cols*12){
                 float prevY=cy;
                 for(int c=0;c<cols;++c){
                     const int i0=c*n/cols, i1=juce::jmax(i0+1, (c+1)*n/cols);
