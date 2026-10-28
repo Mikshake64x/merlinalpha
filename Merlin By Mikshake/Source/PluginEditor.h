@@ -93,6 +93,10 @@ namespace Ui {
     // taille déjà mise à l'échelle par l'appelant (ex. texte ajusté à une largeur)
     inline juce::Font icelandAbs(float h) { return juce::Font(Lang::withScriptFallback(juce::FontOptions().withName("Iceland").withHeight(h))); }
 
+    // Bande de titre des modules : un glisser qui y commence détache le module
+    // (appli) et ne fait jamais tourner / basculer les vues 3D
+    inline float titleStripHeight() { return 22.f*textScale; }
+
     // Gros texte (Aa) : une ligne dont la police rétrécit juste assez pour tenir
     // dans sa largeur — jamais de « … », les mesures restent entières
     inline juce::Font fitFont(juce::Font f, const juce::String& t, float maxW, float minH=6.f)
@@ -536,6 +540,7 @@ protected:
     // haut de l'axe de fréquence de la correspondance en cours (20 kHz ou Nyquist)
     float axisTopHz() const { return PsdLogMap::topHz(mappedSampleRate>0.0 ? mappedSampleRate : 48000.0); }
     float tiltAtDragStart { 0.3f };
+    bool  dragFromTitle { false };   // glisser parti du titre : pas de perspective (détachement du module)
     float skewAtDragStart { 0.f };
     juce::Rectangle<float> dirBtnBounds;
     juce::Point<float> hoverPos;   // lecture fréquence/amplitude au survol

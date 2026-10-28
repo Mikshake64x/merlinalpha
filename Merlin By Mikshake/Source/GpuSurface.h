@@ -62,6 +62,7 @@ private:
     std::atomic<bool>  reverseA { false };
     std::atomic<int>   viewW { 1 }, viewH { 1 };
     float tiltAtDragStart { 0.3f }, skewAtDragStart { 0.f };
+    bool  dragFromTitle { false };   // glisser parti du titre : pas de perspective (détachement du module)
     juce::Rectangle<float> dirBtnBounds;
 
     // survol : position souris (interface) -> courbe touchée (thread GL)

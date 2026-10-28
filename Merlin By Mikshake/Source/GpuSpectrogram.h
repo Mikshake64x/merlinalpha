@@ -77,6 +77,7 @@ private:
     float& pitchRef();
     std::atomic<int>   viewW { 1 }, viewH { 1 };   // zone 3D (à droite du fader TIME)
     float yawAtDrag { 0.f }, pitchAtDrag { kDefaultPitch };
+    bool  dragFromTitle { false };   // glisser parti du titre : pas d'orbite (détachement du module)
 
     // survol : position souris (interface) -> point touché (thread GL)
     std::atomic<bool>  hoverOn { false };

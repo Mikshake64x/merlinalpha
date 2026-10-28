@@ -381,10 +381,11 @@ void GpuSpectrogramDisplay::mouseDown(const juce::MouseEvent& e)
     if(e.mods.isRightButtonDown()) return;   // laisse remonter pour le menu de slot
     yawAtDrag=yaw.load();
     pitchAtDrag=pitch.load();
+    dragFromTitle=e.position.y<Ui::titleStripHeight();   // titre : détachement, pas d'orbite
 }
 void GpuSpectrogramDisplay::mouseDrag(const juce::MouseEvent& e)
 {
-    if(e.mods.isRightButtonDown()) return;
+    if(e.mods.isRightButtonDown() || dragFromTitle) return;
     yaw   = snapYaw(yawAtDrag + (float)e.getDistanceFromDragStartX()*0.006f, kSnapDrag);   // aimant sur les vues droites
     pitch = juce::jlimit(0.12f, 1.1f, pitchAtDrag + (float)e.getDistanceFromDragStartY()*0.004f);
     yawRef()=yaw.load(); pitchRef()=pitch.load();   // vue retenue

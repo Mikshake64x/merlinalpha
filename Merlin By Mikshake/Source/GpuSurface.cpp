@@ -152,6 +152,7 @@ void GpuSurfaceDisplay::mouseDown(const juce::MouseEvent& e)
     if(e.mods.isRightButtonDown()) return;   // laisse remonter pour le menu de slot
     tiltAtDragStart=processor.gpuSurfaceTilt;
     skewAtDragStart=processor.gpuSurfaceSkew;
+    dragFromTitle=e.position.y<Ui::titleStripHeight();   // titre : détachement, pas de perspective
     if(dirBtnBounds.contains(e.position)){
         processor.gpuSurfaceReverse=!processor.gpuSurfaceReverse;
         reverseA=processor.gpuSurfaceReverse;
@@ -160,7 +161,7 @@ void GpuSurfaceDisplay::mouseDown(const juce::MouseEvent& e)
 }
 void GpuSurfaceDisplay::mouseDrag(const juce::MouseEvent& e)
 {
-    if(e.mods.isRightButtonDown()) return;
+    if(e.mods.isRightButtonDown() || dragFromTitle) return;
     // glisser verticalement : hauteur de la perspective ; horizontalement :
     // décalage latéral des courbes anciennes
     processor.gpuSurfaceTilt=juce::jlimit(0.f, 1.8f, tiltAtDragStart-(float)e.getDistanceFromDragStartY()*0.004f);

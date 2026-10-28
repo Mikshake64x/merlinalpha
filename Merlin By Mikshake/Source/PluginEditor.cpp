@@ -1377,6 +1377,7 @@ void Spectrogram3DBase::mouseDown(const juce::MouseEvent& e)
     if(e.mods.isRightButtonDown()) return;  // laisse remonter pour le menu de slot
     tiltAtDragStart = tiltAmount;
     skewAtDragStart = skewAmount;
+    dragFromTitle = e.position.y < Ui::titleStripHeight();   // titre : détachement, pas de perspective
     if(dirBtnBounds.contains(e.position)){
         reverseScroll = !reverseScroll;
         repaint();
@@ -1384,7 +1385,7 @@ void Spectrogram3DBase::mouseDown(const juce::MouseEvent& e)
 }
 void Spectrogram3DBase::mouseDrag(const juce::MouseEvent& e)
 {
-    if(e.mods.isRightButtonDown()) return;
+    if(e.mods.isRightButtonDown() || dragFromTitle) return;
     // glisser verticalement : hauteur de la perspective ; horizontalement :
     // décalage latéral des courbes anciennes
     tiltAmount = juce::jlimit(0.f, 1.8f, tiltAtDragStart - (float)e.getDistanceFromDragStartY()*0.004f);
@@ -5653,7 +5654,7 @@ void LeakEditor::mouseDown(const juce::MouseEvent& e)
         // titre d'un module (bande du haut) : candidat au détachement, si on tire
         if(!AppMode::isPlugin && slot>=0 && slot!=5 && e.eventComponent!=this
            && getComponentForModule(audioProcessor.slotModule[slot])!=nullptr
-           && pt.y < rcSlot[slot].getY()+juce::roundToInt(22.f*Ui::textScale)){
+           && pt.y < rcSlot[slot].getY()+juce::roundToInt(Ui::titleStripHeight())){
             dragSlot=slot;
             dragStart=e.getScreenPosition();
             dragGrab=pt-rcSlot[slot].getPosition();
