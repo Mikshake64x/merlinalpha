@@ -77,6 +77,7 @@ private:
     // vue 3D (orbite souris), mémorisée dans le processeur ; défaut un peu
     // plus incliné qu'à l'origine
     static constexpr float kDefaultPitch = 1.018f;   // vue de face, inclinée (position validée par le user)
+    static constexpr float kMinPitch = 0.12f, kMaxPitch = 1.5f;   // jusqu'à la vue de dessus (86° : à 90° la caméra n'a plus de haut)
     std::atomic<float> yaw { 0.f }, pitch { kDefaultPitch };
     // zoom molette : -25 à +25 %, 0 = cadrage d'origine (butée aimantée), mémorisé avec la vue
     static constexpr float kMinZoom = -0.25f, kMaxZoom = 0.25f;

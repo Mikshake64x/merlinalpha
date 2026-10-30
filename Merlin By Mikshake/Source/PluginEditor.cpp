@@ -5814,6 +5814,15 @@ void LeakEditor::detachSlot(int s)
     });
 }
 
+void LeakEditor::raiseDetachedWindows()
+{
+    auto raise=[](DetachedWindow* w){
+        if(w!=nullptr && w->isVisible() && !w->isMinimised()) w->toFront(false);   // (toFront la rétablirait)
+    };
+    for(auto& f : floating) raise(f.window.get());
+    raise(optionsWindow.get());
+}
+
 // la fenêtre détachée suit la souris tant que le bouton reste enfoncé (timer de l'éditeur)
 void LeakEditor::followDetachDrag()
 {
@@ -5850,7 +5859,11 @@ void LeakEditor::updateDockMagnet()
         const bool resized=b.getWidth()!=f.lastBounds.getWidth() || b.getHeight()!=f.lastBounds.getHeight();
         if(down && !f.lastBounds.isEmpty()){
             if(resized)                                            f.moving=false;   // bord tiré : ce n'est pas un déplacement
-            else if(b.getPosition()!=f.lastBounds.getPosition())   f.moving=true;
+            else if(b.getPosition()!=f.lastBounds.getPosition()){
+                // par sa barre, une fenêtre sans activation ne passe pas devant toute seule
+                if(!f.moving) f.window->toFront(false);
+                f.moving=true;
+            }
         }
         f.lastBounds=b;
         if(!f.moving) continue;

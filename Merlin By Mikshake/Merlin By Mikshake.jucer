@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="MrlnBM" name="Merlin Alpha" projectType="guiapp" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="Side Key System"
-              companyEmail="https://sidekey.fr" version="1.81.0" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
+              companyEmail="https://sidekey.fr" version="1.81.2" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
               displaySplashScreen="0">
   <MAINGROUP id="MbmGrp" name="Merlin Alpha">
     <GROUP id="{6B1F2C7A-3D4E-4F50-9A61-7C8D9E0F1A2B}" name="Source">

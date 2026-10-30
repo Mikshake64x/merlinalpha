@@ -1363,6 +1363,9 @@ public:
     void beginWindowSwap() { ++windowSwaps; updateGpuSuspension(); }
     void endWindowSwap()   { if(windowSwaps>0) --windowSwaps; updateGpuSuspension(); }
     void setKeyboardState(bool b);   // bouton clavier : aussi appliqué aux modules détachés
+    // fenêtres détachées (modules, Options) : elles repassent devant la fenêtre
+    // principale quand celle-ci vient d'être remontée
+    void raiseDetachedWindows();
     void setAlwaysOnTopState(bool b)
     {
         topBar.setAlwaysOnTopState(b);

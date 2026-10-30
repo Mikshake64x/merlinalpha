@@ -153,7 +153,8 @@ namespace
     // Fenêtre plein écran : fenêtre de bureau sans bordure, distincte de la
     // fenêtre principale (masquée pendant ce temps). On n'utilise PAS le mode
     // kiosque de JUCE : sous Windows il se désactive dès que l'appli perd le
-    // focus (clic sur un autre écran).
+    // focus (clic sur un autre écran). Sur Mac il ne sert qu'à masquer la barre
+    // de menus et le Dock, qui passeraient sinon devant l'en-tête.
     // L'éditeur y garde une taille "de conception" proche du 1080p et est
     // agrandi par transformation — même mise en page sur un écran 1080p ou 4K
     // (rendu net, JUCE dessine à la résolution physique). En dessous de 1080
@@ -187,12 +188,18 @@ namespace
             toFront (keyboard);
             if (keyboard)
                 grabKeyboardFocus();
+           #if JUCE_MAC
+            juce::Desktop::getInstance().setKioskModeComponent (this, false);
+           #endif
         }
 
         bool keyboard = false;   // bouton clavier de l'en-tête allumé : la fenêtre prend le clavier
 
         void close()
         {
+           #if JUCE_MAC
+            juce::Desktop::getInstance().setKioskModeComponent (nullptr, false);
+           #endif
             setEditor (nullptr);
             setVisible (false);
             removeFromDesktop();
@@ -943,7 +950,12 @@ private:
         explicit MenuFocus (MainWindow& o) : owner (o) {}
         ~MenuFocus() override { stopTimer(); }
 
-        void mouseDown (const juce::MouseEvent&) override { frontWindow().toFront (false); }
+        void mouseDown (const juce::MouseEvent&) override
+        {
+            frontWindow().toFront (false);
+            if (auto* leak = dynamic_cast<LeakEditor*> (owner.editor.get()))
+                leak->raiseDetachedWindows();   // les modules détachés restent devant
+        }
 
         void begin()
         {

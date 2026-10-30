@@ -357,7 +357,7 @@ void GpuSpectrogramDisplay::syncFromProcessor()
     timeFader->setValue(timeRef(), juce::dontSendNotification);
     yawRef()=snapYaw(yawRef(), kSnapAtLoad);
     yaw=yawRef();
-    pitch=juce::jlimit(0.12f, 1.1f, pitchRef());
+    pitch=juce::jlimit(kMinPitch, kMaxPitch, pitchRef());
     zoom=juce::jlimit(kMinZoom, kMaxZoom, zoomRef());
     repaint();
 }
@@ -450,7 +450,7 @@ void GpuSpectrogramDisplay::mouseDrag(const juce::MouseEvent& e)
 {
     if(e.mods.isRightButtonDown() || dragFromTitle) return;
     yaw   = snapYaw(yawAtDrag + (float)e.getDistanceFromDragStartX()*0.006f, kSnapDrag);   // aimant sur les vues droites
-    pitch = juce::jlimit(0.12f, 1.1f, pitchAtDrag + (float)e.getDistanceFromDragStartY()*0.004f);
+    pitch = juce::jlimit(kMinPitch, kMaxPitch, pitchAtDrag + (float)e.getDistanceFromDragStartY()*0.004f);
     yawRef()=yaw.load(); pitchRef()=pitch.load();   // vue retenue
     hoverX=e.position.x; hoverY=e.position.y;
     repaint();   // repères de fréquence
