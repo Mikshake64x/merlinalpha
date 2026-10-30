@@ -14,7 +14,7 @@ static void drawFreqGrid(juce::Graphics& g, juce::Rectangle<float> pr, float top
             {2000.f,"2k"},{5000.f,"5k"},{10000.f,"10k"},{20000.f,"20k"},{40000.f,"40k"},{80000.f,"80k"}}){
         if(hz>topHz*0.95f) continue;   // au-delà de 20 kHz seulement si l'axe y va
         const float x=std::round(xForHz(hz))+0.5f;
-        g.setColour(juce::Colours::white.withAlpha(0.06f));
+        g.setColour(Col::light(0.06f));
         g.drawVerticalLine((int)x, pr.getY(), pr.getBottom());
         labels.push_back({ x, lbl, hz==100.f || hz==1000.f || hz==10000.f });
     }
@@ -29,7 +29,10 @@ static void drawFreqGrid(juce::Graphics& g, juce::Rectangle<float> pr, float top
 #define DOT_GLSL_COMMON \
     "vec3 hsl2rgb(vec3 c){ vec3 rgb=clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0,0.0,1.0);\n" \
     "    return c.z+c.y*(rgb-0.5)*(1.0-abs(2.0*c.z-1.0)); }\n" \
-    "float hueAt(float u){ return (52.0+u*218.0)/360.0; }\n"     /* jaune -> violet */
+    "float hueAt(float u){ return (52.0+u*218.0)/360.0; }\n"     /* jaune -> violet */ \
+    "uniform float paper;\n"                                       /* 1 : ecran Papier, encre */ \
+    "vec3 inkAt(float u){ return hsl2rgb(vec3(hueAt(u), 0.95, 0.42)); }\n" \
+    "vec4 inked(vec3 ink, float a){ return vec4(mix(vec3(1.0), ink, clamp(a, 0.0, 1.0)), 1.0); }\n"
 
 // Brume : quad de la zone de tracé généré sans tampon (gl_VertexID)
 static const char* kHazeVS = R"(#version 150
@@ -72,6 +75,8 @@ void main()
         ws  += w;
     }
     float h = acc/ws;
+    // Papier : la lumiere devient de l'encre (melange multiplicatif, voir renderOpenGL)
+    if(paper > 0.5){ fragColour = inked(inkAt(u), h*strength*0.9); return; }
     vec3  c = hsl2rgb(vec3(hueAt(u), 0.95, 0.55));
     fragColour = vec4(c*h*strength, 1.0);
 }
@@ -142,6 +147,7 @@ void main()
         a = core + exp(-r2*2.6)*0.5;
         c = mix(c, vec3(1.0), core*0.55);
     }
+    if(paper > 0.5){ fragColour = inked(inkAt(vU), a*vA*0.85); return; }
     fragColour = vec4(c*a*vA, 1.0);
 }
 )";
@@ -173,6 +179,7 @@ void main()
 {
     float s = abs(vSide);
     float a = glow > 0.5 ? exp(-s*s*3.5)*0.5 : 1.0-smoothstep(0.45, 1.0, s);
+    if(paper > 0.5){ fragColour = inked(hsl2rgb(vec3(hueAt(vU), 0.95, glow > 0.5 ? 0.50 : 0.34)), a*(glow > 0.5 ? 0.6 : 1.0)); return; }
     vec3  c = hsl2rgb(vec3(hueAt(vU), 0.95, glow > 0.5 ? 0.58 : 0.80));
     fragColour = vec4(c*a, 1.0);
 }
@@ -262,7 +269,7 @@ void GpuDotSpectrumDisplay::paint(juce::Graphics& g)
     drawFreqGrid(g, pr, topHz, xForHz);
     for(float db : { -80.f, -60.f, -40.f, -20.f }){
         const float y=std::round(yForDb(db))+0.5f;
-        g.setColour(juce::Colours::white.withAlpha(0.06f));
+        g.setColour(Col::light(0.06f));
         g.drawHorizontalLine((int)y, pr.getX(), pr.getRight());
         g.setColour(Col::textMid.withAlpha(0.75f));
         g.drawText(juce::String((int)db), juce::Rectangle<float>(kReleaseFaderW, y-7.f, pr.getX()-kReleaseFaderW-5.f, 14.f), juce::Justification::centredRight, false);
@@ -457,7 +464,11 @@ void GpuDotSpectrumDisplay::renderOpenGL()
     GLint prevVao=0; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);   // tout s'additionne : lumière sur fond sombre
+    // tout s'additionne : lumière sur fond sombre ; sur écran Papier, l'encre
+    // se multiplie (chaque couche assombrit, comme de l'encre qui se superpose)
+    const float paper=Col::paper ? 1.f : 0.f;
+    if(paper>0.5f) glBlendFunc(GL_DST_COLOR, GL_ZERO);
+    else           glBlendFunc(GL_ONE, GL_ONE);
 
     // 1) brume colorée
     glActiveTexture(GL_TEXTURE0);
@@ -468,6 +479,7 @@ void GpuDotSpectrumDisplay::renderOpenGL()
     hazeShader->setUniform("view", (float)w, (float)h);
     hazeShader->setUniform("plot", px, py, pw, ph);
     hazeShader->setUniform("strength", style==Style::Chroma ? 0.9f : 0.55f);
+    hazeShader->setUniform("paper", paper);
     glBindVertexArray(vaoQuad);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
@@ -477,6 +489,7 @@ void GpuDotSpectrumDisplay::renderOpenGL()
         dotShader->setUniform("view", (float)w, (float)h);
         dotShader->setUniform("plot", px, py, pw, ph);
         dotShader->setUniform("style", (GLint)(style==Style::Chroma ? 0 : 1));
+        dotShader->setUniform("paper", paper);
         glBindVertexArray(vaoDots);
         glBindBuffer(GL_ARRAY_BUFFER, vboDots);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(partVerts.size()*sizeof(float)), partVerts.data(), GL_STREAM_DRAW);
@@ -493,8 +506,8 @@ void GpuDotSpectrumDisplay::renderOpenGL()
         for(int i=0;i<NB;++i){
             float s=0.f, ws=0.f;
             for(int k=-2;k<=2;++k){
-                const float w=(float)(3-std::abs(k));
-                s+=w*smooth[juce::jlimit(0, NB-1, i+k)]; ws+=w;
+                const float wk=(float)(3-std::abs(k));
+                s+=wk*smooth[juce::jlimit(0, NB-1, i+k)]; ws+=wk;
             }
             env[i]=s/ws;
         }
@@ -508,6 +521,7 @@ void GpuDotSpectrumDisplay::renderOpenGL()
         }
         ribbonShader->use();
         ribbonShader->setUniform("view", (float)w, (float)h);
+        ribbonShader->setUniform("paper", paper);
         glBindVertexArray(vaoRibbon);
         glBindBuffer(GL_ARRAY_BUFFER, vboRibbon);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(ribbonVerts.size()*sizeof(float)), ribbonVerts.data(), GL_STREAM_DRAW);
@@ -548,14 +562,19 @@ void main()
 {
     float u = (vPx.x-plot.x)/plot.z;
     float p = (vPx.y-plot.y)/plot.w*2.0-1.0;        // -1 at top (L), +1 at bottom (R)
-    vec3 acc = vec3(0.0);
+    vec3 acc = vec3(0.0), inkAcc = vec3(0.0);
+    float wSum = 0.0;
     for(int i=0; i<74; ++i){
         if(i >= nBands) break;
         vec4  b  = bands[i];
         float dx = (u-b.x)/(bandW*0.8);
         float dy = (p-b.y)/(b.w*1.3+0.08);
-        acc += hsl2rgb(vec3(hueAt(b.x), 0.95, 0.55))*exp(-dx*dx-dy*dy)*b.z*b.z;
+        float wt = exp(-dx*dx-dy*dy)*b.z*b.z;
+        acc    += hsl2rgb(vec3(hueAt(b.x), 0.95, 0.55))*wt;
+        inkAcc += inkAt(b.x)*wt;
+        wSum   += wt;
     }
+    if(paper > 0.5){ fragColour = inked(inkAcc/max(wSum, 1e-4), wSum*strength*0.9); return; }
     fragColour = vec4(acc*strength, 1.0);
 }
 )";
@@ -622,7 +641,7 @@ void GpuDotPanoramaDisplay::paint(juce::Graphics& g)
             g.setColour(Col::gridCtr.withAlpha(0.85f));
             g.drawLine(pr.getX(), y, pr.getRight(), y, 0.8f);
         } else {
-            g.setColour(juce::Colours::white.withAlpha(0.06f));
+            g.setColour(Col::light(0.06f));
             g.drawHorizontalLine((int)y, pr.getX(), pr.getRight());
         }
         g.setColour(Col::textMid.withAlpha(0.7f));
@@ -812,7 +831,9 @@ void GpuDotPanoramaDisplay::renderOpenGL()
     GLint prevVao=0; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    const float paper=Col::paper ? 1.f : 0.f;   // écran Papier : encre multipliée (voir Dot Spectrum)
+    if(paper>0.5f) glBlendFunc(GL_DST_COLOR, GL_ZERO);
+    else           glBlendFunc(GL_ONE, GL_ONE);
 
     // 1) lueur par bande
     if(nBands>0){
@@ -820,6 +841,7 @@ void GpuDotPanoramaDisplay::renderOpenGL()
         hazeShader->setUniform("view", (float)w, (float)h);
         hazeShader->setUniform("plot", px, py, pw, ph);
         hazeShader->setUniform("strength", 0.55f);
+        hazeShader->setUniform("paper", paper);
         hazeShader->setUniform("bandW", nBands>1 ? (bandU[nBands-1]-bandU[0])/(float)(nBands-1) : 0.05f);
         hazeShader->setUniform("nBands", (GLint)juce::jmin(nBands, NMAX));
         const GLint loc=glGetUniformLocation(hazeShader->getProgramID(), "bands");
@@ -834,6 +856,7 @@ void GpuDotPanoramaDisplay::renderOpenGL()
         dotShader->setUniform("view", (float)w, (float)h);
         dotShader->setUniform("plot", px, py, pw, ph);
         dotShader->setUniform("style", (GLint)0);   // points nets, comme Chroma
+        dotShader->setUniform("paper", paper);
         glBindVertexArray(vaoDots);
         glBindBuffer(GL_ARRAY_BUFFER, vboDots);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(partVerts.size()*sizeof(float)), partVerts.data(), GL_STREAM_DRAW);

@@ -54,7 +54,11 @@ uniform float headT, invNZ, ageSpan, sScale, sOff, parity, gridPhase, halfX, hal
 uniform int   style;          // 0 terrain, 1 neon, 2 cristal
 uniform vec3  eye, viewDir, bg, accent;
 uniform vec3  hover;         // survol : u, age, actif (0/1)
+uniform float paper;         // 1 : ecran Papier (theme clair), encre sur fond clair
 
+const vec3 pstops[8] = vec3[8](vec3(236.,241.,245.)/255., vec3(170.,222.,205.)/255., vec3(45.,179.,138.)/255.,
+                               vec3(140.,198.,63.)/255.,  vec3(241.,194.,50.)/255.,  vec3(240.,138.,44.)/255.,
+                               vec3(224.,65.,47.)/255.,   vec3(150.,24.,44.)/255.);
 const vec3 stops[8] = vec3[8](vec3(0.,0.,4.)/255.,     vec3(40.,11.,84.)/255.,  vec3(101.,21.,110.)/255.,
                               vec3(159.,42.,99.)/255., vec3(212.,72.,66.)/255., vec3(245.,125.,21.)/255.,
                               vec3(250.,193.,39.)/255.,vec3(252.,255.,164.)/255.);
@@ -62,8 +66,13 @@ vec3 inferno(float t)
 {
     t = clamp(t, 0.0, 1.0)*7.0;
     int i = min(6, int(t));
+    // Papier : meme degrade que le spectre (pale en bas, rouge en haut)
+    if(paper > 0.5) return mix(pstops[i], pstops[i+1], t - float(i));
     return mix(stops[i], stops[i+1], t - float(i));
 }
+// anciennete : vers le noir sur ecran sombre, vers le fond sur papier
+// (sur papier, a peine : vers le blanc, l'anciennete faisait un voile)
+vec3 aged(vec3 c, float fade) { return paper > 0.5 ? mix(bg, c, 0.7 + 0.3*fade) : c*fade; }
 float H(float u, float age) { return texture(heights, vec2(u*sScale + sOff, headT - age*invNZ)).r; }
 
 // Cristal : vert (niveau le plus faible) -> jaune -> orange -> rouge, violet
@@ -110,7 +119,8 @@ void main()
     vec3 col;
     if(style == 0){
         // A - terrain eclaire : cle blanche haut-gauche, contre-jour turquoise
-        vec3  base = inferno(vH)*fade;
+        // Papier : le bas du degrade (presque blanc) est saute, sinon le relief bas se fond dans le fond
+        vec3  base = aged(inferno(paper > 0.5 ? 0.16 + 0.84*vH : vH), fade);
         vec3  L1 = normalize(vec3(-4.0, 6.0, 5.0)), L2 = normalize(vec3(5.0, 2.0, -6.0));
         float d1 = max(dot(n, L1), 0.0), d2 = max(dot(n, L2), 0.0);
         float sp = pow(max(dot(n, normalize(L1 + V)), 0.0), 28.0)*0.22;
@@ -126,16 +136,27 @@ void main()
         float pf = vD/wf;
         float mf = 1.0 - smoothstep(0.8, 1.8, pf);
         haloF = exp(-pf*pf/30.0);
-        vec3 lc = inferno(0.3 + 0.7*vH)*(1.0 - clamp(vAge/64.0, 0.0, 1.0));
-        vec3 fc = inferno(0.35 + 0.65*vH);
-        col = vec3(0.008, 0.024, 0.024)
-            + lc*(m*1.25 + halo*0.45)
-            + fc*(mf*1.4 + haloF*0.6);
+        if(paper > 0.5){
+            // Papier : surface claire qui masque, quadrillage a l'encre (les
+            // traits fonces et s'effacent vers le fond avec l'anciennete)
+            float k  = 1.0 - clamp(vAge/64.0, 0.0, 1.0);
+            vec3 lc = inferno(0.4 + 0.6*vH);
+            vec3 fc = inferno(0.45 + 0.55*vH);
+            col = bg;
+            col = mix(col, lc, clamp((m*0.95 + halo*0.18)*k, 0.0, 1.0));
+            col = mix(col, fc, clamp(mf*1.0 + haloF*0.25, 0.0, 1.0));
+        } else {
+            vec3 lc = inferno(0.3 + 0.7*vH)*(1.0 - clamp(vAge/64.0, 0.0, 1.0));
+            vec3 fc = inferno(0.35 + 0.65*vH);
+            col = vec3(0.008, 0.024, 0.024)
+                + lc*(m*1.25 + halo*0.45)
+                + fc*(mf*1.4 + haloF*0.6);
+        }
     } else {
         // C - cristal : Phong brillant, lumiere d'accent, grille fine. Lumieres
         // placees derriere le relief (pivotees d'un demi-tour) : contre-jour,
         // reflets sur les cretes (rendu de la vue retournee, en vue normale)
-        vec3  base = crystalRamp(vH)*fade;   // degrade vert -> violet (demande du user)
+        vec3  base = aged(crystalRamp(vH), fade);   // degrade vert -> violet (demande du user)
         vec3  L1 = normalize(vec3(3.0, 7.0, -6.0));
         vec3  Lp = vec3(-3.0, 3.0, -4.0) - vPos;
         float dp = length(Lp); Lp /= dp;
@@ -158,8 +179,9 @@ void main()
     if(pl > 0.0){
         float gu, ga;
         float gp = max(lineMask(vU*32.0, gu), lineMask((vAge - gridPhase)*0.25, ga));
-        vec3 plc = mix(vec3(0.18, 0.17, 0.40), vec3(0.42, 0.44, 0.80), vD);
-        plc = mix(plc, vec3(0.78, 0.82, 1.0), gp*0.35);
+        vec3 plc = paper > 0.5 ? mix(vec3(0.89, 0.91, 0.94), vec3(0.80, 0.84, 0.89), vD)
+                               : mix(vec3(0.18, 0.17, 0.40), vec3(0.42, 0.44, 0.80), vD);
+        plc = mix(plc, paper > 0.5 ? vec3(0.42, 0.49, 0.59) : vec3(0.78, 0.82, 1.0), gp*0.35);
         col = mix(col, plc, pl);
     }
 
@@ -169,9 +191,11 @@ void main()
         float pa = abs(vAge - hover.y)/max(fwidth(vAge), 1e-6);
         float ln = max(1.0 - smoothstep(0.6, 1.6, pu), 1.0 - smoothstep(0.6, 1.6, pa));
         col = mix(col, accent, ln*0.8);
-        col = mix(col, vec3(1.0), 1.0 - smoothstep(2.5, 4.0, length(vec2(pu, pa))));
+        col = mix(col, paper > 0.5 ? vec3(0.15, 0.19, 0.23) : vec3(1.0), 1.0 - smoothstep(2.5, 4.0, length(vec2(pu, pa))));
     }
-    fragColour = vec4(mix(col, bg, fogK), 1.0);
+    // brouillard : vers le noir sur ecran sombre ; sur papier il voilait tout de
+    // blanc, il ne reste qu'un leger fondu au loin
+    fragColour = vec4(mix(col, bg, paper > 0.5 ? fogK*0.25 : fogK), 1.0);
 }
 )";
 
@@ -647,6 +671,7 @@ void GpuSpectrogramDisplay::renderOpenGL()
     meshShader->setUniform("viewDir", cam.dir[0], cam.dir[1], cam.dir[2]);
     meshShader->setUniform("bg", bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue());
     meshShader->setUniform("accent", acc.getFloatRed(), acc.getFloatGreen(), acc.getFloatBlue());
+    meshShader->setUniform("paper", Col::paper ? 1.f : 0.f);
     meshShader->setUniformMat4("mvp", cam.mvp, 1, GL_FALSE);
     meshShader->setUniform("hover", hitU.load(), hitAge.load(), showHover ? 1.f : 0.f);
 

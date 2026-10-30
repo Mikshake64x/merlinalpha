@@ -197,7 +197,7 @@ void GpuSurfaceDisplay::drawDirectionButton(juce::Graphics& g)
     const int W=getWidth();
     const float bs=16.f;
     dirBtnBounds=juce::Rectangle<float>((float)W-bs-6.f, 4.f, bs, bs);
-    g.setColour(juce::Colours::white.withAlpha(0.06f));
+    g.setColour(Col::light(0.06f));
     g.fillRoundedRectangle(dirBtnBounds, 3.f);
     g.setColour(Col::border);
     g.drawRoundedRectangle(dirBtnBounds.reduced(0.5f), 3.f, 1.f);
@@ -351,7 +351,8 @@ void GpuSurfaceDisplay::renderOpenGL()
         const int s=mark();
         vtx(bl.x, bl.y, 0.f, 0.85f); vtx(br.x, br.y, 0.f, 0.85f);
         vtx(fl.x, fl.y, 1.f, 0.85f); vtx(fr.x, fr.y, 1.f, 0.85f);
-        draws.push_back({ GL_TRIANGLE_STRIP, s, 4, 2, juce::Colour(0xFF2E2B66), juce::Colour(0xFF6A6FC8), 1.f });
+        draws.push_back({ GL_TRIANGLE_STRIP, s, 4, 2, Col::pick(juce::Colour(0xFF2E2B66), juce::Colour(0xFFE4E9F0)),
+                                                      Col::pick(juce::Colour(0xFF6A6FC8), juce::Colour(0xFFCBD4E1)), 1.f });
     }
     {
         const int s=mark();
@@ -368,7 +369,7 @@ void GpuSurfaceDisplay::renderOpenGL()
             const auto a=bl+(fl-bl)*d, b=br+(fr-br)*d;
             vtx(a.x, a.y, 0.f, 1.f); vtx(b.x, b.y, 0.f, 1.f);
         }
-        draws.push_back({ GL_LINES, s, mark()-s, 1, juce::Colour(0xFFC8D0FF).withAlpha(0.13f), {}, cover(0.6f) });
+        draws.push_back({ GL_LINES, s, mark()-s, 1, Col::pick(juce::Colour(0xFFC8D0FF).withAlpha(0.13f), Col::textHi.withAlpha(0.10f)), {}, cover(0.6f) });
     }
 
     // courbes : la plus récente naît au fond, dessin du fond vers l'avant
@@ -381,7 +382,9 @@ void GpuSurfaceDisplay::renderOpenGL()
         if(depth<0.f) continue;                                   // sortie par l'avant
         const float ox=geo.x0+geo.dir*geo.totalDx*depth, oy=geo.base-geo.totalDy*depth;
         const float a=juce::jmin(1.f, 1.f-(float)r/(float)NROWS); // 1 = récente, 0 = ancienne
-        const float fa=0.35f+0.65f*a;                             // plus transparente au fond
+        // plus transparente au fond (sur écran Papier, à peine : le blanc
+        // traversait les courbes et voilait la surface)
+        const float fa=Col::paper ? 0.80f+0.20f*a : 0.35f+0.65f*a;
         // (hauteur < 1,5 px : remplissage estompé, sinon des éclats d'un
         // pixel scintillent sur le sol)
         auto edgeA=[&](float v){ return juce::jlimit(0.f, 1.f, v*geo.peakH/1.5f); };
@@ -400,7 +403,7 @@ void GpuSurfaceDisplay::renderOpenGL()
         vtx(ox, oy, 0.f, edgeA(row[0]));
         for(int i=0;i<NPTS;++i) vtx(ox+(float)i/(float)(NPTS-1)*geo.pw, oy-row[i]*geo.peakH, 0.f, edgeA(row[i]));
         vtx(ox+geo.pw, oy, 0.f, edgeA(row[NPTS-1]));
-        draws.push_back({ GL_LINE_STRIP, s, NPTS+2, 1, juce::Colours::black.withAlpha(0.35f), {}, cover(0.8f) });
+        draws.push_back({ GL_LINE_STRIP, s, NPTS+2, 1, Col::pick(juce::Colours::black.withAlpha(0.35f), Col::textHi.withAlpha(0.30f)), {}, cover(0.8f) });
     }
 
     // ── survol : la courbe visible sous la souris est la plus en avant qui

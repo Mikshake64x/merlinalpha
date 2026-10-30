@@ -80,6 +80,7 @@ out vec4 fragColour;
 uniform sampler2D acc;
 uniform vec2 texel;
 uniform vec3 phos;
+uniform float paper;          // 1 : ecran Papier, l'encre se multiplie au fond clair
 void main()
 {
     float v = texture(acc, vUv).r;
@@ -90,6 +91,14 @@ void main()
         bloom += texture(acc, vUv+d*texel*3.0).r*0.6 + texture(acc, vUv+d*texel*7.0).r*0.4;
     }
     bloom /= 12.0;
+    if(paper > 0.5){
+        // trace a l'encre : halo pale, coeur plus fonce la ou le faisceau insiste
+        float a    = clamp((1.0-exp(-v*1.4)) + (1.0-exp(-bloom*0.9))*0.35, 0.0, 1.0);
+        float core = 1.0-exp(-max(v-0.8, 0.0)*0.8);
+        vec3  ink  = mix(phos, vec3(0.10, 0.13, 0.17), core*0.6);
+        fragColour = vec4(mix(vec3(1.0), ink, a), 1.0);
+        return;
+    }
     vec3 c = phos*(1.0-exp(-v*1.4))
            + phos*(1.0-exp(-bloom*0.9))*0.45
            + vec3(1.0)*(1.0-exp(-max(v-0.8, 0.0)*0.8))*0.75;
@@ -117,6 +126,10 @@ out vec4 fragColour;
 uniform sampler2D dens;
 uniform float invMax;
 uniform float texel;
+uniform float paper;          // 1 : ecran Papier (degrade pale -> rouge, encre multipliee)
+const vec3 pst[8] = vec3[8](vec3(236.,241.,245.)/255., vec3(170.,222.,205.)/255., vec3(45.,179.,138.)/255.,
+                            vec3(140.,198.,63.)/255.,  vec3(241.,194.,50.)/255.,  vec3(240.,138.,44.)/255.,
+                            vec3(224.,65.,47.)/255.,   vec3(150.,24.,44.)/255.);
 const vec3 st[8] = vec3[8](vec3(0.,0.,4.)/255.,     vec3(40.,11.,84.)/255.,  vec3(101.,21.,110.)/255.,
                            vec3(159.,42.,99.)/255., vec3(212.,72.,66.)/255., vec3(245.,125.,21.)/255.,
                            vec3(250.,193.,39.)/255.,vec3(252.,255.,164.)/255.);
@@ -138,6 +151,13 @@ void main()
             ws += w;
         }
     float v = pow(clamp(s/ws*invMax, 0.0, 1.0), 0.35);
+    if(paper > 0.5){
+        float t = clamp(0.2+0.8*v, 0.0, 1.0)*7.0;
+        int   i = min(6, int(t));
+        vec3  c = mix(pst[i], pst[i+1], t-float(i));
+        fragColour = vec4(mix(vec3(1.0), c, smoothstep(0.01, 0.08, v)), 1.0);
+        return;
+    }
     fragColour = vec4(inferno(0.12+0.88*v)*smoothstep(0.01, 0.08, v), 1.0);
 }
 )";
@@ -185,11 +205,11 @@ void GpuVectorscopeDisplay::paint(juce::Graphics& g)
     if(!gl) g.fillAll(Col::bg);
 
     const float cx=scopeCx.load(), cy=scopeCy.load(), r=scopeR.load();
-    const auto grid=juce::Colour(0xFF78C8BE);
+    const auto grid=Col::pick(juce::Colour(0xFF78C8BE), Col::textHi);
 
     // graticule : cercles plein / moitié, axes M et S, diagonales L / R
     // anneau extérieur blanc, comme l'original : même cercle de référence
-    g.setColour(juce::Colours::white.withAlpha(0.35f));
+    g.setColour(Col::light(0.35f));
     g.drawEllipse(cx-r, cy-r, 2.f*r, 2.f*r, 1.1f);
     g.setColour(grid.withAlpha(0.16f));
     g.drawEllipse(cx-r*0.5f, cy-r*0.5f, r, r, 1.f);
@@ -203,7 +223,7 @@ void GpuVectorscopeDisplay::paint(juce::Graphics& g)
     }
     // repères aux mêmes places que le Vectorscope d'origine
     g.setFont(Ui::iceland(9.5f));
-    g.setColour(juce::Colours::white.withAlpha(0.7f));
+    g.setColour(Col::light(0.7f));
     // "M" au-dessus du cercle, sauf s'il tombe sur le titre (gros texte,
     // module large et bas) : il passe alors juste sous le haut de l'anneau
     {
@@ -232,12 +252,12 @@ void GpuVectorscopeDisplay::paint(juce::Graphics& g)
         const float co=juce::jlimit(-1.f, 1.f, corrUi.load());
         const float mh=3.f, y=(float)H-mh*0.5f-8.f;
         const float x0=cx-r*0.80f, x1=cx+r*0.80f, mid=cx;
-        g.setColour(juce::Colours::white.withAlpha(0.08f));
+        g.setColour(Col::light(Col::paper ? 0.10f : 0.08f));
         g.fillRoundedRectangle(x0, y-mh*0.5f, x1-x0, mh, 1.5f);
         const float v=mid+co*(x1-x0)*0.5f;
-        g.setColour(co<0.f ? juce::Colour(0xFFFF5A4A) : Col::accent);
+        g.setColour(co<0.f ? Col::ink(juce::Colour(0xFFFF5A4A)) : Col::accent);
         g.fillRoundedRectangle(juce::jmin(mid, v), y-mh*0.5f, std::abs(v-mid), mh, 1.5f);
-        g.setColour(juce::Colours::white.withAlpha(0.5f));
+        g.setColour(Col::light(0.5f));
         g.fillRect(mid-0.5f, y-3.5f, 1.f, 7.f);
     }
 
@@ -443,7 +463,10 @@ void GpuVectorscopeDisplay::renderOpenGL()
             phosphorShader->setUniform("texel", 1.f/(float)pw, 1.f/(float)ph);
             const auto acc=Col::accent;
             phosphorShader->setUniform("phos", acc.getFloatRed(), acc.getFloatGreen(), acc.getFloatBlue());
-            glBlendFunc(GL_ONE, GL_ONE);
+            phosphorShader->setUniform("paper", Col::paper ? 1.f : 0.f);
+            // lumière ajoutée sur écran sombre, encre multipliée sur écran Papier
+            if(Col::paper) glBlendFunc(GL_DST_COLOR, GL_ZERO);
+            else           glBlendFunc(GL_ONE, GL_ONE);
             glBindVertexArray(vaoQuad);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
@@ -459,7 +482,9 @@ void GpuVectorscopeDisplay::renderOpenGL()
         densityShader->setUniform("box", cx-r, cy-r, 2.f*r, 2.f*r);
         densityShader->setUniform("invMax", 1.f/densityMax);
         densityShader->setUniform("texel", 1.f/(float)NG);
-        glBlendFunc(GL_ONE, GL_ONE);
+        densityShader->setUniform("paper", Col::paper ? 1.f : 0.f);
+        if(Col::paper) glBlendFunc(GL_DST_COLOR, GL_ZERO);
+        else           glBlendFunc(GL_ONE, GL_ONE);
         glBindVertexArray(vaoQuad);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }

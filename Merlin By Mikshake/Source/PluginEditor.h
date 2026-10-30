@@ -11,6 +11,7 @@
 #include "Lang.h"
 #include "OptionsOverlay.h"
 #include "LicenseOverlay.h"
+#include "AlphaKnob.h"   // knob de Sevenpack Alpha (volume de l'en-tête)
 
 // NB : toutes les couleurs ci-dessous sont des variables 'inline' (C++17, une
 // seule instance partagée entre PluginEditor.cpp et PluginProcessor.cpp),
@@ -35,6 +36,29 @@ namespace Col {
     inline juce::Colour spectroLow  { 0xFF030A0F };
     inline juce::Colour spectroMid  { 0xFFB0B0B0 };
     inline juce::Colour spectroHigh { 0xFFFFFFFF };
+
+    // Écrans « Papier » (v1.75) : en thème clair, les écrans des modules
+    // passent en clair (option lightScreens) et Theme::applyCustom() remplace
+    // la palette par sa version encre sur papier. generation change à chaque
+    // nouvelle palette : un module qui garde un fond en cache le refait
+    // quand elle a bougé.
+    inline bool paper      { false };
+    inline int  generation { 0 };
+    // couleur vive pensée pour un fond noir → version lisible sur papier
+    // (inchangée sur écran sombre)
+    juce::Colour ink(juce::Colour c);
+    // lumière (blanc) sur écran sombre → encre (texte foncé) sur papier
+    inline juce::Colour light(float alpha) { return (paper ? textHi : juce::Colours::white).withAlpha(alpha); }
+    // ombre portée sous un texte ou un trait : noire sur écran sombre, halo blanc sur papier
+    inline juce::Colour shade(float alpha) { return (paper ? juce::Colours::white : juce::Colours::black).withAlpha(alpha); }
+    // couleur propre à chaque fond (fonds, creux, pistes des écrans)
+    inline juce::Colour pick(juce::Colour onDark, juce::Colour onPaper) { return paper ? onPaper : onDark; }
+    // trace plus forte quand le signal monte : vers le blanc sur écran sombre,
+    // vers l'encre sur papier
+    // dégradé de niveau des spectrogrammes sur papier (bas pâle → haut rouge,
+    // comme le spectre), à la place d'inferno qui part du noir
+    juce::Colour paperHeat(float t);
+    inline juce::Colour hot(juce::Colour c, float k) { return paper ? c.interpolatedWith(textHi, k*0.45f) : c.interpolatedWith(juce::Colours::white, k); }
 }
 
 // ── Thème (couleurs) ─────────────────────────────────────────────────────────
@@ -67,7 +91,9 @@ namespace Neu {
     inline juce::Colour shadowLight { 0x14FFFFFF };
     inline juce::Colour text        { 0xFFD9DFE7 };
     inline juce::Colour textDim     { 0xFF8B95A3 };
-    void apply(bool lightTint, bool contrast);
+    // slate : thème sombre en ardoise (design de Sunny, v1.73), sinon gris d'origine
+    // paperScreens : écrans des modules en clair quand le thème est clair (Col::paper)
+    void apply(bool lightTint, bool contrast, bool slate=false, bool paperScreens=false);
     juce::Colour accentInk();   // accent lisible sur le châssis (assombri en clair)
 
     // Relief : carte en saillie (deux ombres) ou creux (ombres internes).
@@ -90,6 +116,16 @@ namespace Ui {
     // repli de police selon la langue (Lang::withScriptFallback : japonais, chinois, coréen, russe)
     inline juce::Font iceland(float h) { return juce::Font(Lang::withScriptFallback(juce::FontOptions().withName("Iceland").withHeight(h*textScale))); }
     inline juce::Font plain  (float h) { return juce::Font(Lang::withScriptFallback(juce::FontOptions(h*textScale))); }
+    // Taille de l'interface : l'éditeur est conçu pour un écran de 1080 lignes
+    // (logiques) ; en Auto, au-delà (4K à 100 %, 1440p…) tout est agrandi
+    // d'autant, par quarts entiers (1152 lignes : ×1, 1440 : ×1,25, 2160 : ×2),
+    // au plus ×3. Réglage 100..200 : pourcentage fixe.
+    inline float uiScaleFor(int setting, const juce::Displays::Display* d)
+    {
+        if(setting>0) return (float)setting/100.f;
+        if(d==nullptr) return 1.f;
+        return juce::jlimit(1.f, 3.f, std::floor(d->logicalBounds.getHeight()/1080.f*4.f)/4.f);
+    }
     // taille déjà mise à l'échelle par l'appelant (ex. texte ajusté à une largeur)
     inline juce::Font icelandAbs(float h) { return juce::Font(Lang::withScriptFallback(juce::FontOptions().withName("Iceland").withHeight(h))); }
 
@@ -145,14 +181,6 @@ namespace SpectroReadout {
                        float labelH, juce::Rectangle<float> clip);
     // texte lisible sur un relief clair ou sombre (ombre portée discrète)
     void drawShadowedText(juce::Graphics&, const juce::String&, juce::Rectangle<float>, juce::Justification, juce::Colour);
-}
-
-// Templates : décor nature éventuel autour du châssis neumorphique (la teinte
-// claire/sombre est un réglage à part, interrupteur lune de la barre de titre).
-namespace Templates {
-    enum class Decor { None, Ivy, Grass };
-    struct Info { const char* name; Decor decor; };
-    const Info& get(LeakAudioProcessor::UiTemplate);
 }
 
 //==============================================================================
@@ -279,7 +307,7 @@ private:
 class PillToggle : public juce::Button, private juce::Timer
 {
 public:
-    enum class Icon { Moon, Contrast, Cube, Text, Meter, Pin };   // Pin : toujours au premier plan
+    enum class Icon { Moon, Contrast, Cube, Text, Meter, Pin, Keyboard };   // Pin : toujours au premier plan ; Keyboard : clavier à Merlin
     explicit PillToggle(Icon i) : juce::Button("pill"), icon(i) { setClickingTogglesState(true); }
     ~PillToggle() override { stopTimer(); }
     void paintButton(juce::Graphics&, bool, bool down) override;
@@ -588,34 +616,6 @@ public:
 };
 
 //==============================================================================
-// TransientDisplay
-//==============================================================================
-class TransientDisplay : public juce::Component, private juce::Timer
-{
-public:
-    explicit TransientDisplay(LeakAudioProcessor&);
-    ~TransientDisplay() override { stopTimer(); }
-    void paint  (juce::Graphics&) override;
-    void resized() override;
-    void setThreshold(float db) { threshold = db; }
-    void setFrameRateHz(int hz) { if(hz<=0){ stopTimer(); return; } startTimerHz(hz); }
-    void mouseDown(const juce::MouseEvent&) override;
-    void mouseUp  (const juce::MouseEvent&) override;
-    void mouseExit(const juce::MouseEvent&) override;
-private:
-    void timerCallback() override;
-    LeakAudioProcessor& processor;
-    static constexpr int COLS = 256;
-    float peakCols[COLS] {};
-    float threshold { -18.f };
-    bool  listening { false };
-    juce::Image scrollImage;
-    bool imageValid { false };
-    float lastHash { -999.f };  // optimisation CPU : évite les repaint inutiles en silence
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TransientDisplay)
-};
-
-//==============================================================================
 // VuMeterLeak
 //==============================================================================
 class VuMeterLeak : public juce::Component
@@ -696,7 +696,7 @@ public:
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp  (const juce::MouseEvent&) override;
     // Efface la sélection de bandes locale (appelé quand un AUTRE module
-    // prend la main sur l'audition — un seul module sélectionné à la fois).
+    // efface celle des autres — un seul module sélectionné à la fois).
     void clearBandSelection() { multiSelectMask=0; soloBand=-1; lastDragBand=-1; repaint(); }
     // Notifié quand CE module vient de modifier sa propre sélection (clic/glisser) —
     // câblé par LeakEditor pour effacer la sélection des autres modules.
@@ -729,6 +729,7 @@ private:
     struct BandCache { float x{0},bw{0},labelX{0},labelY{0}; bool showLabel{false}; };
     BandCache barCache[NMAX];
     bool  cacheValid    { false };
+    int   cacheGen      { -1 };   // Col::generation du cache (palette écrans Papier / sombres)
     bool  gridImageValid{ false };
     float cachedPadL{ 38.f }, cachedGW{ 600.f }, cachedGH{ 250.f };
     float cachedLogMin{ 1.30103f }, cachedLogMax{ 4.30103f };   // axe log (bords des bandes extrêmes)
@@ -763,7 +764,7 @@ private:
 
     int          hoveredBand    { -1 };
     int          soloBand       { -1 };
-    // ── Sélection multi-bandes (Ctrl+clic / Ctrl+glisser) pour l'audition ──
+    // ── Sélection multi-bandes (Ctrl+clic / Ctrl+glisser) ──
     uint64_t     multiSelectMask{ 0 };
     int          lastDragBand   { -1 };
     float        hoverPixX      { 0.f };
@@ -848,7 +849,7 @@ private:
     float prevCorr[NMAX] {};  // dernière valeur repeinte — référence du dirty-check
     float releaseSec { 0.4f };
     int   soloBand    { -1 };
-    // ── Sélection multi-bandes (Ctrl+clic / Ctrl+glisser) pour l'audition ──
+    // ── Sélection multi-bandes (Ctrl+clic / Ctrl+glisser) ──
     uint64_t multiSelectMask { 0 };
     int      lastDragBand    { -1 };
     int   hoveredBand { -1 };
@@ -894,7 +895,7 @@ private:
     float releaseAlpha { 0.88f };   // décroissance phosphore par frame — pilotée par RELEASE
     float releaseSec   { 0.4f };
     int   soloBand     { -1 };
-    // ── Sélection multi-bandes (Ctrl+clic / Ctrl+glisser) pour l'audition ──
+    // ── Sélection multi-bandes (Ctrl+clic / Ctrl+glisser) ──
     uint64_t multiSelectMask { 0 };
     int      lastDragBand    { -1 };
     int   hoveredBand  { -1 };
@@ -1033,13 +1034,82 @@ private:
 //==============================================================================
 // TopBar — titre + sous-titre, logo, sélecteur de presets, bouton settings
 //==============================================================================
-class TopBar : public juce::Component
+//==============================================================================
+// VolumeRing — volume de la sortie Windows dans l'en-tête. v1.73.4 : knob
+// neumorphique du thème clair de Sevenpack Alpha, contraste renforcé, dans
+// tous les thèmes ; « VOL » et la valeur à gauche ; glisser ou molette.
+//==============================================================================
+class VolumeRing : public juce::Slider
+{
+public:
+    VolumeRing()
+    {
+        setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+        setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
+        setRotaryParameters(juce::MathConstants<float>::pi*1.25f, juce::MathConstants<float>::pi*2.75f, true);
+        setRange(0.0, 100.0, 1.0);
+    }
+    void paint(juce::Graphics&) override;
+private:
+    juce::SharedResourcePointer<AlphaKnob::Cache> knobCache;
+};
+
+//==============================================================================
+// StepArrow — petite flèche ◀ / ▶ (preset précédent / suivant)
+//==============================================================================
+class StepArrow : public juce::Button
+{
+public:
+    explicit StepArrow(bool pointsRight) : juce::Button(pointsRight ? "next" : "prev"), right(pointsRight)
+    { setMouseCursor(juce::MouseCursor::PointingHandCursor); }
+    void paintButton(juce::Graphics&, bool over, bool down) override;
+private:
+    bool right;
+};
+
+//==============================================================================
+// PresetBar (v1.73) — sélecteur de presets au centre de la bande du bas (design
+// de Sunny) : flèches précédent / suivant autour du menu PRESET (presets
+// d'usine, presets utilisateur, enregistrer / supprimer / dossier). Repris de
+// l'en-tête, où il se trouvait avant.
+//==============================================================================
+class PresetBar : public juce::Component
+{
+public:
+    PresetBar();
+    void resized() override;
+    void retranslate();
+    void setPresetList(const juce::StringArray& userNames, const juce::String& current);
+    std::function<void(int)> onPresetSelected;   // 0=Mixing 1=Mastering 2=Sound Design 3=TV
+    std::function<void(const juce::String&)> onUserPresetSelected;
+    std::function<void()>                    onSavePresetRequested;
+    std::function<void(const juce::String&)> onDeletePresetRequested;
+    std::function<void()>                    onOpenPresetFolder;
+private:
+    void step(int dir);   // flèches : preset suivant / précédent (usine puis utilisateur, en boucle)
+    FocusComboBox     presetCombo;
+    StepArrow         prevBtn { false }, nextBtn { true };
+    juce::StringArray userPresets;   // noms des presets utilisateur (ids 100+)
+    juce::String      shownPreset;   // preset utilisateur affiché (vide = usine ou aucun)
+    int               shownId { 0 }; // élément affiché avant une action (enregistrer…)
+    enum { kSavePresetId=900, kDeletePresetId, kPresetFolderId, kUserPresetBaseId=100 };
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PresetBar)
+};
+
+// En-tête (v1.73, design de Sunny, hauteur d'origine) : merle, interrupteurs en
+// 2×2 (thème, 3D / premier plan, clavier), logotype MERLIN α + fréquence
+// d'échantillonnage dans un cadre d'accent, volume Windows, RESET, plein écran,
+// options, monogramme Side Key.
+class TopBar : public juce::Component, private juce::Timer
 {
 public:
     explicit TopBar();
-    ~TopBar() override { setLookAndFeel(nullptr); }
+    ~TopBar() override { stopTimer(); setLookAndFeel(nullptr); }
     void paint  (juce::Graphics&) override;
     void resized() override;
+    // v1.74 : l'en-tête a pris 16 px à la bande du bas ; les tailles plafond
+    // de ses éléments grandissent d'autant (x1 jusqu'à 52 px de haut)
+    float headerScale() const { return juce::jlimit(1.f, 1.24f, (float)getHeight()/52.f); }
     // repeint seulement pendant l'effet (il s'anime) et à son extinction
     void setGlitch(bool b) { if(b || glitching){ glitching=b; repaint(); } }
     void mouseDown(const juce::MouseEvent& e) override
@@ -1059,13 +1129,7 @@ public:
     std::function<void()>    onAboutClicked;
     std::function<void()>    onTitleClicked;
     std::function<void()>    onSettingsClicked;
-    std::function<void(int)> onPresetSelected;   // 0=Mixing 1=Mastering 2=Sound Design 3=TV
-    // presets utilisateur (menu PRESET) : liste + actions
-    void setPresetList(const juce::StringArray& userNames, const juce::String& current);
-    std::function<void(const juce::String&)> onUserPresetSelected;
-    std::function<void()>                    onSavePresetRequested;
-    std::function<void(const juce::String&)> onDeletePresetRequested;
-    std::function<void()>                    onOpenPresetFolder;
+    std::function<void()>    onResetClicked;     // RESET (loudness, crêtes, VU)
     std::function<void(bool)> onThemeToggled;    // true = sombre (nuit)
     std::function<void(bool)> onContrastToggled; // true = contraste renforcé
     std::function<void(bool)> onModules3DToggled; // true = modules en 3D
@@ -1075,12 +1139,12 @@ public:
     std::function<void()>     onFullScreenClicked;  // bouton plein écran (à côté de PRESET)
     void setFullScreenState(bool b) { fullScreenBtn.setFullScreen(b); }
     std::function<void(bool)> onKeyboardToggled;    // true = le clavier va à Merlin
-    void retranslate();   // langue changée : infobulles et menu PRESET
+    void retranslate();   // langue changée : infobulles
     void setKeyboardState(bool b)
     {
-        keyboardBtn.setToggleState(b, juce::dontSendNotification);
-        keyboardBtn.setTooltip(TR(b ? "Clavier : Merlin (cliquer pour le rendre \xc3\xa0 Ableton)"
-                                    : "Clavier : Ableton (cliquer pour le donner \xc3\xa0 Merlin)"));
+        keyboardToggle.setToggleState(b, juce::dontSendNotification);
+        keyboardToggle.setTooltip(TR(b ? "Clavier : Merlin (cliquer pour le rendre \xc3\xa0 Ableton)"
+                                       : "Clavier : Ableton (cliquer pour le donner \xc3\xa0 Merlin)"));
     }
     void setLookState(bool dark, bool contrast, bool modules3D, bool largeText)
     {
@@ -1090,13 +1154,16 @@ public:
         largeTextToggle.setToggleState(largeText,     juce::dontSendNotification);
     }
 private:
-    // Interrupteurs thème / contraste de Sevenpack, en haut à gauche après le merle
-    // (le style de la section master est passé sous le VU master, dans l'éditeur)
+    void timerCallback() override;    // suit le volume Windows changé ailleurs
+    void showWindowsVolume(float v);  // v 0..1, < 0 si indisponible
+    // Interrupteurs de Sevenpack, en 2×2 après le merle : thème, 3D / premier
+    // plan, clavier (le style de la section master est dans la bande du bas)
     PillToggle themeToggle    { PillToggle::Icon::Moon };
     PillToggle contrastToggle { PillToggle::Icon::Contrast };
     PillToggle modules3DToggle { PillToggle::Icon::Cube };   // modules en 3D
     PillToggle largeTextToggle { PillToggle::Icon::Text };   // textes agrandis
     PillToggle onTopToggle     { PillToggle::Icon::Pin };    // toujours au premier plan
+    PillToggle keyboardToggle  { PillToggle::Icon::Keyboard };   // clavier à Merlin (sinon à Ableton)
     bool          glitching { false };
     juce::Random  rng;
     juce::Image   logoImage;
@@ -1107,100 +1174,28 @@ private:
     NeuLookAndFeel   laf;
     KebabButton      gearBtn;   // menu d'options (trois points, comme Sevenpack Alpha)
     FullScreenButton fullScreenBtn;
-    KeyboardButton   keyboardBtn;   // à gauche de PRESET
-    FocusComboBox    presetCombo;
-    juce::StringArray userPresets;   // noms des presets utilisateur (ids 100+)
-    juce::String      shownPreset;   // preset utilisateur affiché (vide = usine ou aucun)
-    int               shownId { 0 }; // élément affiché avant une action (enregistrer…)
-    enum { kSavePresetId=900, kDeletePresetId, kPresetFolderId, kUserPresetBaseId=100 };
+    NeuAnimButton    resetBtn { "RESET" };
+    VolumeRing       volKnob;   // volume général de la sortie Windows (appli)
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TopBar)
-};
-
-//==============================================================================
-// SettingsOverlay — voile plein écran (icône engrenage) : palette d'accent
-// + réinitialisation de la disposition des slots.
-//==============================================================================
-class SettingsOverlay : public juce::Component, private juce::ChangeListener, private juce::Timer
-{
-public:
-    SettingsOverlay();
-    void paint  (juce::Graphics&) override;
-    void resized() override;
-    void mouseDown(const juce::MouseEvent&) override;
-    void mouseMove(const juce::MouseEvent&) override;
-    void mouseExit(const juce::MouseEvent&) override;
-    void visibilityChanged() override;
-
-    // Galerie des templates (colonne de gauche) : vignettes animées avec les
-    // mesures réelles ; survol = aperçu sur toute l'appli, clic = appliquer.
-    static constexpr int NUM_TEMPLATES = (int)LeakAudioProcessor::UiTemplate::Count;
-    void setProcessor(LeakAudioProcessor* p) { processor=p; }
-    void setCurrentTemplate(int t) { currentTemplate=t; repaint(); }
-    void invalidateThumbs() { for(auto& t : templateThumbs) t={}; }   // teinte / contraste changés
-    std::function<void(int)> onTemplateHover;      // -1 = fin du survol
-    std::function<void(int)> onTemplateSelected;
-    void setLightCpuMode(bool b) { lightCpu=b; repaint(); }
-    static constexpr int NUM_COLOR_ROLES = 8;
-    // Reflète l'état courant des 8 rôles de couleur (menu Settings) — appelé
-    // à l'ouverture du panneau pour que les swatches affichent la bonne teinte.
-    void setColorRoles(juce::Colour accent, juce::Colour grid, juce::Colour bg,
-                        juce::Colour text, juce::Colour side,
-                        juce::Colour spectroLow, juce::Colour spectroMid, juce::Colour spectroHigh)
-    { roleColors[0]=accent; roleColors[1]=grid; roleColors[2]=bg; roleColors[3]=text; roleColors[4]=side;
-      roleColors[5]=spectroLow; roleColors[6]=spectroMid; roleColors[7]=spectroHigh; }
-    std::function<void(int)>  onAccentSelected;
-    std::function<void()>     onResetLayout;
-    std::function<void(bool)> onLightCpuToggled;
-    // role : 0=accent 1=grille 2=fond 3=texte 4=canal side 5=spectro creux 6=spectro milieu 7=spectro pic
-    std::function<void(int,juce::Colour)> onColorRoleChanged;
-    std::function<void()>     onColorsReset;
-private:
-    void changeListenerCallback(juce::ChangeBroadcaster*) override;
-    void timerCallback() override;
-    void openColorPicker(int role);
-    void setHoveredTemplate(int t);
-    void drawTemplateCard(juce::Graphics&, int t, juce::Rectangle<float> r);
-    juce::Rectangle<float> panelBounds;
-    juce::Rectangle<float> templatesArea, settingsArea;
-    juce::Rectangle<float> templateRects[NUM_TEMPLATES];
-    juce::Image templateThumbs[NUM_TEMPLATES];   // fond (décor) pré-rendu à la taille des vignettes
-    int  hoveredTemplate { -1 }, currentTemplate { 0 };
-    LeakAudioProcessor* processor { nullptr };
-    float liveBands[LeakAudioProcessor::N_BANDS_31] {};
-    LeakAudioProcessor::VuData liveVu;
-    juce::Rectangle<float> swatchRects[Theme::NUM_PALETTES];
-    juce::Rectangle<float> resetBtnBounds;
-    juce::Rectangle<float> resetColorsBtnBounds;
-    juce::Rectangle<float> lightCpuBounds;
-    juce::Rectangle<float> colorSwatchRects[NUM_COLOR_ROLES];
-    juce::Colour roleColors[NUM_COLOR_ROLES] { juce::Colour(0xFF00FFB2), juce::Colour(0xFF0B3030),
-                                  juce::Colour(0xFF030A0A), juce::Colour(0xFFC8FFE8),
-                                  juce::Colour(0xFFB266FF), juce::Colour(0xFF333333),
-                                  juce::Colour(0xFFB0B0B0), juce::Colour(0xFF470000) };
-    int activeColorRole { -1 };
-    bool lightCpu { false };
-    int hoveredSwatch { -1 };
-    int hoveredColorRow { -1 };
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsOverlay)
 };
 
 //==============================================================================
 // ControlsBarLeak
 //==============================================================================
-class ControlsBarLeak : public juce::Component, private juce::Timer
+// Bande du bas (v1.73, design de Sunny) : une seule rangée fixe, titres en
+// ligne — PEAK HOLD, RANGE, MS à gauche, presets au centre, VIEW à droite.
+// RESET et le volume Windows sont passés dans l'en-tête.
+class ControlsBarLeak : public juce::Component
 {
 public:
     ControlsBarLeak(SpectrumDisplayLeak&, LeakAudioProcessor&, VuMeterLeak&, GpuOscilloscopeDisplay&);
-    ~ControlsBarLeak() override { stopTimer(); setLookAndFeel(nullptr); }
+    ~ControlsBarLeak() override { setLookAndFeel(nullptr); }
     void resized() override;
     void paint  (juce::Graphics&) override;
     void syncFromProcessor();
     void syncOscFromProcessor();   // oscilloscope (et ses faders) relu dans le processor
+    PresetBar presets;             // sélecteur de presets, au centre
 private:
-    void timerCallback() override;   // suit le volume Windows changé ailleurs
-    void showWindowsVolume(float v); // v 0..1, < 0 si indisponible
-    juce::Slider     volKnob;        // volume général de la sortie Windows
-    juce::Label      volVal;
     SpectrumDisplayLeak&  display;
     LeakAudioProcessor&   processor;
     VuMeterLeak&          vuMeter;
@@ -1215,9 +1210,10 @@ private:
     NeuAnimButton    bands15Btn{ "15" };
     NeuAnimButton    bands31Btn{ "31" };
     NeuAnimButton    bands62Btn{ "62" };
-    NeuAnimButton    resetBtn  { "RESET" };
 
-    // Positions des séparateurs verticaux entre groupes (calculées dans resized())
+    // titres en ligne (PEAK HOLD, RANGE, MS, VIEW) et séparateurs gravés entre
+    // groupes, placés dans resized()
+    juce::Rectangle<int> groupLabel[4];
     float groupDividerX[2] {};
 
     std::function<void()> updateMSMode;
@@ -1225,25 +1221,87 @@ private:
 };
 
 //==============================================================================
-// AboutOverlay — présentation complète de Merlin MTR 2 (texte, photo, tampon
-// "Calibrated by Side Key System"), même traitement visuel que Nuke Mk1.
-// Se ferme au clic n'importe où sur le voile (sauf le lien du site).
+// AboutOverlay (v1.70) — page À propos dans l'esprit de Sevenpack Alpha (aperçu
+// preview/merlin_about_preview.html validé) : en-tête (monogramme, ABOUT
+// MERLIN α, accroche, version), bandeau du duo (portraits noir et blanc
+// Mikshake · CODE / Sunny · DESIGN + présentation), 3 colonnes de texte
+// défilantes, pied de page (deux signatures, liens site | licence, tampon
+// "Calibrated"). Apparition / disparition animées ; se ferme au clic n'importe
+// où ou à Échap, sauf sur les liens.
 //==============================================================================
-class AboutOverlay : public juce::Component
+class AboutOverlay : public juce::Component, private juce::Timer
 {
 public:
+    // Élément de colonne : titre, paragraphe justifié ou puce
+    struct ColumnItem
+    {
+        enum class Kind { Paragraph, Header, Bullet };
+        juce::String text;
+        Kind kind = Kind::Paragraph;
+    };
+
+    // Colonne de texte : calcule sa propre hauteur (le Viewport parent sait
+    // jusqu'où défiler) ; un clic dessus ferme aussi la page
+    class Column : public juce::Component
+    {
+    public:
+        std::function<void()> onAnyClick;
+        void mouseDown(const juce::MouseEvent&) override { if(onAnyClick) onAnyClick(); }
+        void setItems(std::vector<ColumnItem> v) { items=std::move(v); }
+        void layout(int width);   // appelé par le parent une fois la largeur connue
+        void paint(juce::Graphics&) override;
+    private:
+        float itemHeight(const ColumnItem&, float width) const;
+        float drawItem(juce::Graphics*, const ColumnItem&, float y, float width) const;   // renvoie la hauteur
+        std::vector<ColumnItem> items;
+    };
+
     AboutOverlay();
     void paint(juce::Graphics&) override;
-    void resized() override {}
+    void resized() override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseMove(const juce::MouseEvent&) override;   // main sur les liens
+    bool keyPressed(const juce::KeyPress&) override;
+    void visibilityChanged() override;
+
+    void showAnimated();   // thème relu, voile fondu, panneau qui grandit avec un léger rebond
+    void hideAnimated();
+    void setLicenseManager(LicenseManager& lm) { license=&lm; }
+    std::function<void()> onOpenLicence;   // lien licence du pied de page
+
 private:
-    static float drawParagraph(juce::Graphics&, const juce::String&, juce::Rectangle<float>,
-                                juce::Font, juce::Colour, float lineSpacing);
-    void drawStamp      (juce::Graphics&, juce::Rectangle<float>) const;
-    void drawWebsiteLink(juce::Graphics&, juce::Rectangle<float>);
-    juce::Image badgeImage;
-    juce::Image photoImage;
-    juce::Rectangle<float> websiteBounds;
+    struct Layout
+    {
+        juce::Rectangle<float> header, team, footer;
+        float headerLineY=0.f, teamLineY=0.f, footerLineY=0.f, lineX0=0.f, lineX1=0.f;
+        juce::Rectangle<int> colA, colB, colC;
+        float dividerX1=0.f, dividerX2=0.f, colTop=0.f, colBottom=0.f;
+    };
+    Layout computeLayout() const;
+    juce::Rectangle<float> panelBounds() const;
+    juce::AffineTransform panelTransform() const;
+    void startAnimation(bool in);
+    void timerCallback() override;
+    void rebuildChromeCache();
+    void drawHeader(juce::Graphics&, juce::Rectangle<float>) const;
+    void drawTeam  (juce::Graphics&, juce::Rectangle<float>, float scale) const;
+    void drawFooter(juce::Graphics&, juce::Rectangle<float>, float scale);
+    void drawStamp (juce::Graphics&, juce::Rectangle<float>) const;
+    juce::String licenceText() const;
+
+    juce::Image monogram, portrait[2], signature[2];   // signatures : encre seule (alpha), teintée au thème
+    juce::Image chromeCache;                              // décor statique, à l'échelle de l'écran
+    float chromeScale=1.f;
+    juce::Rectangle<float> websiteBounds, licenceBounds;
+    LicenseManager* license=nullptr;
+
+    juce::Viewport viewport[3];
+    Column column[3];
+
+    bool animating=false, animatingIn=false;
+    double animStartMs=0.0;
+    float animOpacity=1.f, animScale=1.f, animFrom=0.f;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AboutOverlay)
 };
 
@@ -1261,8 +1319,6 @@ public:
     void paint  (juce::Graphics&) override;
     void resized() override;
 
-    // Applique et mémorise un template (galerie Settings, menu de l'appli).
-    void setTemplate(LeakAudioProcessor::UiTemplate);
     // Applique les réglages d'Options > Image (images/s, anticrénelage, V-Sync)
     void applyGraphics();
     // Bouton plein écran de la barre de titre : la fenêtre (Main.cpp) bascule
@@ -1277,8 +1333,8 @@ public:
     {
         topBar.setAlwaysOnTopState(b);
         alwaysOnTopState=b;
-        for(auto& w : detached)   // les modules détachés suivent la fenêtre principale
-            if(w!=nullptr) w->setAlwaysOnTop(b);
+        for(auto& f : floating)   // les modules détachés suivent la fenêtre principale
+            if(f.window!=nullptr) f.window->setAlwaysOnTop(b);
         if(optionsWindow!=nullptr) optionsWindow->setAlwaysOnTop(b);   // la fenêtre des Options aussi
     }
     void mouseDown(const juce::MouseEvent&) override;
@@ -1295,6 +1351,7 @@ public:
         std::function<void(bool)>     setAlwaysOnTop;
         std::function<void(bool)>     setKeyboardInMerlin;   // bouton clavier de l'en-tête
         std::function<void(bool)>     holdKeyboard;          // écran de licence : clavier à Merlin le temps de la saisie
+        std::function<void()>         uiScaleChanged;        // Options › Taille de l'interface : la fenêtre remet l'éditeur à l'échelle
     };
     HostHooks host;
     bool isLicenceOpen() const { return licenseOverlay.isVisible(); }   // écran de licence affiché
@@ -1305,27 +1362,27 @@ private:
     void applyPreset(int idx);   // 0=Mixing 1=Mastering 2=Sound Design 3=TV
     void applyFrameRate(int hz);   // cadence des modules à l'écran (cachés : arrêtés)
     std::map<const juce::Component*, int> appliedFrameRate;   // dernière cadence appliquée par module
-    void refreshChassis();   // reconstruit le châssis du template affiché (aperçu ou mémorisé)
+    void refreshChassis();   // reconstruit les caches du châssis
     void applyLook();   // teinte + contraste du processeur -> châssis, caches, vignettes
     void applyTextScale();   // taille de texte du processeur -> toute l'interface
+    // Taille de l'interface (plugin) : échelle de l'hôte × celle choisie, appliquée
+    // par AudioProcessorEditor::setScaleFactor (la DAW suit la taille de la fenêtre).
+    // Dans l'appli, c'est la fenêtre qui met l'éditeur à l'échelle (Main.cpp).
+    void setScaleFactor(float newScale) override;
+    void applyUiScale();
+    float hostScale { 1.f }, appliedUiScale { 0.f };
+    int   uiScaleCheckTicks { 0 };
     void applyLanguage();    // langue du processeur -> toute l'interface, en place
-    LeakAudioProcessor::UiTemplate shownTemplate() const;
     void paintChassisOverlay(juce::Graphics&);
-    // withDynamic=false : sans les éléments qui bougent pendant le repli de la
-    // barre de contrôles (écrans E et F, barre, poignée), peints en direct
-    void rebuildChassisCaches(float pxScale, bool withDynamic=true);
-    void paintDynamicChassis(juce::Graphics&);           // pendant l'animation de repli
-    void drawControlsCardAndHandle(juce::Graphics&, float collapse, float pulse);
+    void rebuildChassisCaches(float pxScale);
     void drawEmptySlotPlus(juce::Graphics&, int slot);
-
-    // Animation du repli de la barre de contrôles (flèche) : 0 = dépliée, 1 = repliée
-    void startCollapseAnimation(bool collapse);
-    void collapseAnimStep();
-    float  collapseAnim { 0.f }, animFrom { 0.f }, animTo { 0.f }, handlePulse { 0.f };
-    double animStartMs { 0.0 };
-    bool   collapseAnimating { false }, animBaseValid { false };
-    std::unique_ptr<juce::VBlankAttachment> collapseVBlank;
-    juce::Component controlsDrawer;   // découpe la barre quand elle glisse sous le bord
+    // palette des modules relue depuis les couleurs du processeur (écrans
+    // Papier compris) ; actions de l'onglet Couleurs des Options
+    void applyColours();
+    void selectAccentPalette(int idx);
+    void setColourRole(int role, juce::Colour c);
+    void resetColours();
+    void resetLayout();
 
     // Slot management
     juce::Component* getComponentForModule(int moduleId);
@@ -1333,7 +1390,6 @@ private:
     void showModuleMenu(int slot, juce::Point<int> screenPos);
 
     bool initialSyncDone { false };
-    bool controlsCollapsed { false };
 
     LeakAudioProcessor&  audioProcessor;
     LeakLookAndFeel      laf;
@@ -1341,7 +1397,6 @@ private:
     TopBar               topBar;
     VectorscopeDisplay   vectorscope;
     GpuOscilloscopeDisplay oscilloscope;   // rendu par la carte graphique
-    TransientDisplay     transient;
     LoudnessPanel        loudnessPanel;
     VuMeterLeak          vuMeter;
     SpectrumDisplayLeak  spectrum;
@@ -1384,7 +1439,6 @@ private:
     };
     OverlayLayer         overlayLayer;
     AboutOverlay         aboutOverlay;
-    SettingsOverlay      settingsOverlay;   // galerie des templates (ouverte depuis Options > Apparence)
     OptionsOverlay       optionsOverlay;    // menu Options (trois points)
     // licence (DRM SideKey) : un gestionnaire partagé par l'appli et toutes les instances du plugin
     juce::SharedResourcePointer<LicenseManager> license;
@@ -1394,8 +1448,11 @@ private:
     void openLicence();
 
     // Modules détachés (appli) : titre tiré hors de l'emplacement → fenêtre à
-    // part qui suit la souris ; l'emplacement devient un creux cliquable qui le
-    // ramène. Pas mémorisé d'un lancement à l'autre.
+    // part qui suit la souris. L'emplacement devient un creux partagé en deux
+    // (v1.71) : une moitié ramène le module, l'autre ouvre le menu pour en
+    // mettre un autre, la fenêtre restant ouverte. Fermer la fenêtre ramène le
+    // module si son emplacement l'attend encore, sinon il disparaît (il reste
+    // dans le menu ; le choisir le ramène). Pas mémorisé d'un lancement à l'autre.
     struct DetachedWindow : public juce::DocumentWindow
     {
         // fenêtre native créée une seule fois, une fois taillée (sinon la barre de
@@ -1413,16 +1470,28 @@ private:
         void closeButtonPressed() override { if(onClose) onClose(); }
         std::function<void()> onClose;
     };
-    std::array<std::unique_ptr<DetachedWindow>, LeakAudioProcessor::NUM_SLOTS> detached;
+    // fenêtre d'un module détaché, et l'emplacement qu'il a quitté
+    struct FloatingModule { int module=0, homeSlot=-1; std::unique_ptr<DetachedWindow> window; };
+    std::vector<FloatingModule> floating;
     // Options (appli) : fenêtre à part, déplaçable ; Merlin reste visible et actif
     std::unique_ptr<DetachedWindow> optionsWindow;
     void closeOptions();
-    bool isDetached(int s) const { return s>=0 && s<LeakAudioProcessor::NUM_SLOTS && detached[(size_t)s]!=nullptr; }
+    FloatingModule* floatingFor(int module);   // nullptr si le module n'est pas dans une fenêtre
+    // emplacement quitté par son module, qui est dans une fenêtre (creux partagé)
+    bool isDetached(int s) const;
     void detachSlot(int s);
-    void reattachSlot(int s);
+    void reattachSlot(int s);       // ramène dans s le module qui l'a quitté
+    void dockFloating(int module);  // ferme la fenêtre : le module revient à l'éditeur (affiché seulement s'il a un emplacement)
     void reattachAll();
     void followDetachDrag();
     void drawDetachedSlot(juce::Graphics&, int s);
+    void drawDetachedHalf(juce::Graphics&, int s, bool addHalf, bool hover);
+    // moitiés du creux partagé : ramener le module (gauche / haut), en ajouter un autre (droite / bas)
+    juce::Rectangle<int> detachedHalf(int s, bool addHalf) const;
+    int  hoverDetachedSlot { -1 };
+    bool hoverDetachedAdd { false };
+    void mouseMove(const juce::MouseEvent&) override;
+    void mouseExit(const juce::MouseEvent&) override;
     int  dragSlot { -1 };                 // titre de module cliqué : candidat au détachement
     juce::Point<int> dragStart, dragGrab; // départ (écran) / prise dans le module
     bool dragFollowing { false };         // fenêtre détachée qui suit la souris
@@ -1446,27 +1515,17 @@ private:
     // 6 slots remplaçant rcVec/rcOsc/rcTrn/rcLoud/rcSpec/rcVu
     juce::Rectangle<int> rcSlot[LeakAudioProcessor::NUM_SLOTS];
     juce::Rectangle<int> rcTitle, rcCtrl;
-    juce::Rectangle<int> rcCollapseHandle;   // poignée de repli de la barre de contrôles
     // design de la section master (A Instrument / C Console), sous le VU master
     PillToggle masterStyleToggle { PillToggle::Icon::Meter };
 
-    // Template affiché (aperçu au survol de la galerie, sinon celui mémorisé)
-    int previewTemplate { -1 };
-
-    // Décor nature (photo de fond, cadre de lierre, bande d'herbe)
-    juce::Image natureImage;
-    juce::Image foliageImage;          // cadre de lierre (image entière)
-    juce::Image grassImage;            // bande d'herbe, répétée sur les 4 bords
-
     // Caches du châssis, à la résolution physique — reconstruits si la taille,
-    // l'échelle, le template ou la disposition des slots changent.
-    juce::Image chassisCache;          // fond + plaque + cartes en relief (opaque)
-    juce::Image overlayCache;          // décor débordant + bords creusés (transparent)
+    // l'échelle, le thème ou la disposition des slots changent.
+    juce::Image chassisCache;          // plaque + cartes en relief (opaque)
+    juce::Image overlayCache;          // bords creusés des écrans (transparent)
     juce::RectangleList<int> overlayRegions;   // zones utiles de overlayCache
     float cacheScale { 0.f };
-    int   cacheW { 0 }, cacheH { 0 }, cacheTemplate { -1 };
+    int   cacheW { 0 }, cacheH { 0 };
     bool  layoutDirty { true };
-    int frameWidth() const;            // largeur du cadre selon le template
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LeakEditor)
 };

@@ -3,7 +3,7 @@
 <JUCERPROJECT id="MrlaPg" name="Merlin Alpha Plugin" projectType="audioplug"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
               companyName="Side Key System" companyEmail="https://sidekey.fr"
-              companyWebsite="https://sidekey.fr" version="1.69.2" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
+              companyWebsite="https://sidekey.fr" version="1.76.3" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
               displaySplashScreen="0" defines="MERLIN_PLUGIN=1" pluginFormats="buildAU,buildVST3"
               pluginName="Merlin Alpha" pluginDesc="Advanced Audio Analyzer"
               pluginManufacturer="Side Key System" pluginManufacturerCode="SdKy"
@@ -17,6 +17,7 @@
             file="../Merlin By Mikshake/Source/PluginProcessor.h"/>
       <FILE id="MpEdC" name="PluginEditor.cpp" compile="1" resource="0" file="../Merlin By Mikshake/Source/PluginEditor.cpp"/>
       <FILE id="MpEdH" name="PluginEditor.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/PluginEditor.h"/>
+      <FILE id="AlKnb1" name="AlphaKnob.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/AlphaKnob.h"/>
       <FILE id="MpModH" name="AppMode.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/AppMode.h"/>
       <FILE id="MpLicM" name="LicenseManager.h" compile="0" resource="0"
             file="../Merlin By Mikshake/Source/LicenseManager.h"/>
@@ -59,6 +60,14 @@
             file="../Merlin By Mikshake/Source/Audiowide-Regular.ttf"/>
       <FILE id="lLoAXi" name="mikshake_about.png" compile="0" resource="1"
             file="../Merlin By Mikshake/Source/mikshake_about.png"/>
+      <FILE id="Ab7Mkc" name="mikshake_about_crop.jpg" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/mikshake_about_crop.jpg"/>
+      <FILE id="Ab7Snc" name="sunny_crop.jpg" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/sunny_crop.jpg"/>
+      <FILE id="Ab7Msg" name="signature_mikshake.png" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/signature_mikshake.png"/>
+      <FILE id="Ab7Ssg" name="signature_sunny.png" compile="0" resource="1"
+            file="../Merlin By Mikshake/Source/signature_sunny.png"/>
       <FILE id="MbLngT" name="translations.tsv" compile="0" resource="1"
             file="../Merlin By Mikshake/Source/translations.tsv"/>
     </GROUP>

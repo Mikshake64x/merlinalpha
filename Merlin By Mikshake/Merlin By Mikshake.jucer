@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="MrlnBM" name="Merlin Alpha" projectType="guiapp" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="Side Key System"
-              companyEmail="https://sidekey.fr" version="1.69.2" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
+              companyEmail="https://sidekey.fr" version="1.76.3" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
               displaySplashScreen="0">
   <MAINGROUP id="MbmGrp" name="Merlin Alpha">
     <GROUP id="{6B1F2C7A-3D4E-4F50-9A61-7C8D9E0F1A2B}" name="Source">
@@ -24,7 +24,16 @@
             file="Source/Audiowide-Regular.ttf"/>
       <FILE id="lLoAXi" name="mikshake_about.png" compile="0" resource="1"
             file="Source/mikshake_about.png"/>
+      <FILE id="Ab7Mkc" name="mikshake_about_crop.jpg" compile="0" resource="1"
+            file="Source/mikshake_about_crop.jpg"/>
+      <FILE id="Ab7Snc" name="sunny_crop.jpg" compile="0" resource="1"
+            file="Source/sunny_crop.jpg"/>
+      <FILE id="Ab7Msg" name="signature_mikshake.png" compile="0" resource="1"
+            file="Source/signature_mikshake.png"/>
+      <FILE id="Ab7Ssg" name="signature_sunny.png" compile="0" resource="1"
+            file="Source/signature_sunny.png"/>
       <FILE id="M66LeR" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="AlKnb1" name="AlphaKnob.h" compile="0" resource="0" file="Source/AlphaKnob.h"/>
       <FILE id="MbGpuC" name="GpuSpectrogram.cpp" compile="1" resource="0"
             file="Source/GpuSpectrogram.cpp"/>
       <FILE id="MbGpuH" name="GpuSpectrogram.h" compile="0" resource="0"

@@ -166,6 +166,7 @@ namespace
 
         std::function<void()> onExitRequested;    // F11 / Échap
         std::function<void()> onCloseRequested;   // Alt+F4
+        float fixedScale = 0.f;   // Options › Taille de l'interface fixe (0 : Auto, d'après la taille de l'écran)
 
         FullScreenWindow()
         {
@@ -238,8 +239,50 @@ namespace
             if (editor == nullptr || getWidth() <= 0 || getHeight() <= 0)
                 return;
 
-            const float scale = juce::jmax (1.f, (float) getHeight() / referenceHeight,
-                                                 (float) getWidth()  / maxDesignWidth);
+            const float scale = fixedScale > 0.f ? fixedScale
+                                                 : juce::jmax (1.f, (float) getHeight() / referenceHeight,
+                                                                    (float) getWidth()  / maxDesignWidth);
+            editor->setTransform ({});
+            editor->setBounds (0, 0, juce::roundToInt ((float) getWidth()  / scale),
+                                     juce::roundToInt ((float) getHeight() / scale));
+            editor->setTransform (juce::AffineTransform::scale (scale));
+        }
+
+    private:
+        juce::Component* editor = nullptr;
+    };
+
+    // Contenu de la fenêtre normale (v1.72) : comme en plein écran, l'éditeur y
+    // est agrandi d'un bloc (Options › Taille de l'interface) — même mise en
+    // page à toutes les tailles, rendu net à la résolution physique.
+    class ScaledHolder final : public juce::Component
+    {
+    public:
+        float scale = 1.f;
+
+        ScaledHolder() { setOpaque (true); }
+
+        void setEditor (juce::Component* newEditor)
+        {
+            if (editor != nullptr)
+            {
+                editor->setTransform ({});
+                removeChildComponent (editor);
+            }
+            editor = newEditor;
+            if (editor != nullptr)
+            {
+                addAndMakeVisible (editor);
+                resized();
+            }
+        }
+
+        void paint (juce::Graphics& g) override { g.fillAll (juce::Colours::black); }
+
+        void resized() override
+        {
+            if (editor == nullptr || getWidth() <= 0 || getHeight() <= 0)
+                return;
             editor->setTransform ({});
             editor->setBounds (0, 0, juce::roundToInt ((float) getWidth()  / scale),
                                      juce::roundToInt ((float) getHeight() / scale));
@@ -320,7 +363,13 @@ public:
         // 3) fenêtre
         setUsingNativeTitleBar (true);
         editor.reset (processor.createEditorAndMakeActive());
-        setContentNonOwned (editor.get(), true);
+        // l'éditeur vit dans windowHolder, à l'échelle (Options › Taille de
+        // l'interface) ; la fenêtre se redimensionne par ses bords
+        editor->setResizable (false, false);
+        const juce::Point<int> designSize { editor->getWidth(), editor->getHeight() };
+        windowHolder.setEditor (editor.get());
+        windowHolder.setSize (designSize.x, designSize.y);
+        setContentNonOwned (&windowHolder, true);
         // cadre Windows redimensionnable : bouton Agrandir, et la fenêtre
         // glissée en haut de l'écran s'agrandit (Aero Snap), comme un navigateur
         setResizable (true, false);
@@ -343,7 +392,10 @@ public:
         const auto pos = settings.getValue ("windowPos");
         if (pos.isNotEmpty())
             restoreWindowStateFromString (pos);
-        else
+        // échelle de l'écran où la fenêtre se trouve : l'éditeur garde sa taille de
+        // conception mémorisée, la fenêtre en est l'agrandissement
+        applyUiScale (designSize);
+        if (pos.isEmpty())
             centreWithSize (getWidth(), getHeight());
 
         fullScreenWindow.onExitRequested  = [this] { setFullScreenMode (false); };
@@ -366,7 +418,7 @@ public:
     // limite au cadre entier : on y ajoute donc le cadre, connu une fois la fenêtre affichée.
     void applyMinSize()
     {
-        auto w = 1024, h = 576;
+        auto w = juce::roundToInt (1024.f * windowHolder.scale), h = juce::roundToInt (576.f * windowHolder.scale);
         if (auto* peer = getPeer())
             if (const auto frame = peer->getFrameSizeIfPresent())
             {
@@ -386,6 +438,50 @@ public:
             }
         }
         setResizeLimits (w, h, 16384, 16384);
+    }
+
+    // Taille de l'interface (au lancement, Options, écran changé) : l'éditeur garde
+    // sa taille de conception, la fenêtre en est l'agrandissement — l'échelle est
+    // bornée pour que la taille mini (1024×576 × échelle) tienne dans l'écran
+    void applyUiScale (juce::Point<int> designSize)
+    {
+        const juce::ScopedValueSetter<bool> busy (applyingUiScale, true);
+        const auto& displays = juce::Desktop::getInstance().getDisplays();
+        if (fullScreen)
+        {
+            fullScreenWindow.fixedScale = processor.uiScale > 0 ? (float) processor.uiScale / 100.f : 0.f;
+            fullScreenWindow.resized();
+            return;
+        }
+        const auto* d = displays.getDisplayForRect (getScreenBounds());
+        float s = Ui::uiScaleFor (processor.uiScale, d);
+        if (d != nullptr)
+            s = juce::jmax (0.5f, juce::jmin (s, d->userBounds.getWidth() / 1040.f, d->userBounds.getHeight() / 620.f));
+        scaleDisplayArea = d != nullptr ? d->logicalBounds.getSmallestIntegerContainer() : juce::Rectangle<int>();
+        windowHolder.scale = s;
+        applyMinSize();
+        if (! isFullScreen())   // fenêtre agrandie (bouton Agrandir) : elle garde sa taille
+        {
+            auto w = juce::roundToInt ((float) designSize.x * s), h = juce::roundToInt ((float) designSize.y * s);
+            if (d != nullptr)
+            {
+                w = juce::jmin (w, juce::roundToInt (d->userBounds.getWidth()));
+                h = juce::jmin (h, juce::roundToInt (d->userBounds.getHeight()) - 40);   // barre de titre
+            }
+            setContentComponentSize (w, h);
+        }
+        windowHolder.resized();
+    }
+
+    // fenêtre passée sur un autre écran : l'échelle Auto le suit
+    void moved() override
+    {
+        DocumentWindow::moved();
+        if (applyingUiScale || fullScreen || editor == nullptr || processor.uiScale != 0)
+            return;
+        if (const auto* d = juce::Desktop::getInstance().getDisplays().getDisplayForRect (getScreenBounds()))
+            if (d->logicalBounds.getSmallestIntegerContainer() != scaleDisplayArea)
+                applyUiScale ({ editor->getWidth(), editor->getHeight() });
     }
 
     // Merlin relancé alors qu'il tourne déjà : on ramène la fenêtre existante
@@ -418,6 +514,7 @@ public:
         deviceManager.removeChangeListener (this);
         deviceManager.removeAudioCallback (&analyser);
         clearContentComponent();
+        windowHolder.setEditor (nullptr);
         editor = nullptr;
     }
 
@@ -493,6 +590,8 @@ private:
         h.isAlwaysOnTop     = [this] { return alwaysOnTop; };
         h.setAlwaysOnTop    = [this] (bool on) { if (on != alwaysOnTop) toggleAlwaysOnTop(); };
         h.setKeyboardInMerlin = [this] (bool on) { setKeyboardInMerlin (on); };
+        h.uiScaleChanged    = [this] { if (editor != nullptr) applyUiScale (fullScreen ? windowedEditorSize
+                                                                                      : juce::Point<int> { editor->getWidth(), editor->getHeight() }); };
 
         leak->setFullScreenState (fullScreen);
         leak->setKeyboardState (keyboardInMerlin);
@@ -544,8 +643,9 @@ private:
             if (display == nullptr)
                 display = displays.getPrimaryDisplay();
 
-            editor->setResizable (false, false);
             clearContentComponent();
+            windowHolder.setEditor (nullptr);
+            fullScreenWindow.fixedScale = processor.uiScale > 0 ? (float) processor.uiScale / 100.f : 0.f;
             fullScreenWindow.setEditor (editor.get());
             fullScreenWindow.open (display != nullptr ? display->logicalBounds.getSmallestIntegerContainer()
                                                    : getScreenBounds(), alwaysOnTop);
@@ -554,10 +654,10 @@ private:
         else
         {
             fullScreenWindow.close();
-            editor->setSize (windowedEditorSize.x, windowedEditorSize.y);
-            editor->setResizable (true, true);
-            setContentNonOwned (editor.get(), true);
+            windowHolder.setEditor (editor.get());
+            setContentNonOwned (&windowHolder, true);
             restoreWindowStateFromString (windowedState);
+            applyUiScale (windowedEditorSize);   // taille de conception d'avant le plein écran
             setVisible (true);
             applyMinSize();
             applyNoActivate();
@@ -787,7 +887,10 @@ private:
     LeakAudioProcessor processor;
     AnalyserCallback analyser { processor };
     FullScreenWindow fullScreenWindow;
+    ScaledHolder windowHolder;   // contenu de la fenêtre normale : l'éditeur à l'échelle
     std::unique_ptr<juce::AudioProcessorEditor> editor;
+    bool applyingUiScale = false;
+    juce::Rectangle<int> scaleDisplayArea;   // écran sur lequel l'échelle Auto a été calculée
     bool alwaysOnTop = false;
     bool fullScreen = false;
     juce::String windowedState;

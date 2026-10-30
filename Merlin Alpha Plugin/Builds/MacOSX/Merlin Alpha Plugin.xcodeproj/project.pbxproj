@@ -113,9 +113,11 @@
 		17B4E26284F14D33BE5A6676 /* GpuSpectrogram.h */ /* GpuSpectrogram.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuSpectrogram.h; path = "../../../Merlin By Mikshake/Source/GpuSpectrogram.h"; sourceTree = SOURCE_ROOT; };
 		183A1899996C7572F76C6CA2 /* juce_events */ /* juce_events */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_events; path = ../../../JUCE/modules/juce_events; sourceTree = SOURCE_ROOT; };
 		1A6BCE21800E1CF3D1EA3398 /* GpuDotSpectrum.h */ /* GpuDotSpectrum.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuDotSpectrum.h; path = "../../../Merlin By Mikshake/Source/GpuDotSpectrum.h"; sourceTree = SOURCE_ROOT; };
+		1BEF53C268ADDAEBE2447952 /* sunny_crop.jpg */ /* sunny_crop.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = sunny_crop.jpg; path = "../../../Merlin By Mikshake/Source/sunny_crop.jpg"; sourceTree = SOURCE_ROOT; };
 		1F15FA8B71D49D45BA14BB11 /* LicenseManager.h */ /* LicenseManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = LicenseManager.h; path = "../../../Merlin By Mikshake/Source/LicenseManager.h"; sourceTree = SOURCE_ROOT; };
 		22BB10748A3128C93A3E8F81 /* include_juce_graphics_lunasvg.c */ /* include_juce_graphics_lunasvg.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_lunasvg.c; path = ../../JuceLibraryCode/include_juce_graphics_lunasvg.c; sourceTree = SOURCE_ROOT; };
 		26AF23778D57CBC750C05452 /* include_juce_audio_formats_flac_2.c */ /* include_juce_audio_formats_flac_2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_audio_formats_flac_2.c; path = ../../JuceLibraryCode/include_juce_audio_formats_flac_2.c; sourceTree = SOURCE_ROOT; };
+		2E5C1CA8CD88A3DA10DE013D /* mikshake_about_crop.jpg */ /* mikshake_about_crop.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = mikshake_about_crop.jpg; path = "../../../Merlin By Mikshake/Source/mikshake_about_crop.jpg"; sourceTree = SOURCE_ROOT; };
 		2EB72E854DEAFD7DC3F21BD0 /* PluginProcessor.h */ /* PluginProcessor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PluginProcessor.h; path = "../../../Merlin By Mikshake/Source/PluginProcessor.h"; sourceTree = SOURCE_ROOT; };
 		315EF83B873D382C9D7506FB /* include_juce_audio_processors_headless_lv2_libs.cpp */ /* include_juce_audio_processors_headless_lv2_libs.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_audio_processors_headless_lv2_libs.cpp; path = ../../JuceLibraryCode/include_juce_audio_processors_headless_lv2_libs.cpp; sourceTree = SOURCE_ROOT; };
 		3191D5A1927A3B69FD077C7D /* include_juce_gui_extra.mm */ /* include_juce_gui_extra.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_gui_extra.mm; path = ../../JuceLibraryCode/include_juce_gui_extra.mm; sourceTree = SOURCE_ROOT; };
@@ -152,6 +154,7 @@
 		805288AD32965F92FAA3D74C /* AU */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Merlin Alpha.component"; sourceTree = BUILT_PRODUCTS_DIR; };
 		82410569B308A27FAE1AEFEC /* juce_opengl */ /* juce_opengl */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_opengl; path = ../../../JUCE/modules/juce_opengl; sourceTree = SOURCE_ROOT; };
 		839BA18685243342AF4EFD97 /* Foundation.framework */ /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		8729F7071495CE63794DD59D /* AlphaKnob.h */ /* AlphaKnob.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AlphaKnob.h; path = "../../../Merlin By Mikshake/Source/AlphaKnob.h"; sourceTree = SOURCE_ROOT; };
 		877F1F3A0020DA3C82596628 /* juce_graphics */ /* juce_graphics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_graphics; path = ../../../JUCE/modules/juce_graphics; sourceTree = SOURCE_ROOT; };
 		89092D1DEBDF26244E0020F9 /* GpuOscilloscope.h */ /* GpuOscilloscope.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GpuOscilloscope.h; path = "../../../Merlin By Mikshake/Source/GpuOscilloscope.h"; sourceTree = SOURCE_ROOT; };
 		89DEE26EAF810F06C568DC5C /* include_juce_graphics_libjpg_3.c */ /* include_juce_graphics_libjpg_3.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_libjpg_3.c; path = ../../JuceLibraryCode/include_juce_graphics_libjpg_3.c; sourceTree = SOURCE_ROOT; };
@@ -206,6 +209,8 @@
 		EB5B516DB5D5F982BE60F8E3 /* include_juce_graphics.mm */ /* include_juce_graphics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_graphics.mm; path = ../../JuceLibraryCode/include_juce_graphics.mm; sourceTree = SOURCE_ROOT; };
 		ECD55D3982DC0A2F748DACA2 /* GpuDotSpectrum.cpp */ /* GpuDotSpectrum.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GpuDotSpectrum.cpp; path = "../../../Merlin By Mikshake/Source/GpuDotSpectrum.cpp"; sourceTree = SOURCE_ROOT; };
 		EEF076F50509FD7E500EA413 /* include_juce_gui_basics_3.cpp */ /* include_juce_gui_basics_3.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_gui_basics_3.cpp; path = ../../JuceLibraryCode/include_juce_gui_basics_3.cpp; sourceTree = SOURCE_ROOT; };
+		EF66DDEF4E4729707133AC07 /* signature_sunny.png */ /* signature_sunny.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = signature_sunny.png; path = "../../../Merlin By Mikshake/Source/signature_sunny.png"; sourceTree = SOURCE_ROOT; };
+		F8DD9EB1785EE600F05F6BF8 /* signature_mikshake.png */ /* signature_mikshake.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = signature_mikshake.png; path = "../../../Merlin By Mikshake/Source/signature_mikshake.png"; sourceTree = SOURCE_ROOT; };
 		FCFDB761F28D76C3CEB55793 /* VST3 Manifest Helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = juce_vst3_helper; sourceTree = BUILT_PRODUCTS_DIR; };
 		FE0387223FC6FB8A47CC3408 /* mikshake_about.png */ /* mikshake_about.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = mikshake_about.png; path = "../../../Merlin By Mikshake/Source/mikshake_about.png"; sourceTree = SOURCE_ROOT; };
 		FE761DC1D834B3F92693B078 /* Lang.cpp */ /* Lang.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Lang.cpp; path = "../../../Merlin By Mikshake/Source/Lang.cpp"; sourceTree = SOURCE_ROOT; };
@@ -289,6 +294,7 @@
 				2EB72E854DEAFD7DC3F21BD0,
 				6D4AFC59F4A03ECFC5622249,
 				A3B0E55F8C2ABF3752C8BD0D,
+				8729F7071495CE63794DD59D,
 				47C5E9BF17CE74221FE88CFF,
 				1F15FA8B71D49D45BA14BB11,
 				40F5CD96291D80AAA6AF0BFE,
@@ -314,6 +320,10 @@
 				D58DE5A8272DE115859BFEC0,
 				13998962F828BD39AC3D1BA8,
 				FE0387223FC6FB8A47CC3408,
+				2E5C1CA8CD88A3DA10DE013D,
+				1BEF53C268ADDAEBE2447952,
+				F8DD9EB1785EE600F05F6BF8,
+				EF66DDEF4E4729707133AC07,
 				67027D5E734329D5FE080C48,
 			);
 			name = Source;
@@ -922,9 +932,9 @@
 					"JucePlugin_ProducesMidiOutput=0",
 					"JucePlugin_IsMidiEffect=0",
 					"JucePlugin_EditorRequiresKeyboardFocus=0",
-					"JucePlugin_Version=1.69.2",
-					"JucePlugin_VersionCode=0x14502",
-					"JucePlugin_VersionString=\\\"1.69.2\\\"",
+					"JucePlugin_Version=1.76.3",
+					"JucePlugin_VersionCode=0x14c03",
+					"JucePlugin_VersionString=\\\"1.76.3\\\"",
 					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
 					"JucePlugin_VSTCategory=kPlugCategEffect",
 					"JucePlugin_LV2PluginClass=Plugin",
@@ -949,13 +959,13 @@
 					"JucePlugin_ARAContentTypes=0",
 					"JucePlugin_ARATransformationFlags=0",
 					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
-					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.69.2\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.76.3\\\"",
 					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
 					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
 					"MERLIN_PLUGIN=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=1.69.2",
-					"JUCE_APP_VERSION_HEX=0x14502",
+					"JUCE_APP_VERSION=1.76.3",
+					"JUCE_APP_VERSION_HEX=0x14c03",
 				);
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				GENERATE_PKGINFO_FILE = YES;
@@ -1055,9 +1065,9 @@
 					"JucePlugin_ProducesMidiOutput=0",
 					"JucePlugin_IsMidiEffect=0",
 					"JucePlugin_EditorRequiresKeyboardFocus=0",
-					"JucePlugin_Version=1.69.2",
-					"JucePlugin_VersionCode=0x14502",
-					"JucePlugin_VersionString=\\\"1.69.2\\\"",
+					"JucePlugin_Version=1.76.3",
+					"JucePlugin_VersionCode=0x14c03",
+					"JucePlugin_VersionString=\\\"1.76.3\\\"",
 					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
 					"JucePlugin_VSTCategory=kPlugCategEffect",
 					"JucePlugin_LV2PluginClass=Plugin",
@@ -1082,13 +1092,13 @@
 					"JucePlugin_ARAContentTypes=0",
 					"JucePlugin_ARATransformationFlags=0",
 					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
-					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.69.2\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.76.3\\\"",
 					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
 					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
 					"MERLIN_PLUGIN=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=1.69.2",
-					"JUCE_APP_VERSION_HEX=0x14502",
+					"JUCE_APP_VERSION=1.76.3",
+					"JUCE_APP_VERSION_HEX=0x14c03",
 				);
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				GENERATE_PKGINFO_FILE = YES;
@@ -1189,9 +1199,9 @@
 					"JucePlugin_ProducesMidiOutput=0",
 					"JucePlugin_IsMidiEffect=0",
 					"JucePlugin_EditorRequiresKeyboardFocus=0",
-					"JucePlugin_Version=1.69.2",
-					"JucePlugin_VersionCode=0x14502",
-					"JucePlugin_VersionString=\\\"1.69.2\\\"",
+					"JucePlugin_Version=1.76.3",
+					"JucePlugin_VersionCode=0x14c03",
+					"JucePlugin_VersionString=\\\"1.76.3\\\"",
 					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
 					"JucePlugin_VSTCategory=kPlugCategEffect",
 					"JucePlugin_LV2PluginClass=Plugin",
@@ -1216,13 +1226,13 @@
 					"JucePlugin_ARAContentTypes=0",
 					"JucePlugin_ARATransformationFlags=0",
 					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
-					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.69.2\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.76.3\\\"",
 					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
 					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
 					"MERLIN_PLUGIN=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=1.69.2",
-					"JUCE_APP_VERSION_HEX=0x14502",
+					"JUCE_APP_VERSION=1.76.3",
+					"JUCE_APP_VERSION_HEX=0x14c03",
 				);
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				HEADER_SEARCH_PATHS = (
@@ -1368,9 +1378,9 @@
 					"JucePlugin_ProducesMidiOutput=0",
 					"JucePlugin_IsMidiEffect=0",
 					"JucePlugin_EditorRequiresKeyboardFocus=0",
-					"JucePlugin_Version=1.69.2",
-					"JucePlugin_VersionCode=0x14502",
-					"JucePlugin_VersionString=\\\"1.69.2\\\"",
+					"JucePlugin_Version=1.76.3",
+					"JucePlugin_VersionCode=0x14c03",
+					"JucePlugin_VersionString=\\\"1.76.3\\\"",
 					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
 					"JucePlugin_VSTCategory=kPlugCategEffect",
 					"JucePlugin_LV2PluginClass=Plugin",
@@ -1395,13 +1405,13 @@
 					"JucePlugin_ARAContentTypes=0",
 					"JucePlugin_ARATransformationFlags=0",
 					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
-					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.69.2\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.76.3\\\"",
 					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
 					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
 					"MERLIN_PLUGIN=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=1.69.2",
-					"JUCE_APP_VERSION_HEX=0x14502",
+					"JUCE_APP_VERSION=1.76.3",
+					"JUCE_APP_VERSION_HEX=0x14c03",
 					"JUCE_SHARED_CODE=1",
 				);
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
@@ -1498,9 +1508,9 @@
 					"JucePlugin_ProducesMidiOutput=0",
 					"JucePlugin_IsMidiEffect=0",
 					"JucePlugin_EditorRequiresKeyboardFocus=0",
-					"JucePlugin_Version=1.69.2",
-					"JucePlugin_VersionCode=0x14502",
-					"JucePlugin_VersionString=\\\"1.69.2\\\"",
+					"JucePlugin_Version=1.76.3",
+					"JucePlugin_VersionCode=0x14c03",
+					"JucePlugin_VersionString=\\\"1.76.3\\\"",
 					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
 					"JucePlugin_VSTCategory=kPlugCategEffect",
 					"JucePlugin_LV2PluginClass=Plugin",
@@ -1525,13 +1535,13 @@
 					"JucePlugin_ARAContentTypes=0",
 					"JucePlugin_ARATransformationFlags=0",
 					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
-					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.69.2\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.76.3\\\"",
 					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
 					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
 					"MERLIN_PLUGIN=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=1.69.2",
-					"JUCE_APP_VERSION_HEX=0x14502",
+					"JUCE_APP_VERSION=1.76.3",
+					"JUCE_APP_VERSION_HEX=0x14c03",
 				);
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				GENERATE_PKGINFO_FILE = YES;
@@ -1696,9 +1706,9 @@
 					"JucePlugin_ProducesMidiOutput=0",
 					"JucePlugin_IsMidiEffect=0",
 					"JucePlugin_EditorRequiresKeyboardFocus=0",
-					"JucePlugin_Version=1.69.2",
-					"JucePlugin_VersionCode=0x14502",
-					"JucePlugin_VersionString=\\\"1.69.2\\\"",
+					"JucePlugin_Version=1.76.3",
+					"JucePlugin_VersionCode=0x14c03",
+					"JucePlugin_VersionString=\\\"1.76.3\\\"",
 					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
 					"JucePlugin_VSTCategory=kPlugCategEffect",
 					"JucePlugin_LV2PluginClass=Plugin",
@@ -1723,13 +1733,13 @@
 					"JucePlugin_ARAContentTypes=0",
 					"JucePlugin_ARATransformationFlags=0",
 					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
-					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.69.2\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.76.3\\\"",
 					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
 					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
 					"MERLIN_PLUGIN=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=1.69.2",
-					"JUCE_APP_VERSION_HEX=0x14502",
+					"JUCE_APP_VERSION=1.76.3",
+					"JUCE_APP_VERSION_HEX=0x14c03",
 				);
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				GENERATE_PKGINFO_FILE = YES;
@@ -1830,9 +1840,9 @@
 					"JucePlugin_ProducesMidiOutput=0",
 					"JucePlugin_IsMidiEffect=0",
 					"JucePlugin_EditorRequiresKeyboardFocus=0",
-					"JucePlugin_Version=1.69.2",
-					"JucePlugin_VersionCode=0x14502",
-					"JucePlugin_VersionString=\\\"1.69.2\\\"",
+					"JucePlugin_Version=1.76.3",
+					"JucePlugin_VersionCode=0x14c03",
+					"JucePlugin_VersionString=\\\"1.76.3\\\"",
 					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
 					"JucePlugin_VSTCategory=kPlugCategEffect",
 					"JucePlugin_LV2PluginClass=Plugin",
@@ -1857,13 +1867,13 @@
 					"JucePlugin_ARAContentTypes=0",
 					"JucePlugin_ARATransformationFlags=0",
 					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
-					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.69.2\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.76.3\\\"",
 					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
 					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
 					"MERLIN_PLUGIN=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=1.69.2",
-					"JUCE_APP_VERSION_HEX=0x14502",
+					"JUCE_APP_VERSION=1.76.3",
+					"JUCE_APP_VERSION_HEX=0x14c03",
 					"JUCE_SHARED_CODE=1",
 				);
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
@@ -1962,9 +1972,9 @@
 					"JucePlugin_ProducesMidiOutput=0",
 					"JucePlugin_IsMidiEffect=0",
 					"JucePlugin_EditorRequiresKeyboardFocus=0",
-					"JucePlugin_Version=1.69.2",
-					"JucePlugin_VersionCode=0x14502",
-					"JucePlugin_VersionString=\\\"1.69.2\\\"",
+					"JucePlugin_Version=1.76.3",
+					"JucePlugin_VersionCode=0x14c03",
+					"JucePlugin_VersionString=\\\"1.76.3\\\"",
 					"JucePlugin_VSTUniqueID=JucePlugin_PluginCode",
 					"JucePlugin_VSTCategory=kPlugCategEffect",
 					"JucePlugin_LV2PluginClass=Plugin",
@@ -1989,13 +1999,13 @@
 					"JucePlugin_ARAContentTypes=0",
 					"JucePlugin_ARATransformationFlags=0",
 					"JucePlugin_ARAFactoryID=\\\"com.SideKeySystem.MerlinAlphaPlugin.factory\\\"",
-					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.69.2\\\"",
+					"JucePlugin_ARADocumentArchiveID=\\\"com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.76.3\\\"",
 					"JucePlugin_ARACompatibleArchiveIDs=\\\"\\\"",
 					"JUCE_STANDALONE_APPLICATION=JucePlugin_Build_Standalone",
 					"MERLIN_PLUGIN=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=1.69.2",
-					"JUCE_APP_VERSION_HEX=0x14502",
+					"JUCE_APP_VERSION=1.76.3",
+					"JUCE_APP_VERSION_HEX=0x14c03",
 				);
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				HEADER_SEARCH_PATHS = (

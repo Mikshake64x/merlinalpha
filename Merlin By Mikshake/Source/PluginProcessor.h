@@ -14,7 +14,7 @@ public:
     static constexpr int N_BANDS_62 = 62;
     static constexpr int N_EXTRA_15 = 3, N_EXTRA_31 = 6, N_EXTRA_62 = 12;
     static constexpr int N_BANDS    = N_BANDS_62 + N_EXTRA_62;
-    // bit d'une bande dans les masques de sélection / d'audition (64 bandes au plus)
+    // bit d'une bande dans les masques de sélection (64 bandes au plus)
     static constexpr uint64_t bandBit(int b) { return b>=0 && b<64 ? (1ULL<<(unsigned)b) : 0ULL; }
 
     enum class AnalysisMode { Stereo, Mid, Side, MS };
@@ -62,7 +62,6 @@ public:
     static constexpr int SCOPE_SIZE   = 16384;   // puissance de 2
     static constexpr int SCOPE_MAX_READ = SCOPE_SIZE - 4096;   // marge : l'audio écrit pendant la lecture
     static constexpr int VECTOR_SIZE  = 4096;
-    static constexpr int TRANSIENT_W  = 512;
 
     LeakAudioProcessor();
     ~LeakAudioProcessor() override;
@@ -119,16 +118,14 @@ public:
     // -1 = pas encore choisi -> langue de Windows au premier lancement
     int  language { -1 };
 
-    // Template d'interface (décor autour du châssis neumorphique), choisi dans
-    // la galerie du panneau Settings ou Options > Apparence. La
-    // teinte (clair/sombre) et le contraste sont indépendants du template :
-    // interrupteurs lune / contraste en haut à gauche.
-    enum class UiTemplate : int { Stadium = 0, Forest, Neumorphic, Count };
-    UiTemplate uiTemplate { UiTemplate::Neumorphic };   // seul template gardé (v1.44)
+    // Thème : teinte claire/sombre (interrupteur lune de l'en-tête) et contraste
     bool lightTint    { false };
     bool highContrast { true };   // toujours actif depuis la v1.51 (demande du user)
     bool modules3D    { false };   // modules en 3D (interrupteur cube) — Spectrum : Blocks 3D
     bool largeText    { true };    // textes agrandis (Options › Affichage) — activé à chaque ouverture
+    int  uiScale      { 0 };       // Options › Affichage › Taille de l'interface : 0 automatique (selon l'écran), sinon 100..200 %
+    int  plateTint    { 1 };       // thème sombre : 0 gris d'origine, 1 ardoise (design de Sunny, v1.73)
+    int  lightScreens { 1 };       // thème clair : 1 écrans des modules « Papier » (v1.75), 0 écrans noirs
     bool masterConsole{ false };   // section master : false = A "Instrument", true = C "Console mastering"
 
     // Sens de défilement du spectrogramme 3D (indépendant par module) —
@@ -262,8 +259,6 @@ public:
     void getMultibandVectorData(int band, VectorPoint* out, int& count) const;
 
     // ── Transitoires ─────────────────────────────────────────────────────
-    void getTransientData (float* outPeak, int n) const;
-    float transientThreshold { -18.f };
 
     // ── Multiband Corrélation & Panorama ─────────────────────────────────
     // corrélation normalisée [-1,+1] par bande
@@ -280,17 +275,6 @@ public:
     bool  getPSDData    (float* destDb, int numBins) const;
     float getPSDBinFreq (int bin) const { return (float)bin*(float)currentSampleRate/(float)PSD_FFT_SIZE; }
 
-    // ── Audition (monitoring solo) — mono-bande ou multi-bande (bitmask) ──
-    void setAuditionBand     (int b)  { auditionMask.store(bandBit(b), std::memory_order_relaxed); }
-    void setAuditionBands    (uint64_t mask) { auditionMask.store(mask,std::memory_order_relaxed); }
-    void toggleAuditionBand  (int b)  { if(b<0) return;
-                                        uint64_t m=auditionMask.load(std::memory_order_relaxed);
-                                        m ^= bandBit(b);
-                                        auditionMask.store(m,std::memory_order_relaxed); }
-    uint64_t getAuditionMask() const  { return auditionMask.load(std::memory_order_relaxed); }
-    void setAuditionTransient(bool e) { auditionTransient.store(e,std::memory_order_relaxed); }
-    void clearAudition()              { auditionMask.store(0ULL,std::memory_order_relaxed);
-                                        auditionTransient.store(false,std::memory_order_relaxed); }
 
 private:
     // ── Filtres spectre (copie exacte Keystone) ───────────────────────────
@@ -453,28 +437,7 @@ private:
     int         mbVectorCount[3] {};
 
     // ── Transitoires ─────────────────────────────────────────────────────
-    mutable juce::SpinLock transientLock;
-    float transientCols[TRANSIENT_W] {};
-    int   transientWrite    { 0 };
-    float transientAccum    { 0.f };
-    int   transientSampPerCol { 256 };
-    int   transientSampCount  { 0 };
 
-    // ── Audition ─────────────────────────────────────────────────────────
-    std::atomic<uint64_t> auditionMask  { 0 };
-    std::atomic<bool>     auditionTransient { false };
-    // Un état de filtre SVF passe-bande par bande (jusqu'à N_BANDS=62) —
-    // permet d'auditionner plusieurs bandes simultanément en sommant leurs sorties.
-    struct AuditionBandState {
-        float a1=0,a2=0,a3=0,g=0,makeup=1.f;
-        float ic1L=0,ic2L=0,ic1R=0,ic2R=0;
-        bool  designed=false;
-    };
-    AuditionBandState auditionStates[N_BANDS];
-    int   auditionStatesConfigBands { -1 }; // numActiveBands utilisé lors du dernier design des filtres
-    float trAtkFast{0.f},trRelFast{0.f},trAtkSlow{0.f},trRelSlow{0.f};
-    float trEnvFastL{0.f},trEnvSlowL{0.f},trEnvFastR{0.f},trEnvSlowR{0.f};
-    float trGainL{0.f},trGainR{0.f};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LeakAudioProcessor)
 };

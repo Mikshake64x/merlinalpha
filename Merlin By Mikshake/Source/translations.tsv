@@ -67,7 +67,6 @@ Décor autour des écrans		Decor around the screens	Dekor rund um die Bildschirm
 Galerie des templates		Template gallery	Vorlagengalerie	Galleria dei modelli	Galería de plantillas	Galeria de modelos	Галерея шаблонов	テンプレートギャラリー	模板库	템플릿 갤러리
 Aperçu animé au survol		Animated preview on hover	Animierte Vorschau beim Überfahren	Anteprima animata al passaggio	Vista previa animada al pasar el cursor	Prévia animada ao passar o mouse	Анимированный предпросмотр при наведении	ホバーでアニメーションプレビュー	悬停时显示动画预览	마우스를 올리면 애니메이션 미리보기
 Couleurs		Colours	Farben	Colori	Colores	Cores	Цвета	カラー	颜色	색상
-Les écrans des modules gardent leur fond sombre, en thème clair comme en sombre.		Module screens keep their dark background, in the light and dark themes alike.	Die Modulbildschirme behalten ihren dunklen Hintergrund, im hellen wie im dunklen Design.	Gli schermi dei moduli mantengono lo sfondo scuro, sia con il tema chiaro che con quello scuro.	Las pantallas de los módulos mantienen su fondo oscuro, tanto en el tema claro como en el oscuro.	As telas dos módulos mantêm o fundo escuro, tanto no tema claro quanto no escuro.	Экраны модулей остаются тёмными как в светлой, так и в тёмной теме.	モジュールの画面は、ライト・ダークどちらのテーマでも暗い背景のままです。	无论浅色还是深色主题，模块屏幕都保持深色背景。	모듈 화면은 라이트·다크 테마 모두에서 어두운 배경을 유지합니다.
 Couleur d'accent		Accent colour	Akzentfarbe	Colore d'accento	Color de acento	Cor de destaque	Цвет акцента	アクセントカラー	强调色	강조 색상
 Palettes prêtes à l'emploi		Ready-made palettes	Fertige Paletten	Tavolozze pronte	Paletas listas para usar	Paletas prontas	Готовые палитры	既製のパレット	现成调色板	기본 제공 팔레트
 Accent		Accent	Akzent	Accento	Acento	Destaque	Акцент	アクセント	强调色	강조
@@ -277,3 +276,22 @@ Trace de l'oscilloscope		Oscilloscope trace	Oszilloskop-Spur	Traccia dell'oscill
 Tracé		Drawing	Darstellung	Tracciato	Trazado	Traçado	Отрисовка	描画	绘制	그리기
 Précis : chaque échantillon · Classique : trait lissé		Precise: every sample · Classic: smoothed line	Präzise: jedes Sample · Klassisch: geglättete Linie	Preciso: ogni campione · Classico: linea levigata	Preciso: cada muestra · Clásico: trazo suavizado	Preciso: cada amostra · Clássico: traço suavizado	Точный: каждый отсчёт · Классический: сглаженная линия	精密：全サンプル · クラシック：なめらかな線	精确：每个采样 · 经典：平滑线条	정밀: 모든 샘플 · 클래식: 부드러운 선
 0 = le plus fin · double-clic : valeur d'origine		0 = thinnest · double-click: default	0 = am dünnsten · Doppelklick: Standard	0 = il più sottile · doppio clic: predefinito	0 = el más fino · doble clic: valor original	0 = o mais fino · duplo clique: valor original	0 = самый тонкий · двойной щелчок: по умолчанию	0 = 最も細い · ダブルクリック：初期値	0 = 最细 · 双击：默认值	0 = 가장 얇게 · 더블클릭: 기본값
+Ajouter un module		Add a module	Modul hinzufügen	Aggiungi un modulo	Añadir un módulo	Adicionar um módulo	Добавить модуль	モジュールを追加	添加模块	모듈 추가
+Ajouter		Add	Hinzufügen	Aggiungi	Añadir	Adicionar	Добавить	追加	添加	추가
+la fenêtre reste ouverte		the window stays open	das Fenster bleibt offen	la finestra resta aperta	la ventana sigue abierta	a janela continua aberta	окно остаётся открытым	ウィンドウは開いたまま	窗口保持打开	창은 열린 채로 유지됩니다
+un autre module		another module	ein anderes Modul	un altro modulo	otro módulo	outro módulo	другой модуль	別のモジュール	其他模块	다른 모듈
+ramener		bring back	zurückholen	riportare	devolver	trazer de volta	вернуть	戻す	放回	되돌리기
+Taille de l'interface		Interface size	Oberflächengröße	Dimensione dell'interfaccia	Tamaño de la interfaz	Tamanho da interface	Размер интерфейса	インターフェースのサイズ	界面大小	인터페이스 크기
+Auto : selon la résolution de l'écran		Auto: follows the screen resolution	Auto: nach Bildschirmauflösung	Auto: in base alla risoluzione dello schermo	Auto: según la resolución de la pantalla	Auto: conforme a resolução da tela	Авто: по разрешению экрана	自動：画面の解像度に合わせる	自动：根据屏幕分辨率	자동: 화면 해상도에 맞춤
+Auto		Auto	Auto	Auto	Auto	Auto	Авто	自動	自动	자동
+Plaque		Plate	Platte	Piastra	Placa	Placa	Панель	プレート	面板	플레이트
+Couleur du thème sombre		Dark theme colour	Farbe des dunklen Themas	Colore del tema scuro	Color del tema oscuro	Cor do tema escuro	Цвет тёмной темы	ダークテーマの色	深色主题颜色	다크 테마 색상
+Gris		Grey	Grau	Grigio	Gris	Cinza	Серый	グレー	灰色	회색
+Ardoise		Slate	Schiefer	Ardesia	Pizarra	Ardósia	Графит	スレート	石板蓝	슬레이트
+Preset précédent		Previous preset	Vorheriges Preset	Preset precedente	Preset anterior	Preset anterior	Предыдущий пресет	前のプリセット	上一个预设	이전 프리셋
+Preset suivant		Next preset	Nächstes Preset	Preset successivo	Preset siguiente	Próximo preset	Следующий пресет	次のプリセット	下一个预设	다음 프리셋
+Écrans des modules		Module screens	Modulanzeigen	Schermi dei moduli	Pantallas de los módulos	Telas dos módulos	Экраны модулей	モジュールの画面	模块屏幕	모듈 화면
+Avec le thème clair		With the light theme	Mit dem hellen Thema	Con il tema chiaro	Con el tema claro	Com o tema claro	Со светлой темой	ライトテーマ使用時	浅色主题下	라이트 테마에서
+Clairs		Light	Hell	Chiari	Claras	Claras	Светлые	明るい	浅色	밝게
+Noirs		Black	Schwarz	Neri	Negras	Pretas	Чёрные	黒	黑色	검정
+Couleurs des écrans sombres ; en thème clair, les écrans Papier en reprennent l'accent.		Dark screen colours; with the light theme, Paper screens take their accent from them.	Farben der dunklen Anzeigen; im hellen Thema übernehmen die Papier-Anzeigen ihren Akzent.	Colori degli schermi scuri; con il tema chiaro, gli schermi Carta ne riprendono l'accento.	Colores de las pantallas oscuras; con el tema claro, las pantallas Papel toman su acento.	Cores das telas escuras; com o tema claro, as telas Papel usam o seu destaque.	Цвета тёмных экранов; в светлой теме экраны «Бумага» берут из них акцент.	暗い画面の色。ライトテーマでは、ペーパー画面がアクセントを引き継ぎます。	深色屏幕的颜色；浅色主题下，纸张屏幕沿用其强调色。	어두운 화면 색상. 라이트 테마에서는 페이퍼 화면이 강조색을 이어받습니다.

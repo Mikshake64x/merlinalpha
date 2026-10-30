@@ -1164,12 +1164,14 @@ public:
         juce::String gpuInfo;
         bool fullScreen = false, alwaysOnTop = false;
         bool dark = true, contrast = false, modules3D = false, largeText = false, masterConsole = false;
+        int uiScale = 0;                    // taille de l'interface : 0 automatique, sinon pourcentage
+        int plateTint = 1;                  // thème sombre : 0 gris, 1 ardoise
+        int lightScreens = 1;               // thème clair : 1 écrans Papier, 0 écrans noirs
         int oscStyle = 0;                   // 0 tube, 1 numérique, 2 vintage, 3 deux voies
         int oscFps = 30;                    // 24, 30 ou 60
         int oscLineWidth = 20;              // curseur 0..100 (0 = le plus fin)
         int oscTraceMode = 0;               // 0 précis, 1 classique
         bool oscPersist = true;
-        int uiTemplate = 0;
         juce::Array<juce::Colour> accentPalette;
         int accentIndex = -1;
         juce::Colour roles[8];
@@ -1257,6 +1259,10 @@ public:
         contrastSwitch.setOn (s.contrast);
         modules3DSwitch.setOn (s.modules3D);
         largeTextSwitch.setOn (s.largeText);
+        plateSeg.setSelected (juce::jlimit (0, 1, s.plateTint));
+        screensSeg.setSelected (s.lightScreens != 0 ? 0 : 1);
+        for (int i = 0; i < kNumUiScales; ++i)
+            if (uiScaleValues[i] == s.uiScale) uiScaleSeg.setSelected (i);
         masterSeg.setSelected (s.masterConsole ? 1 : 0);
         oscStyleSeg.setSelected (juce::jlimit (0, 3, s.oscStyle));
         oscFpsSeg.setSelected (s.oscFps <= 24 ? 0 : s.oscFps <= 30 ? 1 : 2);
@@ -1265,7 +1271,6 @@ public:
         oscTraceSeg.setSelected (juce::jlimit (0, 1, s.oscTraceMode));
         oscPersistSwitch.setOn (s.oscPersist);
 
-        templateSeg.setSelected (s.uiTemplate);
         accentSwatches.setPalette (s.accentPalette, s.accentIndex);
         for (int i = 0; i < 8; ++i)
             roleChips[i].setColour (s.roles[i]);
@@ -1412,10 +1417,11 @@ public:
     std::function<void (int)>   onOscFpsSelected;        // 24, 30, 60
     std::function<void (int)>   onOscLineWidthChanged;   // curseur 0..100
     std::function<void (int)>   onOscTraceModeSelected;  // 0 précis, 1 classique
+    std::function<void (int)>   onUiScaleSelected;       // taille de l'interface : 0 automatique, sinon pourcentage
+    std::function<void (int)>   onPlateTintSelected;     // thème sombre : 0 gris, 1 ardoise
+    std::function<void (bool)>  onLightScreensSelected;  // thème clair : écrans Papier ou noirs
     std::function<void (bool)>  onOscPersistChanged;
     // Apparence
-    std::function<void (int)>   onTemplateSelected;
-    std::function<void()>       onOpenTemplateGallery;
     std::function<void (int)>   onAccentSelected;        // indice de palette
     std::function<void (int, juce::Colour)> onColourRoleChanged;
     std::function<void()>       onColoursReset;
@@ -1532,8 +1538,20 @@ private:
         }
         p.addGroup (TR ("Interface"));
         p.addRow (Icon::theme, juce::Colour (0xff48484a), TR ("Thème sombre"), {}, &darkSwitch, 44, 26);
+        // design de Sunny (v1.73) : plaque ardoise ou gris d'origine
+        plateSeg.setLabels ({ TR ("Gris"), TR ("Ardoise") });
+        p.addRow (Icon::theme, juce::Colour (0xff48484a), TR ("Plaque"), TR ("Couleur du thème sombre"), &plateSeg, plateSeg.getIdealWidth());
+        plateSeg.onChange = [this] (int i) { if (onPlateTintSelected) onPlateTintSelected (i); };
+        screensSeg.setLabels ({ TR ("Clairs"), TR ("Noirs") });
+        p.addRow (Icon::theme, juce::Colour (0xff8e8e93), TR ("Écrans des modules"), TR ("Avec le thème clair"), &screensSeg, screensSeg.getIdealWidth());
+        screensSeg.onChange = [this] (int i) { if (onLightScreensSelected) onLightScreensSelected (i == 0); };
         p.addRow (Icon::grid, juce::Colour (0xff30b0c7), TR ("Modules 3D"), TR ("Spectrum en blocs 3D"), &modules3DSwitch, 44, 26);
         p.addRow (Icon::text, juce::Colour (0xff0a84ff), TR ("Gros texte"), TR ("Lecture à distance"), &largeTextSwitch, 44, 26);
+        // tout agrandi d'un bloc (écrans 4K) : Auto suit la résolution de l'écran
+        uiScaleSeg.setLabels ({ TR ("Auto"), "100 %", "125 %", "150 %", "175 %", "200 %" });
+        p.addRow (Icon::window, juce::Colour (0xff0a84ff), TR ("Taille de l'interface"), TR ("Auto : selon la résolution de l'écran"),
+                  &uiScaleSeg, uiScaleSeg.getIdealWidth());
+        uiScaleSeg.onChange = [this] (int i) { if (onUiScaleSelected) onUiScaleSelected (uiScaleValues[i]); };
         p.addRow (Icon::gauge, juce::Colour (0xffff9f0a), TR ("Section master"), TR ("Style du VU master (aussi sous la colonne)"),
                   &masterSeg, masterSeg.getIdealWidth());
         p.addGroup (TR ("Modules"));
@@ -1569,9 +1587,7 @@ private:
         using OptionsUi::Icon;
         auto& p = pages[kAppearancePage];
         resetColoursButton.setButtonText (TR ("Réinitialiser"));
-        // Templates retirés (demande du user) : Merlin garde uniquement le
-        // Neumorphic ; plus de choix de template ni de galerie.
-        p.addGroup (TR ("Couleurs"), TR ("Les écrans des modules gardent leur fond sombre, en thème clair comme en sombre."));
+        p.addGroup (TR ("Couleurs"), TR ("Couleurs des écrans sombres ; en thème clair, les écrans Papier en reprennent l'accent."));
         p.addRow (Icon::palette, juce::Colour (0xff0a84ff), TR ("Couleur d'accent"), TR ("Palettes prêtes à l'emploi"), &accentSwatches, accentSwatches.getIdealWidth() + 140);
         static const char* const roleNames[8] = { "Accent", "Grille", "Fond des écrans", "Texte", "Canal Side",
                                                   "Spectrogramme : creux", "Spectrogramme : milieu", "Spectrogramme : crêtes" };
@@ -1652,14 +1668,19 @@ private:
     OptionsUi::Switch vsyncSwitch;
     // Affichage
     OptionsUi::Switch fullScreenSwitch, alwaysOnTopSwitch, darkSwitch, contrastSwitch, modules3DSwitch, largeTextSwitch;
+    OptionsUi::Segmented plateSeg { { "Gris", "Ardoise" } };
+    OptionsUi::Segmented screensSeg { { "Clairs", "Noirs" } };
     OptionsUi::Segmented masterSeg { { "Instrument", "Console" } };
     OptionsUi::Segmented oscStyleSeg { juce::StringArray { juce::String ("Tube"), TR ("Numérique"), juce::String ("Vintage"), juce::String ("Deux voies") } };
     OptionsUi::Segmented oscFpsSeg { { "24", "30", "60" } };
     OptionsUi::ValueSlider oscWidthSlider;   // épaisseur du trait de l'oscilloscope, 0..100
     OptionsUi::Segmented oscTraceSeg { { juce::String (juce::CharPointer_UTF8 ("Pr\xc3\xa9" "cis")), "Classique" } };
+    // taille de l'interface : 0 automatique, sinon pourcentage
+    static constexpr int kNumUiScales = 6;
+    static constexpr int uiScaleValues[kNumUiScales] = { 0, 100, 125, 150, 175, 200 };
+    OptionsUi::Segmented uiScaleSeg { { "Auto", "100 %", "125 %", "150 %", "175 %", "200 %" } };
     OptionsUi::Switch oscPersistSwitch;
     // Apparence
-    OptionsUi::Segmented templateSeg { { "Stadium", "Forest", "Neumorphic" } };
     OptionsUi::PillButton galleryButton { "Ouvrir" };
     AccentSwatches accentSwatches;
     ColourChip roleChips[8];

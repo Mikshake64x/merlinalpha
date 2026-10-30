@@ -23,11 +23,23 @@ namespace BinaryData
     extern const char*   mikshake_about_png;
     const int            mikshake_about_pngSize = 68539;
 
+    extern const char*   mikshake_about_crop_jpg;
+    const int            mikshake_about_crop_jpgSize = 58144;
+
+    extern const char*   sunny_crop_jpg;
+    const int            sunny_crop_jpgSize = 100431;
+
+    extern const char*   signature_mikshake_png;
+    const int            signature_mikshake_pngSize = 51640;
+
+    extern const char*   signature_sunny_png;
+    const int            signature_sunny_pngSize = 24650;
+
     extern const char*   translations_tsv;
-    const int            translations_tsvSize = 78441;
+    const int            translations_tsvSize = 81417;
 
     // Number of elements in the namedResourceList and originalFileNames arrays.
-    const int namedResourceListSize = 6;
+    const int namedResourceListSize = 10;
 
     // Points to the start of a list of resource names.
     extern const char* namedResourceList[];

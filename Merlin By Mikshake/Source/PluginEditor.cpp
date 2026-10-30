@@ -52,7 +52,35 @@ namespace Theme {
         Col::spectroLow  = juce::Colour(c.spectroLow);
         Col::spectroMid  = juce::Colour(c.spectroMid);
         Col::spectroHigh = juce::Colour(c.spectroHigh);
+        if(Col::paper){
+            // écrans Papier (aperçu validé, variante A) : blanc cassé, grille
+            // gris-bleu fine, encre ardoise ; accent et Side tirés des couleurs choisies
+            Col::bg      = juce::Colour(0xFFF8FAFC);
+            Col::panel   = juce::Colour(0xFFF0F3F7);
+            Col::grid    = juce::Colour(0xFFE0E5EB);
+            Col::gridCtr = juce::Colour(0xFFC6CFD9);
+            Col::border  = juce::Colour(0xFFCBD3DD);
+            Col::knobDim = juce::Colour(0xFFE4E9EF);
+            Col::textHi  = juce::Colour(0xFF26303B);
+            Col::textMid = juce::Colour(0xFF7C8898);
+            Col::accent  = Col::ink(juce::Colour(c.accent));
+            Col::midCol  = Col::accent;
+            Col::sideCol = Col::ink(juce::Colour(c.side));
+        }
+        ++Col::generation;
     }
+}
+
+juce::Colour Col::ink(juce::Colour c)
+{
+    if(!paper) return c;
+    float h, s, b; c.getHSB(h, s, b);
+    if(s<0.15f)   // gris / blanc : la lumière devient de l'encre
+        return juce::Colour::fromHSV(h, s, juce::jlimit(0.16f, 0.55f, 1.f-b*0.82f), c.getFloatAlpha());
+    // teinte gardée, assez sombre pour se lire sur du blanc (rouges, oranges
+    // et jaunes un peu moins, sinon ils tournent au brun)
+    const float maxB=(h<0.20f || h>0.95f) ? 0.86f : 0.66f;
+    return juce::Colour::fromHSV(h, juce::jmax(s, 0.72f), juce::jmin(b, maxB), c.getFloatAlpha());
 }
 
 //==============================================================================
@@ -60,29 +88,16 @@ void draw3DButtonL(juce::Graphics& g,juce::Rectangle<float> b,bool isDown,bool i
                    juce::Colour face,juce::Colour lit)
 {
     const float r=4.f;
-    g.setColour(juce::Colour(0xFF000000).withAlpha(0.5f));
+    g.setColour(juce::Colour(0xFF000000).withAlpha(Col::paper ? 0.16f : 0.5f));
     g.fillRoundedRectangle(b.translated(0.f,isDown?0.5f:1.5f),r);
     juce::ColourGradient grad=isDown
         ?juce::ColourGradient(face.darker(0.55f),b.getX(),b.getY(),face.darker(0.2f),b.getX(),b.getBottom(),false)
         :juce::ColourGradient(face.brighter(0.22f),b.getX(),b.getY(),face.darker(0.28f),b.getX(),b.getBottom(),false);
     g.setGradientFill(grad);g.fillRoundedRectangle(b,r);
-    if(!isDown){g.setColour(juce::Colours::white.withAlpha(0.09f));g.fillRoundedRectangle(b.withHeight(b.getHeight()*0.42f),r);}
+    if(!isDown){g.setColour(juce::Colours::white.withAlpha(Col::paper ? 0.55f : 0.09f));g.fillRoundedRectangle(b.withHeight(b.getHeight()*0.42f),r);}
     if(isOn){g.setColour(lit.withAlpha(0.85f));g.drawRoundedRectangle(b.reduced(0.5f),r,1.2f);}
     else{g.setColour(Col::border);g.drawRoundedRectangle(b.reduced(0.5f),r,0.8f);}
 }
-
-// Cadre autour de la plaque : fin avec un décor nature, absent sans décor (le
-// châssis neumorphique occupe alors toute la fenêtre).
-static constexpr int   kFrameWidthDecor   = 20;
-static constexpr float kPlateCornerRadius = 14.f;
-
-// Débord du décor sur la plaque — les cartes commencent 12 px à l'intérieur
-// de la plaque : à 8 px, aucune carte ni mesure n'est recouverte.
-static constexpr int   kFoliageReach      = 8;
-
-// Épaisseur de la bande d'herbe (base au bord de la fenêtre) : les brins les
-// plus hauts dépassent le débord et s'effacent avec lui.
-static constexpr float kGrassThickness    = 32.f;
 
 // Cartes neumorphiques : saillie autour de chaque écran (module), lunette
 // sombre (Neu::bezelW) dans la carte, rayon des coins de l'écran.
@@ -128,7 +143,7 @@ namespace SpectroReadout {
 
 void drawShadowedText(juce::Graphics& g, const juce::String& t, juce::Rectangle<float> r, juce::Justification j, juce::Colour c)
 {
-    g.setColour(juce::Colours::black.withAlpha(0.65f));
+    g.setColour(Col::shade(0.65f));
     g.drawText(t, r.translated(0.8f, 0.8f), j, false);
     g.setColour(c);
     g.drawText(t, r, j, false);
@@ -195,7 +210,7 @@ void drawLines(juce::Graphics& g, juce::Rectangle<float> area, juce::Point<float
     y=juce::jlimit(area.getY()+4.f, juce::jmax(area.getY()+4.f, area.getBottom()-bh-4.f), y);
     const juce::Rectangle<float> box(x, y, bw, bh);
 
-    g.setColour(juce::Colours::black.withAlpha(0.72f));
+    g.setColour(Col::pick(juce::Colours::black.withAlpha(0.72f), juce::Colours::white.withAlpha(0.92f)));
     g.fillRoundedRectangle(box, 5.f);
     g.setColour(Col::accent.withAlpha(0.7f));
     g.drawRoundedRectangle(box.reduced(0.5f), 5.f, 1.f);
@@ -214,11 +229,22 @@ void drawLines(juce::Graphics& g, juce::Rectangle<float> area, juce::Point<float
 // Neu — châssis neumorphique
 //==============================================================================
 namespace Neu {
-void apply(bool lightTint, bool contrast)
+void apply(bool lightTint, bool contrast, bool slate, bool paperScreens)
 {
     light = lightTint;
     highContrast = contrast;
-    if(light){
+    Col::paper = light && paperScreens;   // palette relue par Theme::applyCustom()
+    if(!light && slate){
+        // ardoise bleutée de la maquette de Sunny (plaque, cartes, creux)
+        surface     = juce::Colour(0xFF2A3240);
+        frame       = juce::Colour(0xFF20262F);
+        well        = juce::Colour(0xFF141A22);
+        bezel       = juce::Colour(0xFF111417);
+        shadowDark  = juce::Colours::black.withAlpha(0.62f);
+        shadowLight = juce::Colours::white.withAlpha(0.075f);
+        text        = juce::Colour(0xFFDDE3EA);
+        textDim     = juce::Colour(0xFF8D99A8);
+    } else if(light){
         surface     = juce::Colour(0xFFE2E7EE);
         frame       = juce::Colour(0xFFD4DBE4);
         well        = juce::Colour(0xFFC8D0DB);
@@ -289,12 +315,22 @@ void drawInset(juce::Graphics& g, juce::Rectangle<float> r, float radius, float 
 // rectangle sortait d'un pixel hors de la courbe extérieure. Le coin reste
 // dedans tant que (R - bezelW)·√2 < R, soit R < 3,41·bezelW : on garde une marge.
 static float bezelOuterRadius() { return juce::jmin(screenRadius+bezelW, bezelW*3.1f); }
+// anneau autour d'un écran Papier : la carte, un ton plus bas
+static juce::Colour paperBezel() { return surface.darker(0.05f); }
 
 void drawBezel(juce::Graphics& g, juce::Rectangle<float> s)
 {
     const auto o=s.expanded(bezelW);
     const float R=bezelOuterRadius();
     juce::Path p; p.addRoundedRectangle(o, R);
+    if(Col::paper){
+        // écran Papier : pas de lunette sombre, l'écran est creusé dans la carte
+        // (anneau à peine plus foncé que la carte, filet gris-bleu net)
+        g.setColour(paperBezel()); g.fillPath(p);
+        g.setColour(juce::Colour(0xFFB4BFCC));
+        g.drawRoundedRectangle(o.reduced(0.5f), R-0.5f, 1.f);
+        return;
+    }
     g.setColour(bezel); g.fillPath(p);
     // la lunette s'enfonce dans la carte : filet sombre net sur son bord extérieur
     // (une ombre floue assombrissait tout l'anneau, et les coins de l'écran,
@@ -312,9 +348,24 @@ void drawScreenGlass(juce::Graphics& g, juce::Rectangle<float> s)
     // coins : les modules peignent des rectangles, la lunette les arrondit
     juce::Path caps; caps.addRectangle(s); caps.addRoundedRectangle(s, screenRadius);
     caps.setUsingNonZeroWinding(false);
+    juce::Path glass; glass.addRoundedRectangle(s, screenRadius);
+    if(Col::paper){
+        // écran Papier creusé : ombre interne en haut à gauche, lumière en bas
+        // à droite, filet net ; pas de reflet
+        g.setColour(paperBezel()); g.fillPath(caps);
+        juce::Path ring; ring.addRectangle(s.expanded(24.f)); ring.addRoundedRectangle(s, screenRadius);
+        ring.setUsingNonZeroWinding(false);
+        g.saveState();
+        g.reduceClipRegion(glass);
+        juce::DropShadow(juce::Colour(0xFF283C5A).withAlpha(0.20f), 9, { 3,  3}).drawForPath(g, ring);
+        juce::DropShadow(juce::Colours::white.withAlpha(0.85f),     7, {-2, -2}).drawForPath(g, ring);
+        g.restoreState();
+        g.setColour(juce::Colour(0xFFC3CCD7));
+        g.drawRoundedRectangle(s.reduced(0.5f), screenRadius, 1.f);
+        return;
+    }
     g.setColour(bezel); g.fillPath(caps);
     // bord de la vitre : filet sombre tout autour + léger reflet en haut
-    juce::Path glass; glass.addRoundedRectangle(s, screenRadius);
     g.setColour(juce::Colours::black.withAlpha(0.55f));
     g.drawRoundedRectangle(s.reduced(0.5f), screenRadius, 1.f);
     g.saveState();
@@ -324,21 +375,6 @@ void drawScreenGlass(juce::Graphics& g, juce::Rectangle<float> s)
     g.setGradientFill(sheen);
     g.fillRect(s.withHeight(10.f));
     g.restoreState();
-}
-}
-
-//==============================================================================
-// Templates
-//==============================================================================
-namespace Templates {
-const Info& get(LeakAudioProcessor::UiTemplate t)
-{
-    static const Info infos[(int)LeakAudioProcessor::UiTemplate::Count] = {
-        { "STADIUM",    Decor::Grass },
-        { "FOREST",     Decor::Ivy   },
-        { "NEUMORPHIC", Decor::None  },
-    };
-    return infos[juce::jlimit(0, (int)LeakAudioProcessor::UiTemplate::Count-1, (int)t)];
 }
 }
 
@@ -457,9 +493,23 @@ void PillToggle::paintButton(juce::Graphics& g, bool, bool down)
         const float popT=juce::jlimit(0.0f, 1.0f, on ? iconProgress : 1.0f-iconProgress);
         const juce::Colour ink = on ? juce::Colours::white
                                     : (Neu::light ? juce::Colour(0xff3e4857) : juce::Colour(0xffaab4c0));
-        const bool cube=icon==Icon::Cube, text=icon==Icon::Text, meter=icon==Icon::Meter, pin=icon==Icon::Pin;
+        const bool cube=icon==Icon::Cube, isText=icon==Icon::Text, meter=icon==Icon::Meter, pin=icon==Icon::Pin;
+        const bool kbd=icon==Icon::Keyboard;
         drawAnimatedGlyph(g, (on ? leftZone : rightZone).getCentre(), iconSize, popT, 0.0f, on ? -90.0f : 90.0f, 0.4f,
-                          [ink, cube, text, meter, pin](juce::Graphics& gg, juce::Rectangle<float> a){
+                          [ink, cube, isText, meter, pin, kbd](juce::Graphics& gg, juce::Rectangle<float> a){
+                              if(kbd){
+                                  // clavier : boîtier arrondi, deux rangées de touches, barre d'espace
+                                  gg.setColour(ink);
+                                  const float s=a.getWidth(), lw=juce::jmax(1.1f, s*0.08f);
+                                  const auto body=juce::Rectangle<float>(a.getX(), a.getCentreY()-s*0.34f, s, s*0.68f);
+                                  gg.drawRoundedRectangle(body.reduced(lw*0.5f), s*0.10f, lw);
+                                  const float k=s*0.11f;
+                                  for(int row=0; row<2; ++row)
+                                      for(int i=0; i<4; ++i)
+                                          gg.fillRect(body.getX()+s*0.16f+(float)i*s*0.19f, body.getY()+s*0.14f+(float)row*s*0.17f, k, k);
+                                  gg.fillRect(body.getX()+s*0.28f, body.getBottom()-s*0.20f, s*0.44f, k);
+                                  return;
+                              }
                               if(pin){
                                   // punaise : tête, collerette, pointe (toujours au premier plan)
                                   gg.setColour(ink);
@@ -477,7 +527,7 @@ void PillToggle::paintButton(juce::Graphics& g, bool, bool down)
                                   gg.fillRoundedRectangle(a.getRight()-a.getWidth()*0.18f-bw, base-a.getHeight()*0.52f, bw, a.getHeight()*0.52f, bw*0.3f);
                                   return;
                               }
-                              if(text){
+                              if(isText){
                                   // "Aa" : taille de texte (glyphe fixe, hors échelle de texte)
                                   gg.setColour(ink);
                                   gg.setFont(Ui::icelandAbs(a.getHeight()*1.15f));
@@ -644,12 +694,12 @@ juce::ColourGradient levelGradient(float plotTop, float plotBottom)
 {
     // mêmes couleurs que le Classic, mais opaques en bas : les blocs restent
     // pleins même à bas niveau
-    juce::ColourGradient g(juce::Colour(0xFFFF1500).withAlpha(0.95f), 0.f, plotTop,
+    juce::ColourGradient g(Col::ink(juce::Colour(0xFFFF1500)).withAlpha(0.95f), 0.f, plotTop,
                            juce::Colour(0xFF00C88C).withAlpha(0.60f), 0.f, plotBottom, false);
-    g.addColour(0.12, juce::Colour(0xFFFF6600).withAlpha(0.93f));
-    g.addColour(0.28, juce::Colour(0xFFFFD200).withAlpha(0.90f));
-    g.addColour(0.52, juce::Colour(0xFF00FF55).withAlpha(0.86f));
-    g.addColour(0.78, juce::Colour(0xFF00FFB2).withAlpha(0.80f));
+    g.addColour(0.12, Col::ink(juce::Colour(0xFFFF6600)).withAlpha(0.93f));
+    g.addColour(0.28, Col::ink(juce::Colour(0xFFFFD200)).withAlpha(0.90f));
+    g.addColour(0.52, Col::ink(juce::Colour(0xFF00FF55)).withAlpha(0.86f));
+    g.addColour(0.78, Col::ink(juce::Colour(0xFF00FFB2)).withAlpha(0.80f));
     return g;
 }
 
@@ -808,64 +858,6 @@ void NeuAnimButton::paintButton(juce::Graphics& g, bool over, bool down)
     const float fs=juce::jlimit(7.f, 15.f*Ui::textScale, juce::jmin((float)getHeight()*0.5f*Ui::textScale, maxFsByW));
     g.setFont(Ui::icelandAbs(fs));   // taille ajustée à la largeur, déjà à l'échelle
     g.drawText(getButtonText(), getLocalBounds().toFloat().translated(0.f, sunk-glow), juce::Justification::centred);
-}
-
-// Bande d'herbe (base plate en bas, brins vers le haut) répétée sur les 4
-// bords : base contre le bord de la fenêtre, brins vers l'intérieur. Une
-// tuile sur deux en miroir pour des raccords continus, départ décalé par bord.
-static void drawGrassFrame(juce::Graphics& g, const juce::Image& strip, float W, float H, float thickness)
-{
-    if(!strip.isValid()) return;   // image retirée avec le template Stadium
-    const float s=thickness/(float)strip.getHeight(), tileLen=(float)strip.getWidth()*s;
-    // repère d'un bord : u le long du bord, v = distance au bord de la fenêtre
-    const juce::AffineTransform edgeToScreen[4] = {
-        { 1.f, 0.f, 0.f,   0.f,-1.f, H   },   // bas
-        { 1.f, 0.f, 0.f,   0.f, 1.f, 0.f },   // haut
-        { 0.f, 1.f, 0.f,   1.f, 0.f, 0.f },   // gauche
-        { 0.f,-1.f, W,     1.f, 0.f, 0.f },   // droite
-    };
-    const float lengths[4] = { W, W, H, H };
-    const float phases[4]  = { 0.f, 0.37f, 0.71f, 0.13f };
-    for(int e=0;e<4;++e)
-    {
-        int k=0;
-        for(float u=-phases[e]*tileLen; u<lengths[e]; u+=tileLen, ++k)
-        {
-            const bool mirrored=(k%2)!=0;
-            // image -> bord : base (bas de l'image) à v=0, pointes à v=thickness
-            const juce::AffineTransform toEdge(mirrored ? -s : s, 0.f, mirrored ? u+tileLen : u,
-                                               0.f, -s, thickness);
-            g.drawImageTransformed(strip, toEdge.followedBy(edgeToScreen[e]));
-        }
-    }
-}
-
-// Décor au premier plan (image ARGB logicielle, coordonnées physiques) :
-// pleinement visible sur le cadre, il s'efface ensuite sur les `reach`
-// premiers px de la plaque et devient transparent au-delà.
-static juce::Image fadeOverPlate(juce::Image out, juce::Rectangle<float> plate, float reach)
-{
-    const int w=out.getWidth(), h=out.getHeight();
-    {
-        juce::Image::BitmapData bd(out, juce::Image::BitmapData::readWrite);
-        for(int y=0;y<h;++y)
-        {
-            const float py=(float)y+0.5f;
-            if(py<=plate.getY() || py>=plate.getBottom()) continue;   // ligne sur le cadre
-            const float dy=juce::jmin(py-plate.getY(), plate.getBottom()-py);
-            for(int x=0;x<w;++x)
-            {
-                const float px=(float)x+0.5f;
-                if(px<=plate.getX() || px>=plate.getRight()) continue;
-                const float d=juce::jmin(dy, px-plate.getX(), plate.getRight()-px);
-                auto* p=reinterpret_cast<juce::PixelARGB*>(bd.getPixelPointer(x,y));
-                if(d>=reach) { p->setARGB(0,0,0,0); continue; }
-                const float t=d/reach;
-                p->multiplyAlpha(1.f-t*t*(3.f-2.f*t));
-            }
-        }
-    }
-    return juce::NativeImageType().convert(out);
 }
 
 //==============================================================================
@@ -1114,7 +1106,7 @@ void VectorscopeDisplay::renderTrail()
             const float px1=cx-s1*sc1*r, py1=cy-m1*sc1*r;
             const float a=juce::jlimit(0.08f,0.88f,(n0+n1)*1.0f);
             const float k=juce::jlimit(0.f,1.f,(n0+n1)*0.8f);
-            g.setColour(Col::accent.interpolatedWith(juce::Colours::white,k).withAlpha(a));
+            g.setColour(Col::hot(Col::accent,k).withAlpha(a));
             g.drawLine(px0,py0,px1,py1,0.9f);
         }
     } else {
@@ -1126,7 +1118,7 @@ void VectorscopeDisplay::renderTrail()
             const float px=cx-s*scale*r, py=cy-m*scale*r;
             const float k=juce::jlimit(0.f,1.f,norm*1.6f);
             const float a=juce::jlimit(0.10f,0.95f,norm*2.4f);
-            g.setColour(Col::accent.interpolatedWith(juce::Colours::white,k).withAlpha(a));
+            g.setColour(Col::hot(Col::accent,k).withAlpha(a));
             g.fillEllipse(px-1.1f,py-1.1f,2.2f,2.2f);
         }
     }
@@ -1143,7 +1135,8 @@ void VectorscopeDisplay::paint(juce::Graphics& g)
     const float pxScale=g.getInternalContext().getPhysicalPixelScaleFactor();
     const juce::int64 key=(((juce::int64)W*8191+H)*131+juce::roundToInt(pxScale*100.f))*31
                           +juce::roundToInt(Ui::textScale*100.f)
-                          +(juce::int64)Col::grid.getARGB()*3+(juce::int64)Col::gridCtr.getARGB()*5;
+                          +(juce::int64)Col::grid.getARGB()*3+(juce::int64)Col::gridCtr.getARGB()*5
+                          +(juce::int64)Col::generation*7919;
     if(!bgCache.isValid() || key!=bgKey){
         bgKey=key;
         bgCache=juce::Image(juce::Image::RGB, juce::jmax(1,juce::roundToInt((float)W*pxScale)), juce::jmax(1,juce::roundToInt((float)H*pxScale)), false);
@@ -1157,14 +1150,14 @@ void VectorscopeDisplay::paint(juce::Graphics& g)
 
 void VectorscopeDisplay::paintBackground(juce::Graphics& g, float cx, float cy, float r)
 {
-    juce::ColourGradient bgGrad(juce::Colour(0xFF04130F),cx,cy,juce::Colour(0xFF010706),cx,cy+r*1.3f,true);
+    juce::ColourGradient bgGrad(Col::pick(juce::Colour(0xFF04130F), Col::bg),cx,cy,Col::pick(juce::Colour(0xFF010706), Col::panel),cx,cy+r*1.3f,true);
     g.setGradientFill(bgGrad); g.fillRect(getLocalBounds());
-    g.setColour(juce::Colour(0xFF00FFB2).withAlpha(0.04f));
+    g.setColour(Col::accent.withAlpha(0.04f));
     g.fillEllipse(cx-r*1.02f,cy-r*1.02f,r*2.04f,r*2.04f);
     g.setColour(Col::grid.withAlpha(0.9f));
     for(float k : {0.66f,0.33f}) g.drawEllipse(cx-r*k,cy-r*k,r*2*k,r*2*k,0.6f);
     // Anneau extérieur en blanc — plus stylé, se détache nettement (comme la maquette)
-    g.setColour(juce::Colours::white.withAlpha(0.35f));
+    g.setColour(Col::light(0.35f));
     g.drawEllipse(cx-r,cy-r,r*2,r*2,1.1f);
     g.setColour(Col::gridCtr.withAlpha(0.8f));
     g.drawLine(cx,cy-r,cx,cy+r,0.6f);
@@ -1173,7 +1166,7 @@ void VectorscopeDisplay::paintBackground(juce::Graphics& g, float cx, float cy, 
     g.drawLine(cx-r*0.707f,cy-r*0.707f,cx+r*0.707f,cy+r*0.707f,0.6f);
     g.drawLine(cx+r*0.707f,cy-r*0.707f,cx-r*0.707f,cy+r*0.707f,0.6f);
     g.setFont(Ui::iceland((9.5f)));
-    g.setColour(juce::Colours::white.withAlpha(0.7f));
+    g.setColour(Col::light(0.7f));
     // "M" au-dessus du cercle, sauf s'il tombe sur le titre (gros texte,
     // module large et bas) : il passe alors juste sous le haut de l'anneau
     {
@@ -1187,7 +1180,7 @@ void VectorscopeDisplay::paintBackground(juce::Graphics& g, float cx, float cy, 
 }
 
 // Partie animée : traînée, jauge de corrélation, titre (même ordre qu'avant)
-void VectorscopeDisplay::paintForeground(juce::Graphics& g, float cx, float cy, float r)
+void VectorscopeDisplay::paintForeground(juce::Graphics& g, float cx, float, float r)
 {
     const int H=getHeight();
     if(trailValid) g.drawImageAt(trailImage,0,0);
@@ -1197,7 +1190,7 @@ void VectorscopeDisplay::paintForeground(juce::Graphics& g, float cx, float cy, 
         g.setColour(Col::knobDim.darker(0.3f));
         g.fillRoundedRectangle(mx,my,mw,mh,1.f);
         const float t=(corr*0.5f+0.5f);
-        juce::Colour cc=(corr>=0.f)?Col::accent.interpolatedWith(juce::Colour(0xFFFFD200),1.f-corr):juce::Colour(0xFFFF5530);
+        juce::Colour cc=(corr>=0.f)?Col::accent.interpolatedWith(Col::ink(juce::Colour(0xFFFFD200)),1.f-corr):Col::ink(juce::Colour(0xFFFF5530));
         g.setColour(cc.withAlpha(0.92f));
         g.fillRect(mx+t*mw-1.5f,my-0.5f,3.f,mh+1.f);
         g.setColour(Col::gridCtr.withAlpha(0.45f));
@@ -1272,7 +1265,7 @@ void MultibandVectorscopeDisplay::renderTrail(int band)
         const float px=cx-s*scale*r, py=cy-m*scale*r;
         const float k=juce::jlimit(0.f,1.f,norm*1.6f);
         const float a=juce::jlimit(0.10f,0.95f,norm*2.4f);
-        g.setColour(Col::accent.interpolatedWith(juce::Colours::white,k).withAlpha(a));
+        g.setColour(Col::hot(Col::accent,k).withAlpha(a));
         g.fillEllipse(px-1.0f,py-1.0f,2.0f,2.0f);
     }
 }
@@ -1284,11 +1277,11 @@ void MultibandVectorscopeDisplay::paint(juce::Graphics& g)
     static const char* labels[3]={"LOW","MID|band","HIGH"};
     for(int b=0;b<3;++b){
         float cx,cy,r; getBandCircle(b,cx,cy,r);
-        juce::ColourGradient bgGrad(juce::Colour(0xFF04130F),cx,cy,juce::Colour(0xFF010706),cx,cy+r*1.3f,true);
+        juce::ColourGradient bgGrad(Col::pick(juce::Colour(0xFF04130F), Col::bg),cx,cy,Col::pick(juce::Colour(0xFF010706), Col::panel),cx,cy+r*1.3f,true);
         g.setGradientFill(bgGrad); g.fillEllipse(cx-r,cy-r,r*2,r*2);
         g.setColour(Col::grid.withAlpha(0.9f));
         for(float k : {0.66f,0.33f}) g.drawEllipse(cx-r*k,cy-r*k,r*2*k,r*2*k,0.5f);
-        g.setColour(juce::Colours::white.withAlpha(0.30f));
+        g.setColour(Col::light(0.30f));
         g.drawEllipse(cx-r,cy-r,r*2,r*2,1.0f);
         g.setColour(Col::gridCtr.withAlpha(0.7f));
         g.drawLine(cx,cy-r,cx,cy+r,0.5f);
@@ -1323,8 +1316,20 @@ Spectrogram3DBase::Spectrogram3DBase(LeakAudioProcessor& p, bool& reverseFlag, f
     startTimerHz(60);
 }
 
+juce::Colour Col::paperHeat(float t)
+{
+    static const juce::uint8 stops[8][3] = {
+        {236,241,245},{170,222,205},{45,179,138},{140,198,63},{241,194,50},{240,138,44},{224,65,47},{150,24,44} };
+    t=juce::jlimit(0.f,1.f,t)*7.f;
+    const int i=juce::jmin(6,(int)t);
+    const float f=t-(float)i;
+    auto mix=[&](int c){ return (juce::uint8)juce::roundToInt((float)stops[i][c]+((float)stops[i+1][c]-(float)stops[i][c])*f); };
+    return juce::Colour(mix(0),mix(1),mix(2));
+}
+
 juce::Colour Spectrogram3DBase::inferno(float t)
 {
+    if(Col::paper) return Col::paperHeat(t);
     static const juce::uint8 stops[8][3] = {
         {0,0,4},{40,11,84},{101,21,110},{159,42,99},{212,72,66},{245,125,21},{250,193,39},{252,255,164} };
     t=juce::jlimit(0.f,1.f,t)*7.f;
@@ -1361,7 +1366,7 @@ void Spectrogram3DBase::drawDirectionButton(juce::Graphics& g)
     const int W=getWidth();
     const float bs=16.f;
     dirBtnBounds = juce::Rectangle<float>((float)W-bs-6.f, 4.f, bs, bs);
-    g.setColour(juce::Colours::white.withAlpha(0.06f));
+    g.setColour(Col::light(0.06f));
     g.fillRoundedRectangle(dirBtnBounds,3.f);
     g.setColour(Col::border);
     g.drawRoundedRectangle(dirBtnBounds.reduced(0.5f),3.f,1.f);
@@ -1476,11 +1481,12 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
                                  bl(x0+dir*totalDx, base-totalDy), br(x0+dir*totalDx+pw, base-totalDy);
         juce::Path floor;
         floor.startNewSubPath(fl); floor.lineTo(fr); floor.lineTo(br); floor.lineTo(bl); floor.closeSubPath();
-        g.setGradientFill(juce::ColourGradient(juce::Colour(0xFF2E2B66), 0.f, base-totalDy, juce::Colour(0xFF6A6FC8), 0.f, base, false));
+        g.setGradientFill(juce::ColourGradient(Col::pick(juce::Colour(0xFF2E2B66), juce::Colour(0xFFE4E9F0)), 0.f, base-totalDy,
+                                               Col::pick(juce::Colour(0xFF6A6FC8), juce::Colour(0xFFCBD4E1)), 0.f, base, false));
         g.setOpacity(0.85f);
         g.fillPath(floor);
         g.setOpacity(1.f);
-        g.setColour(juce::Colour(0xFFC8D0FF).withAlpha(0.13f));
+        g.setColour(Col::pick(juce::Colour(0xFFC8D0FF).withAlpha(0.13f), Col::textHi.withAlpha(0.10f)));
         for(int k=0;k<=16;++k){
             const float u=(float)k/16.f;
             g.drawLine(juce::Line<float>(fl+(fr-fl)*u, bl+(br-bl)*u), 0.6f);
@@ -1515,21 +1521,22 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
         if(filled){
             // surface : dégradé d'amplitude (bas sombre -> haut chaud), plus
             // transparente au fond
-            juce::ColourGradient sg(inferno(0.12f).withAlpha(0.95f), 0.f, oy,
+            juce::ColourGradient sg(inferno(Col::paper ? 0.28f : 0.12f).withAlpha(0.95f), 0.f, oy,   // papier : pied coloré, pas blanc
                                     inferno(0.95f), 0.f, oy-peakH, false);
             sg.addColour(0.35, inferno(0.45f));
             sg.addColour(0.65, inferno(0.72f));
             g.setGradientFill(sg);
-            g.setOpacity(0.35f+0.65f*a);
+            g.setOpacity(Col::paper ? 0.80f+0.20f*a : 0.35f+0.65f*a);   // papier : sans voile blanc
             g.fillPath(p);
             g.setOpacity(1.f);
-            g.setColour(juce::Colours::black.withAlpha(0.35f));
+            g.setColour(Col::pick(juce::Colours::black.withAlpha(0.35f), Col::textHi.withAlpha(0.30f)));
             g.strokePath(p, juce::PathStrokeType(0.8f));
         } else {
             // lignes : fond masquant (occultation) + trait coloré par ancienneté
             g.setColour(Col::bg.withAlpha(0.88f));
             g.fillPath(p);
-            g.setColour(inferno(0.25f+0.75f*a).withAlpha(0.25f+0.75f*a));
+            if(Col::paper) g.setColour(inferno(0.40f+0.60f*a).withAlpha(0.45f+0.55f*a));
+            else           g.setColour(inferno(0.25f+0.75f*a).withAlpha(0.25f+0.75f*a));
             g.strokePath(p, juce::PathStrokeType(r==0 ? 1.8f : 1.f));
         }
     }
@@ -1599,86 +1606,8 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
 void Spectrogram3DPeaksDisplay::paint(juce::Graphics& g)   { paintCurves(g, "SPECTROGRAM 3D - LINES",   false); }
 void Spectrogram3DSurfaceDisplay::paint(juce::Graphics& g) { paintCurves(g, "SPECTROGRAM 3D - SURFACE", true);  }
 
-//==============================================================================
-// TransientDisplay
-//==============================================================================
-TransientDisplay::TransientDisplay(LeakAudioProcessor& p) : processor(p)
-{
-    startTimerHz(60);
-}
-void TransientDisplay::resized() { imageValid=false; }
-void TransientDisplay::timerCallback()
-{
-    processor.getTransientData(peakCols,COLS);
-    const float hash = peakCols[0] + peakCols[COLS/4]*3.f + peakCols[COLS/2]*7.f
-                      + peakCols[COLS*3/4]*13.f + peakCols[COLS-1]*5.f;
-    if(std::abs(hash - lastHash) > 0.01f){ lastHash=hash; repaint(); }
-}
-void TransientDisplay::mouseDown(const juce::MouseEvent& e)
-{
-    if(e.mods.isRightButtonDown()) return;  // clic droit = menu slot
-    listening=true; processor.setAuditionTransient(true); repaint();
-}
-void TransientDisplay::mouseUp(const juce::MouseEvent& e)
-{
-    if(e.mods.isRightButtonDown()) return;
-    listening=false; processor.setAuditionTransient(false); repaint();
-}
-void TransientDisplay::mouseExit(const juce::MouseEvent&)
-{
-    if(listening){ listening=false; processor.setAuditionTransient(false); repaint(); }
-}
-void TransientDisplay::paint(juce::Graphics& g)
-{
-    const int W=getWidth(),H=getHeight();
-    if(W<10||H<10) return;
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
-    const float dbMin=-60.f, dbMax=0.f;
-    const float padT=22.f, padB=14.f;
-    const float gh=(float)H-padT-padB;
-    auto dbToY=[&](float db)->float{
-        return padT+juce::jlimit(0.f,1.f,(db-dbMax)/(dbMin-dbMax))*gh;
-    };
-    g.setFont(Ui::iceland((7.f)));
-    for(int db : {0,-12,-24,-36,-48}) {
-        const float y=dbToY((float)db);
-        g.setColour(db==0?Col::gridCtr:Col::grid);
-        g.drawLine(0,y,(float)W,y,0.5f);
-        g.setColour(Col::textMid.withAlpha(0.4f));
-        g.drawText(juce::String(db),2,(int)y-7,24,10,juce::Justification::left);
-    }
-    const float thrY=dbToY(threshold);
-    g.setColour(juce::Colour(0xFFFFD200).withAlpha(0.6f));
-    g.drawLine(0,thrY,(float)W,thrY,1.f);
-    const float colW=juce::jmax(1.f,(float)W/COLS);
-    for(int i=0;i<COLS;++i){
-        const float db=peakCols[i];
-        if(db<-119.f) continue;
-        const float barT=dbToY(db), barB=dbToY(dbMin), barH=barB-barT;
-        if(barH<=0.5f) continue;
-        juce::Colour col;
-        if     (db>=-3.f)  col=juce::Colour(0xFFFF1500);
-        else if(db>=-6.f)  col=juce::Colour(0xFFFF6600);
-        else if(db>=-14.f) col=juce::Colour(0xFFFFD200);
-        else if(db>=-26.f) col=juce::Colour(0xFF00FF55);
-        else               col=juce::Colour(0xFF00FFB2);
-        g.setColour(col.withAlpha(0.75f));
-        g.fillRect((float)i*colW, barT, colW-0.5f, barH);
-        g.setColour(col);
-        g.fillRect((float)i*colW, barT, colW-0.5f, 1.5f);
-    }
-    g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
-    g.drawFittedText(TR("TRANSIENT"),6,5,juce::jmax(20,W-130),13,juce::Justification::left,1,0.7f);
-    if(listening){
-        g.setColour(Col::accent); g.drawRect(getLocalBounds(),2);
-        g.drawFittedText(TR("LISTEN"),W-104,4,100,10,juce::Justification::right,1,0.7f);
-    } else {
-        g.setColour(Col::textMid.withAlpha(0.30f));
-        g.drawFittedText(TR("click = listen"),W-124,4,120,10,juce::Justification::right,1,0.7f);
-    }
-}
 
+//==============================================================================
 //==============================================================================
 // VuMeterLeak
 //==============================================================================
@@ -1785,11 +1714,11 @@ void VuMeterLeak::paint(juce::Graphics& g)
     auto yOf=[&](float db){ return dbToY(db, gy0, gh); };
 
     const juce::ColourGradient levelGrad=[&]{
-        juce::ColourGradient lg(juce::Colour(0xFFFF1500), 0.f, gy0, juce::Colour(0xFF00FFB2).withAlpha(0.25f), 0.f, botY, false);
-        lg.addColour(0.10, juce::Colour(0xFFFF6600));
-        lg.addColour(0.24, juce::Colour(0xFFFFD200));
-        lg.addColour(0.50, juce::Colour(0xFF00FF55));
-        lg.addColour(0.80, juce::Colour(0xFF00FFB2));
+        juce::ColourGradient lg(Col::ink(juce::Colour(0xFFFF1500)), 0.f, gy0, Col::ink(juce::Colour(0xFF00FFB2)).withAlpha(0.25f), 0.f, botY, false);
+        lg.addColour(0.10, Col::ink(juce::Colour(0xFFFF6600)));
+        lg.addColour(0.24, Col::ink(juce::Colour(0xFFFFD200)));
+        lg.addColour(0.50, Col::ink(juce::Colour(0xFF00FF55)));
+        lg.addColour(0.80, Col::ink(juce::Colour(0xFF00FFB2)));
         return lg; }();
 
     auto fmt=[](float db, bool sign){
@@ -1801,46 +1730,46 @@ void VuMeterLeak::paint(juce::Graphics& g)
         const auto pill=juce::Rectangle<float>(w, 24.f).withCentre({cx, 4.f+12.f});
         juce::Path p; p.addRoundedRectangle(pill, 6.f);
         if(over){
-            juce::DropShadow(juce::Colour(0xFFFF2A2A).withAlpha(0.8f), 8, {}).drawForPath(g, p);
-            g.setColour(juce::Colour(0xE6A00A0A)); g.fillPath(p);
-            g.setColour(juce::Colour(0xFFFF4A4A)); g.strokePath(p, juce::PathStrokeType(1.2f));
+            juce::DropShadow(Col::ink(juce::Colour(0xFFFF2A2A)).withAlpha(Col::paper ? 0.35f : 0.8f), 8, {}).drawForPath(g, p);
+            g.setColour(Col::pick(juce::Colour(0xE6A00A0A), juce::Colour(0xFFFDE6E3))); g.fillPath(p);
+            g.setColour(Col::ink(juce::Colour(0xFFFF4A4A))); g.strokePath(p, juce::PathStrokeType(1.2f));
         } else {
-            g.setColour(juce::Colour(0xFF0D1416)); g.fillPath(p);
-            g.setColour(juce::Colours::white.withAlpha(0.08f)); g.strokePath(p, juce::PathStrokeType(1.f));
+            g.setColour(Col::pick(juce::Colour(0xFF0D1416), Col::knobDim)); g.fillPath(p);
+            g.setColour(Col::light(Col::paper ? 0.14f : 0.08f)); g.strokePath(p, juce::PathStrokeType(1.f));
         }
         g.setFont(Ui::iceland(8.5f));
-        g.setColour(over ? juce::Colour(0xFFFFD0D0) : Col::textHi.withAlpha(0.55f));
+        g.setColour(over ? Col::pick(juce::Colour(0xFFFFD0D0), Col::ink(juce::Colour(0xFFFF4A4A))) : Col::textHi.withAlpha(0.55f));
         g.drawFittedText("TP", pill.withHeight(11.f).translated(0.f, 1.f).toNearestInt(), juce::Justification::centred, 1);
         g.setFont(Ui::iceland(11.5f));
-        g.setColour(over ? juce::Colours::white : Col::textHi.withAlpha(0.92f));
+        g.setColour(over ? Col::pick(juce::Colours::white, Col::ink(juce::Colour(0xFFFF2A2A))) : Col::textHi.withAlpha(0.92f));
         g.drawFittedText(fmt(tpMax, true), pill.withTrimmedTop(10.f).toNearestInt(), juce::Justification::centred, 1);
     };
 
     // barre crête : piste, dégradé de niveau, bande de clip, maintien
     auto drawBar=[&](juce::Rectangle<float> r, float peakDb, float holdDb, bool clip, bool rounded){
         juce::Path track; track.addRoundedRectangle(r, rounded ? 4.f : 1.f);
-        g.setColour(juce::Colour(0xFF0A1717)); g.fillPath(track);
+        g.setColour(Col::pick(juce::Colour(0xFF0A1717), juce::Colour(0xFFE6EBF0))); g.fillPath(track);
         g.saveState(); g.reduceClipRegion(track);
         const float y=juce::jmax(yOf(peakDb), gy0);
         g.setGradientFill(levelGrad); g.fillRect(r.withTop(y));
         if(rounded){   // galbe : reflet à gauche, ombre à droite
-            juce::ColourGradient sh(juce::Colours::white.withAlpha(0.22f), r.getX(), 0.f,
-                                    juce::Colours::black.withAlpha(0.35f), r.getRight(), 0.f, false);
+            juce::ColourGradient sh(juce::Colours::white.withAlpha(Col::paper ? 0.35f : 0.22f), r.getX(), 0.f,
+                                    juce::Colours::black.withAlpha(Col::paper ? 0.12f : 0.35f), r.getRight(), 0.f, false);
             sh.addColour(0.4, juce::Colours::transparentWhite);
             g.setGradientFill(sh); g.fillRect(r);
         }
-        if(clip){ g.setColour(juce::Colour(0xFFFF1010)); g.fillRect(r.withHeight(4.f)); }
+        if(clip){ g.setColour(Col::ink(juce::Colour(0xFFFF1010))); g.fillRect(r.withHeight(4.f)); }
         g.restoreState();
         if(holdDb>DB_MIN){
-            g.setColour(juce::Colour(0xFFE8FFF6));
+            g.setColour(Col::pick(juce::Colour(0xFFE8FFF6), Col::textHi));
             g.fillRect(r.getX(), juce::jmax(yOf(holdDb), gy0)-1.f, r.getWidth(), 2.f);
         }
     };
 
     // panneau creusé des afficheurs
     auto drawPanel=[&](juce::Rectangle<float> r){
-        g.setColour(juce::Colour(0xFF071012)); g.fillRoundedRectangle(r, 6.f);
-        g.setColour(juce::Colours::white.withAlpha(0.07f)); g.drawRoundedRectangle(r.reduced(0.5f), 6.f, 1.f);
+        g.setColour(Col::pick(juce::Colour(0xFF071012), Col::panel)); g.fillRoundedRectangle(r, 6.f);
+        g.setColour(Col::pick(juce::Colours::white.withAlpha(0.07f), Col::border)); g.drawRoundedRectangle(r.reduced(0.5f), 6.f, 1.f);
     };
 
     const bool overL=tpLatchL || tpMaxL>0.f, overR=tpLatchR || tpMaxR>0.f;
@@ -1861,7 +1790,7 @@ void VuMeterLeak::paint(juce::Graphics& g)
             const float y=yOf((float)db);
             g.setColour(db==0 ? juce::Colour(0x73FF5050) : Col::grid);
             g.drawLine(sc, y, W-sc, y, db==0 ? 1.f : 0.6f);
-            g.setColour(db>0 ? juce::Colour(0xFFFF6060) : juce::Colours::white.withAlpha(0.75f));
+            g.setColour(db>0 ? Col::ink(juce::Colour(0xFFFF6060)) : Col::light(0.75f));
             const juce::String t=db>0 ? "+"+juce::String(db) : juce::String(db);
             g.drawFittedText(t, 0, (int)y-6, (int)sc-4, 12, juce::Justification::centredRight, 1);
             g.drawFittedText(t, (int)(W-sc)+4, (int)y-6, (int)sc-4, 12, juce::Justification::centredLeft, 1);
@@ -1873,8 +1802,8 @@ void VuMeterLeak::paint(juce::Graphics& g)
             drawBar(r, c==0 ? dispPeakL : dispPeakR, c==0 ? holdL : holdR, c==0 ? clipHoldL>0.f : clipHoldR>0.f, false);
             // RMS intégré : bande centrale assombrie + repère blanc
             const float ry=juce::jmax(yOf(c==0 ? dispRmsL : dispRmsR), gy0);
-            g.setColour(juce::Colour(0x8C030A0A)); g.fillRect(x+bw*0.3f, ry, bw*0.4f, botY-ry);
-            g.setColour(juce::Colours::white.withAlpha(0.85f)); g.fillRect(x+bw*0.3f, ry-1.f, bw*0.4f, 2.f);
+            g.setColour(Col::pick(juce::Colour(0x8C030A0A), juce::Colours::white.withAlpha(0.45f))); g.fillRect(x+bw*0.3f, ry, bw*0.4f, botY-ry);
+            g.setColour(Col::light(0.85f)); g.fillRect(x+bw*0.3f, ry-1.f, bw*0.4f, 2.f);
         }
 
         g.setFont(Ui::iceland(11.f));
@@ -1888,10 +1817,10 @@ void VuMeterLeak::paint(juce::Graphics& g)
         const float rowH=panel.getHeight()/3.f;
         struct Row { const char* label; juce::String l, r; juce::Colour col; float size; };
         const Row rows[3] = {
-            { "PEAK",  fmt(numPeakL, false), fmt(numPeakR, false), juce::Colours::white,     17.f },
+            { "PEAK",  fmt(numPeakL, false), fmt(numPeakR, false), Col::light(1.f),          17.f },
             { "RMS",   fmt(numRmsL,  false), fmt(numRmsR,  false), Col::accent,              14.f },
             { "CREST", numPeakL<=-59.f ? juce::String("--") : juce::String(crestL, 1),
-                       numPeakR<=-59.f ? juce::String("--") : juce::String(crestR, 1), juce::Colour(0xFFFFD200), 12.5f },
+                       numPeakR<=-59.f ? juce::String("--") : juce::String(crestR, 1), Col::ink(juce::Colour(0xFFFFD200)), 12.5f },
         };
         for(int i=0;i<3;++i){
             const auto row=panel.withTop(panel.getY()+rowH*(float)i).withHeight(rowH);
@@ -1904,7 +1833,7 @@ void VuMeterLeak::paint(juce::Graphics& g)
             g.drawFittedText(rows[i].l, juce::Rectangle<float>(xL-4.f, valRow.getY(), bw+8.f, valRow.getHeight()).toNearestInt(), juce::Justification::centred, 1);
             g.drawFittedText(rows[i].r, juce::Rectangle<float>(xR-4.f, valRow.getY(), bw+8.f, valRow.getHeight()).toNearestInt(), juce::Justification::centred, 1);
             if(i<2){
-                g.setColour(juce::Colours::white.withAlpha(0.06f));
+                g.setColour(Col::light(Col::paper ? 0.10f : 0.06f));
                 g.fillRect(panel.getX()+6.f, row.getBottom(), panel.getWidth()-12.f, 1.f);
             }
         }
@@ -1920,10 +1849,10 @@ void VuMeterLeak::paint(juce::Graphics& g)
         g.setFont(Ui::iceland(10.f));
         for(int db : marks){
             const float y=yOf((float)db);
-            g.setColour(db>0 ? juce::Colour(0xFFFF6060) : juce::Colours::white.withAlpha(0.8f));
+            g.setColour(db>0 ? Col::ink(juce::Colour(0xFFFF6060)) : Col::light(0.8f));
             g.drawFittedText(db>0 ? "+"+juce::String(db) : juce::String(db),
                              juce::Rectangle<float>(mid-scW*0.5f+6.f, y-6.f, scW-12.f, 12.f).toNearestInt(), juce::Justification::centred, 1);
-            g.setColour(juce::Colours::white.withAlpha(0.25f));
+            g.setColour(Col::light(0.25f));
             g.drawLine(xL+bw+2.f, y, xL+bw+7.f, y, 1.f);
             g.drawLine(xR-7.f,    y, xR-2.f,    y, 1.f);
         }
@@ -1933,7 +1862,7 @@ void VuMeterLeak::paint(juce::Graphics& g)
             const auto r=juce::Rectangle<float>(x, gy0, bw, gh);
             drawBar(r, c==0 ? dispPeakL : dispPeakR, c==0 ? holdL : holdR, c==0 ? clipHoldL>0.f : clipHoldR>0.f, true);
             const float ry=juce::jmax(yOf(c==0 ? dispRmsL : dispRmsR), gy0);   // repère RMS
-            g.setColour(juce::Colours::white.withAlpha(0.9f)); g.fillRect(x, ry-1.f, bw, 2.f);
+            g.setColour(Col::light(0.9f)); g.fillRect(x, ry-1.f, bw, 2.f);
         }
 
         // grands afficheurs LCD
@@ -1950,13 +1879,13 @@ void VuMeterLeak::paint(juce::Graphics& g)
             g.setFont(Ui::iceland(8.5f)); g.setColour(Col::textHi.withAlpha(0.5f));
             g.drawText(t, juce::Rectangle<float>(panel.getX(), y, panel.getWidth(), u*0.7f), juce::Justification::centred); };
         label("PEAK", panel.getY()+u*0.9f);
-        g.setFont(Ui::iceland(19.f)); g.setColour(juce::Colours::white);
+        g.setFont(Ui::iceland(19.f)); g.setColour(Col::light(1.f));
         colText(fmt(numPeakL, false), lx, panel.getY()+u*1.5f, u*1.4f); colText(fmt(numPeakR, false), rx, panel.getY()+u*1.5f, u*1.4f);
         label("RMS", panel.getY()+u*3.0f);
         g.setFont(Ui::iceland(16.f)); g.setColour(Col::accent);
         colText(fmt(numRmsL, false), lx, panel.getY()+u*3.6f, u*1.3f); colText(fmt(numRmsR, false), rx, panel.getY()+u*3.6f, u*1.3f);
         label(TR("CREST FACTOR"), panel.getY()+u*5.1f);
-        g.setFont(Ui::iceland(15.f)); g.setColour(juce::Colour(0xFFFFD200));
+        g.setFont(Ui::iceland(15.f)); g.setColour(Col::ink(juce::Colour(0xFFFFD200)));
         const float crest=(crestL+crestR)*0.5f;
         g.drawFittedText(numPeakL<=-59.f ? juce::String("--") : juce::String(crest, 1)+" dB",
                          juce::Rectangle<float>(panel.getX(), panel.getY()+u*5.7f, panel.getWidth(), u*1.4f).toNearestInt(),
@@ -2027,14 +1956,14 @@ void LoudnessPanel::paint(juce::Graphics& g)
         return (v<=-119.f)?juce::String("---"):juce::String(v,dec);
     };
     auto lufsCol=[](float v)->juce::Colour{
-        if(v>=-9.f)  return juce::Colour(0xFFFF1500);
-        if(v>=-14.f) return juce::Colour(0xFFFFD200);
+        if(v>=-9.f)  return Col::ink(juce::Colour(0xFFFF1500));
+        if(v>=-14.f) return Col::ink(juce::Colour(0xFFFFD200));
         if(v>=-23.f) return Col::accent;
         return Col::textMid;
     };
     auto tpCol=[](float v)->juce::Colour{
-        if(v>=-1.f) return juce::Colour(0xFFFF1500);
-        if(v>=-3.f) return juce::Colour(0xFFFFD200);
+        if(v>=-1.f) return Col::ink(juce::Colour(0xFFFF1500));
+        if(v>=-3.f) return Col::ink(juce::Colour(0xFFFFD200));
         return Col::accent;
     };
     const float bigH=juce::jlimit(28.f,52.f*s,bodyH*0.36f);
@@ -2118,8 +2047,8 @@ void ReleaseFader::paint(juce::Graphics& g)
         g.setColour(acc); g.strokePath(fill, railStroke);
         const float tw=hovered||dragging ? 7.f : 6.f, th=hovered||dragging ? 16.f : 14.f;
         const auto thumb=juce::Rectangle<float>(tw, juce::jmin(th,(float)H)).withCentre({xv, cy});
-        g.setColour(juce::Colours::black.withAlpha(0.5f)); g.fillRoundedRectangle(thumb.translated(1.f, 0.f), tw*0.5f);
-        g.setColour(juce::Colour(0xFFE8FFF6));             g.fillRoundedRectangle(thumb, tw*0.5f);
+        g.setColour(juce::Colours::black.withAlpha(Col::paper ? 0.22f : 0.5f)); g.fillRoundedRectangle(thumb.translated(1.f, 0.f), tw*0.5f);
+        g.setColour(Col::pick(juce::Colour(0xFFE8FFF6), juce::Colours::white)); g.fillRoundedRectangle(thumb, tw*0.5f);
         g.setFont(Ui::iceland(9.5f));
         g.setColour(acc);
         g.drawFittedText(valueText(),(int)x1+6,0,(int)vw-6,H,juce::Justification::centredLeft,1,0.6f);
@@ -2152,8 +2081,8 @@ void ReleaseFader::paint(juce::Graphics& g)
     // curseur
     const float tw=hovered||dragging ? 16.f : 14.f, th=hovered||dragging ? 7.f : 6.f;
     const auto thumb=juce::Rectangle<float>(tw, th).withCentre({cx, yv});
-    g.setColour(juce::Colours::black.withAlpha(0.5f)); g.fillRoundedRectangle(thumb.translated(0.f, 1.f), th*0.5f);
-    g.setColour(juce::Colour(0xFFE8FFF6));             g.fillRoundedRectangle(thumb, th*0.5f);
+    g.setColour(juce::Colours::black.withAlpha(Col::paper ? 0.22f : 0.5f)); g.fillRoundedRectangle(thumb.translated(0.f, 1.f), th*0.5f);
+    g.setColour(Col::pick(juce::Colour(0xFFE8FFF6), juce::Colours::white)); g.fillRoundedRectangle(thumb, th*0.5f);
 
     g.setFont(Ui::iceland(9.5f));
     g.setColour(acc);
@@ -2207,10 +2136,9 @@ void SpectrumDisplayLeak::setActiveBands(int n)
     }
     resetPeaks();
     // Les indices de bandes changent de sens entre 15/31/62 — on efface
-    // toute sélection d'audition pour éviter d'auditionner la mauvaise fréquence.
+    // toute sélection de bandes (elle désignerait d'autres fréquences).
     if(soloBand!=-1 || multiSelectMask!=0ULL){
         soloBand=-1; multiSelectMask=0; lastDragBand=-1;
-        processor.setAuditionBands(0ULL);
     }
     cacheValid=false;gridImageValid=false;
     if(getWidth()>10&&getHeight()>10) rebuildCache();
@@ -2232,10 +2160,9 @@ void SpectrumDisplayLeak::resetAll()
         clipLatch[i]=false;clipHoldF[i]=0;
     }
     globalClipLatch=false;
-    // RESET efface aussi toute sélection de bandes en cours d'audition.
+    // RESET efface aussi toute sélection de bandes.
     if(soloBand!=-1 || multiSelectMask!=0ULL){
         soloBand=-1; multiSelectMask=0; lastDragBand=-1;
-        processor.setAuditionBands(0ULL);
     }
     repaint();
 }
@@ -2332,16 +2259,16 @@ void SpectrumDisplayLeak::rebuildCache()
     {
         juce::Graphics gg(barGradImage);
         juce::ColourGradient grad(
-            juce::Colour(0xFFFF1500).withAlpha(0.95f),0.f,0.f,
-            juce::Colour(0xFF00FFB2).withAlpha(0.10f),0.f,(float)gradH,false);
-        grad.addColour(0.12,juce::Colour(0xFFFF6600).withAlpha(0.92f));
-        grad.addColour(0.28,juce::Colour(0xFFFFD200).withAlpha(0.88f));
-        grad.addColour(0.52,juce::Colour(0xFF00FF55).withAlpha(0.82f));
-        grad.addColour(0.78,juce::Colour(0xFF00FFB2).withAlpha(0.75f));
+            Col::ink(juce::Colour(0xFFFF1500)).withAlpha(0.95f),0.f,0.f,
+            Col::ink(juce::Colour(0xFF00FFB2)).withAlpha(0.10f),0.f,(float)gradH,false);
+        grad.addColour(0.12,Col::ink(juce::Colour(0xFFFF6600)).withAlpha(0.92f));
+        grad.addColour(0.28,Col::ink(juce::Colour(0xFFFFD200)).withAlpha(0.88f));
+        grad.addColour(0.52,Col::ink(juce::Colour(0xFF00FF55)).withAlpha(0.82f));
+        grad.addColour(0.78,Col::ink(juce::Colour(0xFF00FFB2)).withAlpha(0.75f));
         gg.setGradientFill(grad);gg.fillRect(0,0,1,gradH);
     }
     lastHoveredBand=-1;
-    cacheValid=true;gridImageValid=true;
+    cacheValid=true;gridImageValid=true;cacheGen=Col::generation;
 }
 
 void SpectrumDisplayLeak::timerCallback()
@@ -2430,8 +2357,6 @@ void SpectrumDisplayLeak::mouseExit(const juce::MouseEvent&)
     // mais la sélection multi-bandes (Ctrl) reste active.
     if(soloBand!=-1){
         soloBand=-1;
-        processor.setAuditionBands(multiSelectMask);
-        if(multiSelectMask==0ULL) processor.setNumActiveBands(processor.getBandMode());
         repaint();
     }
 }
@@ -2447,13 +2372,11 @@ void SpectrumDisplayLeak::mouseDown(const juce::MouseEvent& e)
             if(band>=0){
                 multiSelectMask ^= LeakAudioProcessor::bandBit(band);
                 lastDragBand=band;
-                processor.setAuditionBands(multiSelectMask);
             }
         } else {
-            // Clic simple : audition mono-bande momentanée, efface la sélection multi
+            // Clic simple : bande isolée tant que le bouton est enfoncé, efface la sélection multi
             multiSelectMask=0;
             soloBand=band;
-            processor.setAuditionBand(soloBand);
         }
         if(onSelectionChanged) onSelectionChanged();
         repaint();
@@ -2473,7 +2396,6 @@ void SpectrumDisplayLeak::mouseDrag(const juce::MouseEvent& e)
             // pour éviter de retirer une bande qu'on vient de traverser).
             multiSelectMask |= LeakAudioProcessor::bandBit(band);
             lastDragBand=band;
-            processor.setAuditionBands(multiSelectMask);
             repaint();
         }
     }
@@ -2486,7 +2408,6 @@ void SpectrumDisplayLeak::mouseUp(const juce::MouseEvent& e)
         soloBand=-1;
         // Relâcher le clic mono-bande retombe sur la sélection multi-bandes
         // (vide si aucune n'est active).
-        processor.setAuditionBands(multiSelectMask);
         repaint();
     }
 }
@@ -2494,7 +2415,7 @@ void SpectrumDisplayLeak::mouseUp(const juce::MouseEvent& e)
 void SpectrumDisplayLeak::paint(juce::Graphics& g)
 {
     const int W=getWidth(),H=getHeight();if(W<10||H<10)return;
-    if(!cacheValid) rebuildCache();
+    if(!cacheValid || cacheGen!=Col::generation) rebuildCache();
     const float gy0=padT(),gh=cachedGH,gw=cachedGW,gx0=cachedPadL;
     const float minY=dbToY(-dbRange),zeroY=dbToY(0.f);
     const int N=activeBands;
@@ -2511,7 +2432,7 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
      if(analysisMode==AM::Mid){g.setColour(Col::midCol.withAlpha(.75f));g.drawText("MID",(int)gx0+2,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}
      else if(analysisMode==AM::Side){g.setColour(Col::sideCol.withAlpha(.75f));g.drawText("SIDE",(int)gx0+2,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}
      else if(isMSMode){g.setColour(Col::midCol.withAlpha(.7f));g.drawText("MID",(int)gx0+2,(int)gy0+2,30,(int)lfs+2,juce::Justification::left);
-         g.setColour(juce::Colours::white.withAlpha(.8f));g.drawText("SIDE",(int)gx0+34,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}}
+         g.setColour(Col::light(.8f));g.drawText("SIDE",(int)gx0+34,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}}
 
     clipOn.clear();clipOff.clear();
     bool anyClipOn=false,anyClipOff=false;
@@ -2519,17 +2440,17 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
 
     // couleurs de pointe (niveau) et de crête — communes Classic / Blocks 3D
     auto tipColour=[](float d){
-        if(d>=-3.f)  return juce::Colour(0xFFFF1500);
-        if(d>=-6.f)  return juce::Colour(0xFFFF6600);
-        if(d>=-14.f) return juce::Colour(0xFFFFD200);
-        if(d>=-26.f) return juce::Colour(0xFF00FF55);
-        return juce::Colour(0xFF00FFB2); };
+        if(d>=-3.f)  return Col::ink(juce::Colour(0xFFFF1500));
+        if(d>=-6.f)  return Col::ink(juce::Colour(0xFFFF6600));
+        if(d>=-14.f) return Col::ink(juce::Colour(0xFFFFD200));
+        if(d>=-26.f) return Col::ink(juce::Colour(0xFF00FF55));
+        return Col::ink(juce::Colour(0xFF00FFB2)); };
     auto peakColour=[](float d){
-        if(d>=-3.f)  return juce::Colour(0xFFFF1500);
-        if(d>=-6.f)  return juce::Colour(0xFFFF6600);
-        if(d>=-12.f) return juce::Colour(0xFFFFD200);
-        if(d>=-24.f) return juce::Colour(0xFF00FF55);
-        return juce::Colour(0xFF00FFB2); };
+        if(d>=-3.f)  return Col::ink(juce::Colour(0xFFFF1500));
+        if(d>=-6.f)  return Col::ink(juce::Colour(0xFFFF6600));
+        if(d>=-12.f) return Col::ink(juce::Colour(0xFFFFD200));
+        if(d>=-24.f) return Col::ink(juce::Colour(0xFF00FF55));
+        return Col::ink(juce::Colour(0xFF00FFB2)); };
 
     // Blocks 3D : sol éclairé + dalles, dégradé de niveau calé sur le tracé
     juce::ColourGradient front3D, side3D;
@@ -2563,7 +2484,7 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
                     if(levels[i]>(float)rd){
                         const float ry=std::round(dbToY((float)rd));
                         if(rd%10==0){g.setColour(kRefMark);g.fillRect(bx,ry-1.f,bw,1.5f);}
-                        else{g.setColour(juce::Colour(0x44AAFFDD));g.fillRect(bx,ry-0.5f,bw,1.0f);}
+                        else{g.setColour(Col::pick(juce::Colour(0x44AAFFDD), Col::accent.withAlpha(0.30f)));g.fillRect(bx,ry-0.5f,bw,1.0f);}
                     }
                 }
             }
@@ -2580,19 +2501,19 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
             if(sH>0.5f){
                 const juce::Rectangle<float> glass(sx,sTop,sw,sH);
                 g.setColour(Col::bg.withAlpha(0.35f)); g.fillRect(glass);
-                g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(0.32f),0.f,sTop,
-                                                       juce::Colours::white.withAlpha(0.06f),0.f,barB,false));
+                g.setGradientFill(juce::ColourGradient(Col::light(0.32f),0.f,sTop,
+                                                       Col::light(0.06f),0.f,barB,false));
                 g.fillRect(glass);
-                g.setColour(juce::Colours::white.withAlpha(0.75f)); g.drawRect(glass,1.f);
+                g.setColour(Col::light(0.75f)); g.drawRect(glass,1.f);
                 if(sw>4.f){
-                    g.setColour(juce::Colours::white.withAlpha(0.18f));
+                    g.setColour(Col::light(0.18f));
                     g.fillRect(glass.reduced(1.f).withWidth(juce::jmax(1.f,(sw-2.f)*0.3f)));
                 }
-                g.setColour(juce::Colours::white); g.fillRect(sx,sTop,sw,1.5f);
+                g.setColour(Col::light(1.f)); g.fillRect(sx,sTop,sw,1.5f);
             }
             if(peakOn&&sidePeaks[i]>-dbRange){
                 const float spy=juce::jmax(dbToY(sidePeaks[i]),gy0);
-                g.setColour(juce::Colours::white.withAlpha(0.8f)); g.fillRect(sx,spy-0.75f,sw,1.5f);
+                g.setColour(Col::light(0.8f)); g.fillRect(sx,spy-0.75f,sw,1.5f);
             }
         }
         if(!blocks3D && peakOn&&peaks[i]>-dbRange){   // (Blocks 3D : crête dessinée avec le bloc)
@@ -2606,15 +2527,15 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
         else            {clipOff.add(bx,ledY,bw,8.f);anyClipOff=true;}
     }
 
-    if(anyClipOff){g.setColour(juce::Colour(0xFF0A1A1A));g.fillRectList(clipOff);
+    if(anyClipOff){g.setColour(Col::pick(juce::Colour(0xFF0A1A1A), Col::knobDim));g.fillRectList(clipOff);
                    g.setColour(Col::border);for(auto&r:clipOff)g.drawRect(r,0.5f);}
-    if(anyClipOn) {g.setColour(juce::Colour(0xFFFF1010));g.fillRectList(clipOn);
-                   g.setColour(juce::Colour(0xFFFF5555));for(auto&r:clipOn)g.drawRect(r,0.5f);}
+    if(anyClipOn) {g.setColour(Col::ink(juce::Colour(0xFFFF1010)));g.fillRectList(clipOn);
+                   g.setColour(Col::ink(juce::Colour(0xFFFF5555)));for(auto&r:clipOn)g.drawRect(r,0.5f);}
 
     // Solo visuel : assombrit les bandes non sélectionnées, encadre les bandes actives
     // (soloBand = clic mono-bande momentané, multiSelectMask = sélection Ctrl persistante)
     if(soloBand>=0 || multiSelectMask!=0ULL){
-        g.setColour(juce::Colour(0xBB000000));
+        g.setColour(Col::pick(juce::Colour(0xBB000000), Col::bg.withAlpha(0.73f)));
         for(int i=0;i<N;++i){
             const bool sel = (i==soloBand) || ((multiSelectMask & LeakAudioProcessor::bandBit(i))!=0ULL);
             if(!sel) g.fillRect(barCache[i].x,gy0,barCache[i].bw,gh);
@@ -2856,7 +2777,7 @@ void NeedleVuMeter::paint(juce::Graphics& g)
                           +(juce::int64)Col::bg.getARGB()*3+(juce::int64)Col::accent.getARGB()*5
                           +(juce::int64)Col::textHi.getARGB()*11+(juce::int64)Col::textMid.getARGB()*13
                           +(juce::int64)Col::border.getARGB()*17+(juce::int64)modeBtn.getX()*19
-                          +(juce::int64)juce::roundToInt(calibRef*10.f)*23;
+                          +(juce::int64)juce::roundToInt(calibRef*10.f)*23+(juce::int64)Col::generation*29;
     if(!dialCache.isValid() || key!=dialKey){
         dialKey=key;
         dialCache=juce::Image(juce::Image::RGB, juce::jmax(1,juce::roundToInt((float)W*pxScale)), juce::jmax(1,juce::roundToInt((float)H*pxScale)), false);
@@ -2886,7 +2807,7 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
     // référence 0VU entre les flèches, dans un petit écran creux
     if(!calibValueArea.isEmpty()){
         const auto va=calibValueArea.toFloat().reduced(1.f, 0.f);
-        g.setColour(juce::Colours::black.withAlpha(0.35f)); g.fillRoundedRectangle(va, 4.f);
+        g.setColour(Col::pick(juce::Colours::black.withAlpha(0.35f), Col::panel)); g.fillRoundedRectangle(va, 4.f);
         g.setColour(Col::border.withAlpha(0.6f));          g.drawRoundedRectangle(va.reduced(0.5f), 4.f, 0.8f);
         g.setFont(Ui::iceland(juce::jmax(8.f, (float)calibValueArea.getHeight()*0.68f)));
         g.setColour(Col::textHi.withAlpha(0.92f));
@@ -2909,7 +2830,7 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
         const bool hot=db>0.5f;
         const auto p0=pointOnArc(ang,radius*0.86f);
         const auto p1=pointOnArc(ang,radius*1.0f);
-        g.setColour(hot?juce::Colour(0xFFFF3B30):(db>=-0.01f?juce::Colours::white:Col::accent));
+        g.setColour(hot?Col::ink(juce::Colour(0xFFFF3B30)):(db>=-0.01f?Col::light(1.f):Col::accent));
         g.drawLine(p0.x,p0.y,p1.x,p1.y, db==0.f?2.2f:1.6f);
         const auto lp=pointOnArc(ang,radius*1.16f);
         juce::String lbl = (db>0.f? "+" : "") + juce::String((int)db);
@@ -2934,7 +2855,7 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
             const auto pt=pointOnArc(angleForDb(db),radius*1.0f);
             if(i==0) redArc.startNewSubPath(pt); else redArc.lineTo(pt);
         }
-        g.setColour(juce::Colour(0xFFFF3B30).withAlpha(0.85f));
+        g.setColour(Col::ink(juce::Colour(0xFFFF3B30)).withAlpha(0.85f));
         g.strokePath(redArc, juce::PathStrokeType(2.2f));
     }
 
@@ -2978,7 +2899,8 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
         const auto tip=pointOnArc(ang,radius*0.92f);
         // Couleur bien distincte du "VU" en arrière-plan (qui est dans l'accent) —
         // blanc chaud, pour que l'aiguille se détache nettement en toute circonstance.
-        const juce::Colour needleCol(0xFFF4F7F5);
+        // (sur écran Papier : aiguille graphite)
+        const juce::Colour needleCol=Col::pick(juce::Colour(0xFFF4F7F5), juce::Colour(0xFF2A323C));
         const float baseW=3.4f;
         const float dx=tip.x-cx, dy=tip.y-cy;
         const float len=std::sqrt(dx*dx+dy*dy);
@@ -2991,8 +2913,8 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
         shadow.lineTo(cx+px,cy+py);
         shadow.lineTo(tip.x,tip.y);
         shadow.closeSubPath();
-        g.setColour(juce::Colours::black.withAlpha(0.35f));
-        g.fillPath(shadow, juce::AffineTransform::translation(0.7f,0.7f));
+        g.setColour(juce::Colours::black.withAlpha(Col::paper ? 0.22f : 0.35f));
+        g.fillPath(shadow, juce::AffineTransform::translation(Col::paper ? 1.2f : 0.7f, Col::paper ? 1.2f : 0.7f));
 
         // Deux facettes (gauche/droite) façon tige métallique arrondie —
         // l'une plus sombre, l'autre plus claire, pour donner du relief 3D.
@@ -3016,7 +2938,7 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
 
         // Reflet spéculaire central — fine ligne claire le long de l'arête,
         // c'est ce qui vend vraiment l'effet 3D (tige ronde qui capte la lumière).
-        g.setColour(juce::Colours::white.withAlpha(0.85f));
+        g.setColour(juce::Colours::white.withAlpha(Col::paper ? 0.45f : 0.85f));
         g.drawLine(cx,cy,tip.x,tip.y,0.9f);
 
         g.setColour(Col::knobDim.darker(0.4f));
@@ -3036,7 +2958,11 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
         // zone en virgule flottante : la version à entiers de drawImage tronquait
         // position et taille (logo décalé d'~1,5 px vers le haut-gauche du pivot)
-        g.drawImage(skLogo, juce::Rectangle<float>(cx-imgW*0.5f, cy-imgH*0.5f, imgW, imgH));
+        if(Col::paper){   // monogramme chromé illisible sur le pivot clair : en silhouette encre
+            g.setColour(Col::textHi.withAlpha(0.85f));
+            g.drawImage(skLogo, juce::Rectangle<float>(cx-imgW*0.5f, cy-imgH*0.5f, imgW, imgH), juce::RectanglePlacement::stretchToFit, true);
+        } else
+            g.drawImage(skLogo, juce::Rectangle<float>(cx-imgW*0.5f, cy-imgH*0.5f, imgW, imgH));
     }
 
     // ── Pied : lectures Peak / RMS (plus de LUFS-I : les deux cartes se
@@ -3069,7 +2995,7 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
         g.setColour(Col::textMid.withAlpha(0.5f));
         Ui::drawFit(g, unit, juce::Rectangle<float>((float)x+4.f,(float)y,tw,(float)unitH), juce::Justification::left, Ui::iceland(7.5f));
     };
-    statCard(0,"PEAK",fmtDb(numPeak),"dBFS", numPeak>=-1.f?juce::Colour(0xFFFF3B30):Col::accent);
+    statCard(0,"PEAK",fmtDb(numPeak),"dBFS", numPeak>=-1.f?Col::ink(juce::Colour(0xFFFF3B30)):Col::accent);
     statCard(1,"RMS", fmtDb(numRms), "dBFS", Col::accent);
 
 }
@@ -3084,7 +3010,7 @@ TopBar::TopBar()
     blackbirdImage = juce::ImageCache::getFromMemory(BinaryData::sidekey_blackbird_png,
                                                       BinaryData::sidekey_blackbird_pngSize);
 
-    setLookAndFeel(&laf);   // PRESET + engrenage : contrôles du châssis neumorphique
+    setLookAndFeel(&laf);   // RESET + options : contrôles du châssis neumorphique
 
     retranslate();   // infobulles
     themeToggle   .onClick=[this]{ if(onThemeToggled)    onThemeToggled   (themeToggle.getToggleState()); };
@@ -3096,24 +3022,132 @@ TopBar::TopBar()
     addChildComponent(contrastToggle);   // contraste permanent (v1.51) : interrupteur masqué
     addAndMakeVisible(modules3DToggle);
     addChildComponent(largeTextToggle);   // retiré de l'en-tête (v1.65) : réglage dans Options › Affichage
-    // premier plan, plein écran, clavier : propres à l'appli (en plugin, la fenêtre est à la DAW)
-    addChildComponent(onTopToggle);    onTopToggle  .setVisible(! AppMode::isPlugin);
+    // premier plan, clavier, plein écran, volume : propres à l'appli (en plugin,
+    // la fenêtre et l'écoute sont à la DAW)
+    addChildComponent(onTopToggle);     onTopToggle   .setVisible(! AppMode::isPlugin);
+    addChildComponent(keyboardToggle);  keyboardToggle.setVisible(! AppMode::isPlugin);
+    setKeyboardState(false);
+    keyboardToggle.onClick = [this]{
+        const bool on=keyboardToggle.getToggleState();
+        setKeyboardState(on);   // infobulle
+        if(onKeyboardToggled) onKeyboardToggled(on);
+    };
 
     addAndMakeVisible(gearBtn);
     gearBtn.onClick = [this]{ if(onSettingsClicked) onSettingsClicked(); };
     addChildComponent(fullScreenBtn);  fullScreenBtn.setVisible(! AppMode::isPlugin);
     fullScreenBtn.onClick = [this]{ if(onFullScreenClicked) onFullScreenClicked(); };
-    addChildComponent(keyboardBtn);    keyboardBtn  .setVisible(! AppMode::isPlugin);
-    setKeyboardState(false);
-    keyboardBtn.onClick = [this]{
-        const bool on=keyboardBtn.getToggleState();
-        setKeyboardState(on);   // infobulle
-        if(onKeyboardToggled) onKeyboardToggled(on);
-    };
+    addAndMakeVisible(resetBtn);
+    resetBtn.onClick = [this]{ if(onResetClicked) onResetClicked(); };
 
+    // Volume général de Windows (comme le curseur de la barre des tâches) : on
+    // écoute plus fort ou moins fort sans quitter Merlin
+    volKnob.onValueChange=[this]{ WindowsVolume::set((float)volKnob.getValue()*0.01f); };
+    addChildComponent(volKnob);
+    if(! AppMode::isPlugin){
+        volKnob.setVisible(true);
+        showWindowsVolume(WindowsVolume::get());
+        startTimerHz(2);   // suit les changements faits dans Windows
+    }
+}
+
+void TopBar::showWindowsVolume(float v)
+{
+    volKnob.setEnabled(v>=0.f);
+    if(v<0.f) return;
+    const double pct=std::round(v*100.0);
+    if(std::abs(volKnob.getValue()-pct)>=0.5) volKnob.setValue(pct, juce::dontSendNotification);
+}
+
+void TopBar::timerCallback()
+{
+    if(!isShowing() || volKnob.isMouseButtonDown()) return;
+    showWindowsVolume(WindowsVolume::get());
+}
+
+// Knob neumorphique du thème clair de Sevenpack Alpha, contraste renforcé,
+// dans tous les thèmes (v1.73.4, aperçu preview/merlin_knob_volume_preview.html
+// validé) : corps plat de la couleur de la plaque, relief sur le bord,
+// couronne de 72 traits, traits bleus allumés jusqu'à la valeur, point bleu
+// creusé. « VOL » et la valeur à gauche du knob.
+void VolumeRing::paint(juce::Graphics& g)
+{
+    const auto all=getLocalBounds().toFloat();
+    const auto area=all.withSizeKeepingCentre(juce::jmin(all.getWidth(), all.getHeight()), juce::jmin(all.getWidth(), all.getHeight()));
+    const auto rp=getRotaryParameters();
+    const float startAngle=rp.startAngleRadians, endAngle=rp.endAngleRadians;
+    const float pos=(float)valueToProportionOfLength(getValue());
+    const bool lively=isEnabled();
+    const auto accent=Neu::accentInk();   // turquoise de Merlin (v1.74 : le bleu de Sevenpack jurait)
+    const float R=juce::jmin(area.getWidth(), area.getHeight())*0.5f/AlphaKnob::kExtent;
+    const auto c=area.getCentre();
+    constexpr bool contrast=true;   // contraste renforcé (choisi sur l'aperçu)
+
+    {
+        const float scale=juce::jmax(0.25f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        const auto& body=knobCache->body(R*scale, Neu::light, contrast);
+        const float half=(float)body.getWidth()*0.5f/scale;
+        g.drawImage(body, juce::Rectangle<float>(c.x-half, c.y-half, half*2.0f, half*2.0f));
+
+        // traits de la couronne allumés du départ jusqu'à la valeur (le plus proche toujours allumé)
+        const float startDeg=juce::radiansToDegrees(startAngle)-360.0f;   // -135 (rotary 1.25 pi .. 2.75 pi)
+        const float spanDeg=juce::radiansToDegrees(endAngle-startAngle);
+        const float valueDeg=startDeg+pos*spanDeg;
+        const float nearest=std::round(valueDeg/5.0f)*5.0f;
+        const float r0=1.08f*R, r1=1.30f*R;
+        juce::Path ticks;
+        for(float d=startDeg; d<=startDeg+spanDeg+0.01f; d+=5.0f){
+            if(!((d<=valueDeg+0.01f) || std::abs(d-nearest)<0.01f)) continue;
+            const float a=juce::degreesToRadians(d);
+            ticks.startNewSubPath(c.x+std::sin(a)*r0, c.y-std::cos(a)*r0);
+            ticks.lineTo(c.x+std::sin(a)*r1, c.y-std::cos(a)*r1);
+        }
+        const float w=juce::jmax(0.9f/scale, 0.0497f*R)+0.6f/scale;
+        const auto lit=lively ? accent : Neu::textDim.withAlpha(0.55f);
+        g.setColour(lit.withMultipliedAlpha(0.28f));   // halo sans flou
+        g.strokePath(ticks, juce::PathStrokeType(w*2.6f));
+        g.setColour(lit);
+        g.strokePath(ticks, juce::PathStrokeType(w));
+
+        const float ang=startAngle+pos*(endAngle-startAngle);
+        const auto& dot=knobCache->dot(juce::jmax(2.0f, AlphaKnob::kDotSize*R)*scale*(contrast ? 1.45f : 1.0f), lively, accent);
+        const float dr=AlphaKnob::kDotRadius*R, dh=(float)dot.getWidth()*0.5f/scale;
+        const juce::Point<float> p(c.x+std::sin(ang)*dr, c.y-std::cos(ang)*dr);
+        g.drawImage(dot, juce::Rectangle<float>(p.x-dh, p.y-dh, dh*2.0f, dh*2.0f));
+    }
+
+    // valeur au centre du knob (v1.76.3, choisie sur l'aperçu) : à l'intérieur du
+    // tracé du point (0,67 R), qui ne la recouvre jamais
+    const auto val=lively ? juce::String(juce::roundToInt(getValue())) : juce::String("--");
+    g.setColour(Neu::text);
+    g.setFont(Ui::fitFont(Ui::icelandAbs(R*0.66f), val, R*0.95f));
+    g.drawText(val, juce::Rectangle<float>(R*1.2f, R*0.8f).withCentre(c.translated(0.f, R*0.04f)), juce::Justification::centred, false);
+}
+
+void StepArrow::paintButton(juce::Graphics& g, bool over, bool down)
+{
+    const auto r=getLocalBounds().toFloat();
+    const float s=juce::jmin(r.getWidth(), r.getHeight())*0.42f;
+    const auto c=r.getCentre().translated(0.f, down ? 0.5f : 0.f);
+    juce::Path t;
+    if(right) t.addTriangle(c.x-s*0.45f, c.y-s*0.6f, c.x-s*0.45f, c.y+s*0.6f, c.x+s*0.6f, c.y);
+    else      t.addTriangle(c.x+s*0.45f, c.y-s*0.6f, c.x+s*0.45f, c.y+s*0.6f, c.x-s*0.6f, c.y);
+    g.setColour(over ? Neu::accentInk() : Neu::textDim);
+    g.fillPath(t);
+}
+
+//==============================================================================
+// PresetBar — au centre de la bande du bas (v1.73)
+//==============================================================================
+PresetBar::PresetBar()
+{
     addAndMakeVisible(presetCombo);
-    presetCombo.setTextWhenNothingSelected(TR("PRESET"));
-    setPresetList({}, {});
+    addAndMakeVisible(prevBtn);
+    addAndMakeVisible(nextBtn);
+    prevBtn.onClick=[this]{ step(-1); };
+    nextBtn.onClick=[this]{ step(1); };
+    retranslate();
     presetCombo.onChange = [this]{
         const int id = presetCombo.getSelectedId();
         if(id >= 1 && id <= 4){                       // presets d'usine
@@ -3141,15 +3175,41 @@ void TopBar::retranslate()
     largeTextToggle.setTooltip(TR("Large text"));
     onTopToggle.setTooltip(TR("Always on top"));
     fullScreenBtn  .setTooltip(TR("Full screen (F11)"));
-    setKeyboardState(keyboardBtn.getToggleState());
+    volKnob.setTooltip(TR("PC VOLUME"));
+    setKeyboardState(keyboardToggle.getToggleState());
+    repaint();
+}
+
+void PresetBar::retranslate()
+{
+    prevBtn.setTooltip(TR("Preset précédent"));
+    nextBtn.setTooltip(TR("Preset suivant"));
     presetCombo.setTextWhenNothingSelected(TR("PRESET"));
     const auto names=userPresets;
     const auto shown=shownPreset;
     setPresetList(names, shown);
-    repaint();
 }
 
-void TopBar::setPresetList(const juce::StringArray& names, const juce::String& current)
+// flèches : preset suivant / précédent, presets d'usine puis utilisateur, en boucle
+void PresetBar::step(int dir)
+{
+    juce::Array<int> ids { 1, 2, 3, 4 };
+    for(int i=0;i<userPresets.size();++i) ids.add(kUserPresetBaseId+i);
+    const int n=ids.size();
+    const int cur=ids.indexOf(presetCombo.getSelectedId());
+    const int next = cur<0 ? (dir>0 ? 0 : n-1) : ((cur+dir)%n+n)%n;
+    presetCombo.setSelectedId(ids[next], juce::sendNotificationSync);
+}
+
+void PresetBar::resized()
+{
+    const int H=getHeight(), aw=juce::jmin(H, juce::roundToInt(22.f*Ui::textScale));
+    prevBtn.setBounds(0, 0, aw, H);
+    nextBtn.setBounds(getWidth()-aw, 0, aw, H);
+    presetCombo.setBounds(aw+4, 0, juce::jmax(20, getWidth()-2*aw-8), H);
+}
+
+void PresetBar::setPresetList(const juce::StringArray& names, const juce::String& current)
 {
     userPresets=names;
     presetCombo.clear(juce::dontSendNotification);
@@ -3172,43 +3232,50 @@ void TopBar::setPresetList(const juce::StringArray& names, const juce::String& c
 void TopBar::resized()
 {
     const int H=getHeight();
-    const int bh=juce::jlimit(18,22,H*40/100);
-    const int gearW=juce::jlimit(26,32,H*54/100);
-    const int presetW=104;
-    const int rightReserve=14+juce::jlimit(18,34,(int)((float)H*0.84f))+12; // place réservée au logo Side Key
+    const float s=Ui::textScale, hk=headerScale();
+    auto cap=[hk](float v){ return juce::roundToInt(v*hk); };
+    // ── à droite : monogramme (réservé), options, plein écran, RESET, volume ──
+    // (tout est centré sur la hauteur de l'en-tête)
+    const int gearW=juce::jlimit(26,cap(32.f),H*54/100);
+    const int rightReserve=14+juce::jlimit(18,cap(34.f),(int)((float)H*0.84f))+cap(12.f); // place réservée au logo Side Key
     int x=getWidth()-rightReserve-gearW;
-    const int y=(H-bh)/2 - 2;
-    gearBtn.setBounds(x,y - (gearW-bh)/2,gearW,gearW);
-    // plein écran : juste à droite de PRESET, avant le menu d'options (appli seulement)
-    if(! AppMode::isPlugin){
+    const int gy=(H-gearW)/2;
+    gearBtn.setBounds(x,gy,gearW,gearW);
+    if(! AppMode::isPlugin){   // plein écran, avant le menu d'options (appli seulement)
         x -= (gearW+4);
-        fullScreenBtn.setBounds(x,y - (gearW-bh)/2,gearW,gearW);
+        fullScreenBtn.setBounds(x,gy,gearW,gearW);
     }
-    x -= (presetW+6);
-    presetCombo.setBounds(x,y,presetW,bh);
-    // clavier : à gauche de PRESET
-    x -= (gearW+4);
-    keyboardBtn.setBounds(x,y - (gearW-bh)/2,gearW,gearW);
+    const int rw=juce::roundToInt(58.f*s*hk), rh=juce::jlimit(20, juce::roundToInt(26.f*s*hk), juce::jmax(20, H-12));
+    x -= rw+cap(12.f);
+    resetBtn.setBounds(x,(H-rh)/2,rw,rh);
+    if(! AppMode::isPlugin){
+        // knob de Sevenpack Alpha (sa couronne déborde jusqu'à 1,3 R), valeur au centre
+        const int vd=juce::jlimit(30, cap(50.f), H-2);
+        x -= vd+cap(10.f);
+        volKnob.setBounds(x,(H-vd)/2,vd,vd);
+    }
 
-    // Interrupteurs thème / contraste : à droite du merle (même calcul que paint)
+    // ── à gauche : merle (même calcul que paint) puis interrupteurs en 2×2 ──
     float bbW=0.f;
     if(blackbirdImage.isValid()){
-        const float bbH=juce::jlimit(18.f,34.f,(float)H*0.84f);
+        const float bbH=juce::jlimit(18.f,34.f*hk,(float)H*0.84f);
         bbW=bbH*(float)blackbirdImage.getWidth()/(float)juce::jmax(1,blackbirdImage.getHeight());
     }
     const float birdRight=14.f+bbW;
-    const int th=juce::jlimit(20,26,H*55/100);
+    // en plugin : thème et 3D seulement, sur une rangée (contrastToggle masqué : contraste permanent)
+    const bool twoRows=! AppMode::isPlugin;
+    const int th=twoRows ? juce::jlimit(14,cap(22.f),(H-10)/2) : juce::jlimit(20,cap(26.f),H*55/100);
     const int tw=juce::roundToInt((float)th*2.3f);
-    const int ty=(H-th)/2;
-    int tx=juce::roundToInt(birdRight)+14;
-    themeToggle    .setBounds(tx,ty,tw,th); tx+=tw+8;
-    // (contrastToggle masqué : contraste permanent)
-    modules3DToggle.setBounds(tx,ty,tw,th); tx+=tw+8;
-    onTopToggle    .setBounds(tx,ty,tw,th);   // toujours au premier plan
+    const int tx=juce::roundToInt(birdRight)+cap(14.f), tx2=tx+tw+cap(8.f);
+    if(twoRows){
+        const int rg=cap(4.f), y0=(H-2*th-rg)/2, y1=y0+th+rg;
+        themeToggle.setBounds(tx, y0,tw,th);  modules3DToggle.setBounds(tx2,y0,tw,th);
+        onTopToggle.setBounds(tx, y1,tw,th);  keyboardToggle .setBounds(tx2,y1,tw,th);
+    } else {
+        const int ty=(H-th)/2;
+        themeToggle.setBounds(tx,ty,tw,th);   modules3DToggle.setBounds(tx2,ty,tw,th);
+    }
 }
-// Nom affiché de l'appli (titre de l'en-tête, À propos)
-static juce::String merlinTitle()  { return juce::String(juce::CharPointer_UTF8("MERLIN \xce\xb1")); }
-static juce::String merlinTitleLc(){ return juce::String(juce::CharPointer_UTF8("Merlin \xce\xb1")); }
 
 // Logotype de l'en-tête (v1.60) : MERLIN en Audiowide (police OFL embarquée,
 // licence Source/Audiowide-OFL.txt), gravé dans la plaque, puis le α tracé
@@ -3262,8 +3329,10 @@ void TopBar::paint(juce::Graphics& g)
 
     // Titre principal + sous-titre ("ADVANCED AUDIO ANALYZER") — le nom du
     // plugin est MERLIN α (MERLIN MTR 2 avant la v1.47), sous-titre en dessous.
+    // (v1.73.1 : le logotype d'origine est gardé avec le design de Sunny)
     const bool hasSubtitle = H >= 34;
-    const float fs = hasSubtitle ? juce::jlimit(14.f,22.f,(float)H*.42f) : juce::jlimit(10.f,18.f,(float)H*.58f);
+    const float hk = headerScale();
+    const float fs = hasSubtitle ? juce::jlimit(14.f,22.f*hk,(float)H*.42f) : juce::jlimit(10.f,18.f,(float)H*.58f);
     const int titleY = hasSubtitle ? (int)((float)H*0.10f) : 0;
     const int titleH = hasSubtitle ? (int)((float)H*0.62f) : H;
 
@@ -3279,7 +3348,17 @@ void TopBar::paint(juce::Graphics& g)
     const auto ink=word.getBoundingBox(0,-1,false);
     const float r=0.79f*cap, gap=0.47f*cap;
     const float x0=((float)W-(ink.getWidth()+gap+2.f*r))*0.5f-ink.getX();
-    const float base=(float)titleY+(float)titleH*0.5f+cap*0.5f;
+    // sous-titre + LCD sous le logotype ; le bloc entier est centré sur la hauteur (v1.74)
+    const auto sf=Ui::iceland((juce::jlimit(7.f,9.5f*hk,(float)H*0.16f))).withExtraKerningFactor(0.22f);
+    const juce::Font lf(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), sf.getHeight()*1.05f, juce::Font::bold));
+    const float lcdH=lf.getHeight()+4.f, lineH=(float)H*0.28f;
+    float base=(float)titleY+(float)titleH*0.5f+cap*0.5f, lineY=(float)H*0.68f;
+    {
+        const float top=base-cap*0.5f-r;
+        const float bottom=hasSubtitle ? lineY+lineH*0.5f+lcdH*0.5f : base;
+        const float dy=std::round((float)H*0.5f-(top+bottom)*0.5f);
+        base+=dy; lineY+=dy;
+    }
     auto drawWord=[&](juce::Colour c, float dx, float dy){
         g.setColour(c);
         word.draw(g, juce::AffineTransform::translation(x0+dx, base+dy));
@@ -3299,6 +3378,30 @@ void TopBar::paint(juce::Graphics& g)
     }
     drawAlphaBadge(g, { x0+ink.getRight()+gap+r, base-cap*0.5f }, r);
 
+    if(hasSubtitle){
+        // sous-titre + petit écran LCD de la fréquence d'échantillonnage (affichage seul)
+        const auto sub=TR("ADVANCED AUDIO ANALYZER");
+        const float subW=juce::GlyphArrangement::getStringWidth(sf, sub);
+        const juce::String srText=sampleRate>0.0 ? juce::String(sampleRate/1000.0, 1)+" kHz" : juce::String("-- kHz");
+        const float lcdW=juce::GlyphArrangement::getStringWidth(lf, srText)+4.f;
+        const float sgap=10.f, sx0=((float)W-(subW+sgap+lcdW))*0.5f;
+        g.setFont(sf);
+        g.setColour(Neu::textDim);
+        g.drawText(sub, juce::Rectangle<float>(sx0, lineY, subW+6.f, lineH), juce::Justification::centredLeft, false);
+
+        // fréquence d'échantillonnage, sans cadre (v1.76.2, demande du user) :
+        // chiffres verts à léger halo sur la plaque sombre, vert foncé sur la claire
+        const juce::Rectangle<float> lcd(sx0+subW+sgap, lineY+lineH*0.5f-lcdH*0.5f, lcdW, lcdH);
+        g.setFont(lf);
+        if(! Neu::light){
+            g.setColour(juce::Colour(0xff2fe0a8).withAlpha(0.22f));
+            for(float d : { -0.8f, 0.8f })
+                g.drawText(srText, lcd.translated(d, 0.f), juce::Justification::centred, false);
+        }
+        g.setColour(Neu::light ? juce::Colour(0xff0a8a64) : juce::Colour(0xff2fe0a8));
+        g.drawText(srText, lcd, juce::Justification::centred, false);
+    }
+
     // démo en cours : pastille ambre à droite de la pastille α (clic = licence)
     demoBounds={};
     if(demoText.isNotEmpty()){
@@ -3314,40 +3417,9 @@ void TopBar::paint(juce::Graphics& g)
         g.drawText(demoText, demoBounds, juce::Justification::centred, false);
     }
 
-    if(hasSubtitle){
-        // sous-titre + petit écran LCD de la fréquence d'échantillonnage (affichage seul)
-        const auto sf=Ui::iceland((juce::jlimit(7.f,9.5f,(float)H*0.16f))).withExtraKerningFactor(0.22f);
-        const auto sub=TR("ADVANCED AUDIO ANALYZER");
-        const float subW=juce::GlyphArrangement::getStringWidth(sf, sub);
-        const float lineY=(float)H*0.68f, lineH=(float)H*0.28f;
-        const juce::Font lf(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), sf.getHeight()*1.05f, juce::Font::bold));
-        const juce::String srText=sampleRate>0.0 ? juce::String(sampleRate/1000.0, 1)+" kHz" : juce::String("-- kHz");
-        const float lcdW=juce::GlyphArrangement::getStringWidth(lf, srText)+12.f, lcdH=lf.getHeight()+4.f;
-        const float gap=10.f, x0=((float)W-(subW+gap+lcdW))*0.5f;
-        g.setFont(sf);
-        g.setColour(Neu::textDim);
-        g.drawText(sub, juce::Rectangle<float>(x0, lineY, subW+6.f, lineH), juce::Justification::centredLeft, false);
-
-        // écran creusé : fond noir, ombre interne en haut, liseré clair autour
-        const juce::Rectangle<float> lcd(x0+subW+gap, lineY+lineH*0.5f-lcdH*0.5f, lcdW, lcdH);
-        g.setColour(juce::Colour(0xff0b0e11));
-        g.fillRoundedRectangle(lcd, 4.f);
-        g.setColour(juce::Colours::black.withAlpha(0.6f));
-        g.drawLine(lcd.getX()+3.f, lcd.getY()+0.75f, lcd.getRight()-3.f, lcd.getY()+0.75f, 1.f);
-        g.setColour(Neu::shadowLight);
-        g.drawRoundedRectangle(lcd.expanded(0.5f), 4.5f, 0.8f);
-        // chiffres verts avec un léger halo
-        g.setFont(lf);
-        g.setColour(juce::Colour(0xff2fe0a8).withAlpha(0.22f));
-        for(float d : { -0.8f, 0.8f })
-            g.drawText(srText, lcd.translated(d, 0.f), juce::Justification::centred, false);
-        g.setColour(juce::Colour(0xff2fe0a8));
-        g.drawText(srText, lcd, juce::Justification::centred, false);
-    }
-
     // Logo Side Key (monogramme) — coin haut-droit (clic → About)
     if(logoImage.isValid()){
-        const float logoH=juce::jlimit(18.f,34.f,(float)H*0.84f);
+        const float logoH=juce::jlimit(18.f,34.f*hk,(float)H*0.84f);
         const float aspect=(float)logoImage.getWidth()/(float)juce::jmax(1,logoImage.getHeight());
         const float logoW=logoH*aspect;
         const float lx=(float)W-logoW-14.f;
@@ -3368,7 +3440,7 @@ void TopBar::paint(juce::Graphics& g)
 
     // Merle (blackbird) — coin haut-gauche, meme traitement (clic → About)
     if(blackbirdImage.isValid()){
-        const float bbH=juce::jlimit(18.f,34.f,(float)H*0.84f);
+        const float bbH=juce::jlimit(18.f,34.f*hk,(float)H*0.84f);
         const float bbAspect=(float)blackbirdImage.getWidth()/(float)juce::jmax(1,blackbirdImage.getHeight());
         const float bbW=bbH*bbAspect;
         const float bx=14.f;
@@ -3428,58 +3500,7 @@ ControlsBarLeak::ControlsBarLeak(SpectrumDisplayLeak& d, LeakAudioProcessor& p, 
     bands31Btn.onClick=[this,setBands]{setBands(31);};
     bands62Btn.onClick=[this,setBands]{setBands(62);};
     addAndMakeVisible(bands15Btn);addAndMakeVisible(bands31Btn);addAndMakeVisible(bands62Btn);
-    auto setupKnob=[this](juce::Slider& k){
-        k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-        k.setTextBoxStyle(juce::Slider::NoTextBox,true,0,0);
-        k.setRotaryParameters(juce::MathConstants<float>::pi*1.25f,juce::MathConstants<float>::pi*2.75f,true);
-        addAndMakeVisible(k);
-    };
-    auto setupVal=[this](juce::Label& l){
-        l.setFont(Ui::iceland((8.f)));
-        l.setColour(juce::Label::textColourId,Col::textMid);
-        l.setJustificationType(juce::Justification::centred);
-        l.setInterceptsMouseClicks(false,false);
-        addAndMakeVisible(l);
-    };
-    resetBtn.onClick=[this]{
-        processor.resetLoudness();
-        display.resetAll();
-        vuMeter.resetAll();
-    };
-    addAndMakeVisible(resetBtn);
-
-    // Volume général de Windows (comme le curseur de la barre des tâches) : on
-    // écoute plus fort ou moins fort sans quitter Merlin
-    setupKnob(volKnob);
-    volKnob.setRange(0.0, 100.0, 1.0);
-    volKnob.onValueChange=[this]{
-        const float v=(float)volKnob.getValue();
-        WindowsVolume::set(v*0.01f);
-        volVal.setText(juce::String(juce::roundToInt(v))+" %", juce::dontSendNotification);
-    };
-    setupVal(volVal);
-    if(AppMode::isPlugin){   // en plugin, le volume d'écoute se règle dans la DAW
-        volKnob.setVisible(false);
-        volVal .setVisible(false);
-        return;
-    }
-    showWindowsVolume(WindowsVolume::get());
-    startTimerHz(2);   // suit les changements faits dans Windows
-}
-
-void ControlsBarLeak::showWindowsVolume(float v)
-{
-    volKnob.setEnabled(v>=0.f);
-    if(v<0.f){ volVal.setText("--", juce::dontSendNotification); return; }
-    const double pct=std::round(v*100.0);
-    if(std::abs(volKnob.getValue()-pct)>=0.5) volKnob.setValue(pct, juce::dontSendNotification);
-    volVal.setText(juce::String((int)pct)+" %", juce::dontSendNotification);
-}
-
-void ControlsBarLeak::timerCallback()
-{
-    if(!isShowing() || volKnob.isMouseButtonDown()) return;
-    showWindowsVolume(WindowsVolume::get());
+    addAndMakeVisible(presets);   // RESET et volume Windows : dans l'en-tête (v1.73)
 }
 void ControlsBarLeak::syncFromProcessor()
 {
@@ -3521,753 +3542,699 @@ void ControlsBarLeak::syncOscFromProcessor()
 }
 void ControlsBarLeak::paint(juce::Graphics& g)
 {
-    // Pas de fond : la barre est posée sur une carte neumorphique (éditeur).
-    g.setFont(Ui::iceland((11.f)).withExtraKerningFactor(0.08f));
+    // Pas de fond : la bande est posée sur la plaque (design de Sunny)
+    g.setFont(Ui::iceland(11.f).withExtraKerningFactor(0.08f));
     g.setColour(Neu::textDim);
-    const int lblH=juce::roundToInt(13.f*Ui::textScale);
-    // titres de groupe : jamais tronqués (débordent légèrement au besoin)
-    auto grpLbl=[&](const juce::String& t,int x,int w){
-        // centré sur le groupe, assez large pour le titre entier, sans sortir de la barre
-        const int tw=juce::roundToInt(juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), t))+8;
-        const int rw=juce::jmax(w+40, tw);
-        const int rx=juce::jlimit(0, juce::jmax(0, getWidth()-rw), x+w/2-rw/2);
-        g.drawText(t,rx,2,rw,lblH,juce::Justification::centred,false); };
-    grpLbl(TR("PEAK HOLD"),peakBtn.getX(),peakSel.getRight()-peakBtn.getX());
-    grpLbl(TR("RANGE"),rangeSel.getX(),rangeSel.getWidth());
-    grpLbl("MS",midBtn.getX(),sideBtn.getRight()-midBtn.getX());
-    grpLbl(TR("VIEW"),bands15Btn.getX(),bands62Btn.getRight()-bands15Btn.getX());
-    if(volKnob.isVisible())
-        grpLbl(TR("PC VOLUME"),volKnob.getX(),volKnob.getWidth());
+    const juce::String titles[4]={ TR("PEAK HOLD"), TR("RANGE"), "MS", TR("VIEW") };
+    for(int i=0;i<4;++i)
+        g.drawText(titles[i], groupLabel[i], juce::Justification::centredLeft, false);
 
-    // Séparateurs verticaux entre groupes fonctionnels distincts
-    // (Spectrum | Reset | Volume)
-    // séparateurs gravés : filet sombre + filet clair
+    // séparateurs gravés entre groupes : filet sombre + filet clair
     for(float dx : groupDividerX){
-        if(dx==groupDividerX[1] && ! volKnob.isVisible()) continue;   // pas de groupe Volume (plugin)
         g.setColour(Neu::shadowDark.withMultipliedAlpha(0.6f));
         g.drawLine(dx,6.f,dx,(float)getHeight()-6.f,1.0f);
         g.setColour(Neu::shadowLight);
         g.drawLine(dx+1.f,6.f,dx+1.f,(float)getHeight()-6.f,1.0f);
     }
-
-    auto cap=[&](const juce::String& t,juce::Component& c){
-        g.setColour(Neu::textDim);
-        g.drawText(t,c.getX()-12,2,c.getWidth()+24,lblH,juce::Justification::centred,false); };
-    cap(TR("RESET"),resetBtn);
 }
 void ControlsBarLeak::resized()
 {
-    // Les bounds des boutons/champs incluent 2,5 px de marge pour le relief
-    // neumorphique (voir NeuLookAndFeel).
-    // Toutes les dimensions suivent la taille de texte (interrupteur "Aa") : en
-    // gros texte la barre s'agrandit en bloc, les boutons gardent des
-    // proportions homogènes et le texte la même taille d'un bouton à l'autre.
+    // Une rangée, titres en ligne : PEAK HOLD, RANGE, MS à gauche, presets au
+    // centre, VIEW à droite. Les bounds des boutons/champs incluent 2,5 px de
+    // marge pour le relief neumorphique (voir NeuLookAndFeel) ; les dimensions
+    // suivent la taille de texte.
     const float s=Ui::textScale;
     auto px=[s](float v){ return juce::roundToInt(v*s); };
     const int H=getHeight();
-    volVal .setFont(Ui::iceland(8.f));
-    const int labelH=px(15.f);                      // rangée des titres de groupe
-    const int bh=juce::jlimit(20,px(28.f),H-labelH-6);
-    const int by=labelH+(H-labelH-bh)/2;
-    const int gap=px(5.f);
-    const int groupGap=px(18.f);   // espace additionnel entre groupes fonctionnels distincts
-    int x=px(10.f);
+    const int bh=juce::jlimit(20,px(28.f),juce::jmax(20,H-4));
+    const int by=(H-bh)/2;
+    const auto lf=Ui::iceland(11.f).withExtraKerningFactor(0.08f);
+    const juce::String titles[4]={ TR("PEAK HOLD"), TR("RANGE"), "MS", TR("VIEW") };
+    auto label=[&](int& x, int i){
+        const int w=juce::roundToInt(juce::GlyphArrangement::getStringWidth(lf, titles[i]))+px(4.f);
+        groupLabel[i]={x,0,w,H};
+        x+=w+px(5.f);
+    };
+    const int groupGap=px(10.f);
+    int x=px(4.f);
 
-    // ── Groupe Spectrum : PEAK HOLD + RANGE + MS + VIEW ───────────────────
+    label(x,0);
     peakBtn.setBounds(x,by,px(42.f),bh); x+=px(44.f);
-    peakSel.setBounds(x,by,px(76.f),bh); x+=px(76.f)+gap*2;
-    rangeSel.setBounds(x,by,px(76.f),bh); x+=px(76.f)+gap*2;
-    midBtn .setBounds(x,by,px(44.f),bh); x+=px(46.f);
-    sideBtn.setBounds(x,by,px(44.f),bh); x+=px(44.f)+gap*2;
-    const int bbw=px(34.f), bgap=px(2.f);
-    bands15Btn.setBounds(x,            by,bbw,bh);
-    bands31Btn.setBounds(x+bbw+bgap,   by,bbw,bh);
-    bands62Btn.setBounds(x+(bbw+bgap)*2,by,bbw,bh);
-    x+=bbw*3+bgap*2;
-
+    peakSel.setBounds(x,by,px(70.f),bh); x+=px(70.f);
     x+=groupGap; groupDividerX[0]=(float)x; x+=groupGap;
-
-    const int valH=px(10.f);
-    const int kd=juce::jlimit(24,px(34.f),H-labelH-valH-2);
-    const int ky=labelH+juce::jmax(0,(H-labelH-valH-kd)/2);
-
-    // ── Groupe Reset ────────────────────────────────────────────────────────
-    resetBtn .setBounds(x,by,px(58.f),bh); x+=px(58.f);
-
+    label(x,1);
+    rangeSel.setBounds(x,by,px(72.f),bh); x+=px(72.f);
     x+=groupGap; groupDividerX[1]=(float)x; x+=groupGap;
+    label(x,2);
+    midBtn .setBounds(x,by,px(44.f),bh); x+=px(46.f);
+    sideBtn.setBounds(x,by,px(44.f),bh); x+=px(44.f);
+    const int leftEnd=x;
 
-    // ── Volume de Windows ───────────────────────────────────────────────────
-    // titre plus large que le bouton (centré dessus) : on le décale pour qu'il dégage le séparateur
-    const float volLblW=juce::GlyphArrangement::getStringWidth(Ui::iceland(11.f).withExtraKerningFactor(0.08f), TR("PC VOLUME"));
-    x+=juce::jmax(0, juce::roundToInt((volLblW-(float)kd)*0.5f));
-    volKnob.setBounds(x,ky,kd,kd); volVal.setBounds(x-px(8.f),ky+kd-2,kd+px(16.f),valH);
+    // VIEW, calé à droite
+    const int bbw=px(34.f), bgap=px(2.f);
+    int xr=getWidth()-px(4.f)-(bbw*3+bgap*2);
+    bands15Btn.setBounds(xr,             by,bbw,bh);
+    bands31Btn.setBounds(xr+bbw+bgap,    by,bbw,bh);
+    bands62Btn.setBounds(xr+(bbw+bgap)*2,by,bbw,bh);
+    const int vw=juce::roundToInt(juce::GlyphArrangement::getStringWidth(lf, titles[3]))+px(4.f);
+    groupLabel[3]={xr-px(5.f)-vw,0,vw,H};
+    const int rightStart=groupLabel[3].getX();
+
+    // presets au centre de l'espace restant
+    const int room=rightStart-leftEnd-px(24.f);
+    const int pw=juce::jlimit(juce::jmin(room, px(110.f)), px(320.f), room);
+    presets.setBounds(leftEnd+(rightStart-leftEnd-pw)/2, by, juce::jmax(0, pw), bh);
 }
 
 //==============================================================================
-// AboutOverlay — même traitement visuel que Nuke Mk1 (voile + carte vitrée,
-// photo, tampon "Calibrated by Side Key System"), adapté à Merlin MTR 2.
+// AboutOverlay (v1.70) — page À propos dans l'esprit de Sevenpack Alpha, aux
+// couleurs de la plaque neumorphique (voir PluginEditor.h)
 //==============================================================================
+namespace
+{
+    juce::String utf8(const char* s) { return juce::String(juce::CharPointer_UTF8(s)); }
+
+    // police des Options (Segoe UI / sans-serif système), tailles en points
+    // comme l'aperçu validé (13 = corps de texte)
+    juce::Font aboutFont(float pt, int weight=0, bool italic=false)
+    {
+        if(!italic) return OptionsUi::font(pt, weight);
+       #if JUCE_WINDOWS
+        const juce::String name("Segoe UI");
+       #else
+        const juce::String name(juce::Font::getDefaultSansSerifFontName());
+       #endif
+        return juce::Font(juce::FontOptions().withName(name).withStyle(weight>0 ? "Bold Italic" : "Italic").withPointHeight(pt));
+    }
+    // titres, liens, tampon : accent (assombri sur le thème clair, comme la pastille α)
+    juce::Colour aboutInk()  { return Neu::light ? Col::accent.darker(0.45f) : Col::accent; }
+    juce::Colour aboutLine() { return Neu::light ? juce::Colours::black.withAlpha(0.10f) : juce::Colours::white.withAlpha(0.085f); }
+
+    // réduction par paliers x2 puis ajustement exact : une seule réduction à
+    // fort rapport crénelle les traits fins (signatures, monogramme)
+    juce::Image smoothRescale(juce::Image img, int w, int h)
+    {
+        w=juce::jmax(1, w); h=juce::jmax(1, h);
+        while(img.getWidth()>w*2 && img.getHeight()>h*2)
+            img=img.rescaled(img.getWidth()/2, img.getHeight()/2, juce::Graphics::highResamplingQuality);
+        return img.rescaled(w, h, juce::Graphics::highResamplingQuality);
+    }
+
+    // signature (encre seule, dans l'alpha) à la couleur du thème
+    juce::Image inked(const juce::Image& src, juce::Colour ink)
+    {
+        juce::Image out(juce::Image::ARGB, src.getWidth(), src.getHeight(), true);
+        const juce::Image::BitmapData s(src, juce::Image::BitmapData::readOnly);
+        juce::Image::BitmapData d(out, juce::Image::BitmapData::writeOnly);
+        for(int y=0;y<s.height;++y)
+            for(int x=0;x<s.width;++x)
+                d.setPixelColour(x, y, ink.withAlpha(s.getPixelColour(x, y).getFloatAlpha()));
+        return out;
+    }
+
+    // monogramme Side Key (argenté) : assombri pour rester lisible sur le thème clair
+    void darken(juce::Image& img, float k)
+    {
+        juce::Image::BitmapData d(img, juce::Image::BitmapData::readWrite);
+        for(int y=0;y<d.height;++y)
+            for(int x=0;x<d.width;++x)
+                d.setPixelColour(x, y, d.getPixelColour(x, y).withMultipliedBrightness(k));
+    }
+
+    constexpr float kTeamH=250.f, kCardW=200.f;
+}
+
+//------------------------------------------------------------------------------
+// Colonne : mise en page mot à mot, paragraphes justifiés (la dernière ligne
+// reste à gauche), titres et puces alignés à gauche
+float AboutOverlay::Column::drawItem(juce::Graphics* g, const ColumnItem& it, float y, float width) const
+{
+    using K=ColumnItem::Kind;
+    const bool head=it.kind==K::Header, bullet=it.kind==K::Bullet;
+    const auto font=head ? aboutFont(15.f, 2) : aboutFont(13.f);
+    const float x0=bullet ? 12.f : 0.f, maxW=juce::jmax(10.f, width-x0);
+    const float lineH=font.getHeight();
+
+    juce::StringArray words;
+    words.addTokens(it.text, " ", "");
+    words.removeEmptyStrings();
+    std::vector<float> wordW;
+    for(const auto& w : words) wordW.push_back(juce::GlyphArrangement::getStringWidth(font, w));
+    const float space=juce::GlyphArrangement::getStringWidth(font, " ");
+
+    std::vector<std::pair<int,int>> lines;   // [début, fin) dans words
+    int start=0; float cur=0.f;
+    for(int i=0;i<words.size();++i){
+        const float add=(i==start ? 0.f : space)+wordW[(size_t)i];
+        if(i>start && cur+add>maxW){ lines.push_back({ start, i }); start=i; cur=wordW[(size_t)i]; }
+        else cur+=add;
+    }
+    if(start<words.size()) lines.push_back({ start, words.size() });
+
+    if(g!=nullptr){
+        if(bullet){
+            g->setColour(aboutInk());
+            g->fillEllipse(0.f, y+lineH*0.5f-2.5f, 5.f, 5.f);
+        }
+        juce::GlyphArrangement ga;
+        float baseline=y+font.getAscent();
+        for(size_t l=0;l<lines.size();++l){
+            const auto [a, b]=lines[l];
+            float total=0.f;
+            for(int i=a;i<b;++i) total+=wordW[(size_t)i];
+            const bool justify=it.kind==K::Paragraph && l+1<lines.size() && b-a>1;
+            const float gap=justify ? (maxW-total)/(float)(b-a-1) : space;
+            float x=x0;
+            for(int i=a;i<b;++i){
+                ga.addLineOfText(font, words[i], x, baseline);
+                x+=wordW[(size_t)i]+gap;
+            }
+            baseline+=lineH;
+        }
+        g->setColour(head ? aboutInk() : Neu::text);
+        ga.draw(*g);
+    }
+    return (float)lines.size()*lineH;
+}
+
+float AboutOverlay::Column::itemHeight(const ColumnItem& it, float width) const
+{
+    return drawItem(nullptr, it, 0.f, width);
+}
+
+// écart sous un élément ; un titre qui suit une liste de puces s'en détache davantage
+static float aboutItemGap(const AboutOverlay::ColumnItem& it, const AboutOverlay::ColumnItem* next)
+{
+    using K=AboutOverlay::ColumnItem::Kind;
+    const float base=it.kind==K::Header ? 6.f : it.kind==K::Bullet ? 4.f : 10.f;
+    return base+((it.kind==K::Bullet && next!=nullptr && next->kind==K::Header) ? 10.f : 0.f);
+}
+
+void AboutOverlay::Column::layout(int width)
+{
+    float y=0.f;
+    for(size_t i=0;i<items.size();++i)
+        y+=itemHeight(items[i], (float)width)+aboutItemGap(items[i], i+1<items.size() ? &items[i+1] : nullptr);
+    setSize(width, juce::roundToInt(y)+4);
+}
+
+void AboutOverlay::Column::paint(juce::Graphics& g)
+{
+    float y=0.f;
+    const float w=(float)getWidth();
+    for(size_t i=0;i<items.size();++i){
+        y+=drawItem(&g, items[i], y, w);
+        y+=aboutItemGap(items[i], i+1<items.size() ? &items[i+1] : nullptr);
+    }
+}
+
+//------------------------------------------------------------------------------
 AboutOverlay::AboutOverlay()
 {
-    badgeImage = juce::ImageCache::getFromMemory(BinaryData::sidekey_monogram_png, BinaryData::sidekey_monogram_pngSize);
-    photoImage = juce::ImageCache::getFromMemory(BinaryData::mikshake_about_png,   BinaryData::mikshake_about_pngSize);
-    setInterceptsMouseClicks(true,true);
-}
+    monogram=juce::ImageCache::getFromMemory(BinaryData::sidekey_monogram_png, BinaryData::sidekey_monogram_pngSize);
+    // portraits du duo en noir et blanc (copies : desaturate() modifie l'image,
+    // celles de l'ImageCache sont partagées)
+    const auto blackAndWhite=[](const void* data, int size){
+        auto img=juce::ImageCache::getFromMemory(data, size).createCopy();
+        img.desaturate();
+        return img;
+    };
+    portrait[0]=blackAndWhite(BinaryData::mikshake_about_crop_jpg, BinaryData::mikshake_about_crop_jpgSize);
+    portrait[1]=blackAndWhite(BinaryData::sunny_crop_jpg,          BinaryData::sunny_crop_jpgSize);
+    signature[0]=juce::ImageCache::getFromMemory(BinaryData::signature_mikshake_png, BinaryData::signature_mikshake_pngSize);
+    signature[1]=juce::ImageCache::getFromMemory(BinaryData::signature_sunny_png,    BinaryData::signature_sunny_pngSize);
 
-void AboutOverlay::mouseDown(const juce::MouseEvent& e)
-{
-    if(websiteBounds.contains(e.position)){
-        juce::URL("https://sidekeysystem.com/").launchInDefaultBrowser();
-        return;
+    using K=ColumnItem::Kind;
+    const auto H=[](const char* s){ return ColumnItem{ utf8(s), K::Header }; };
+    const auto P=[](const char* s){ return ColumnItem{ utf8(s), K::Paragraph }; };
+    const auto B=[](const char* s){ return ColumnItem{ utf8(s), K::Bullet }; };
+
+    column[0].setItems({
+        H("MERLIN \xce\xb1: Every Measurement, One Window"),
+        P("I built MERLIN \xce\xb1 out of a simple frustration. Every session, I ended up juggling several metering plugins "
+          "scattered across the mix, each in its own little window, each with its own idea of where it should live on the screen."),
+        P("What I wanted was one window that stays open next to the DAW, listens to everything that reaches the speakers, "
+          "and shows every measurement I care about, arranged exactly the way I work."),
+        P("So MERLIN \xce\xb1 runs as a standalone application as well as a plugin. It listens to the loopback of your audio "
+          "interface or, on Windows, directly to the system output: no extra hardware, no routing gymnastics."),
+        P("Five slots and one master meter. Any module goes into any slot with a right click, and any module can leave the "
+          "main window to live in its own, on another screen if you like."),
+        P("It stays on top when you want it to, and it can leave the keyboard to your DAW, so your shortcuts keep working "
+          "while MERLIN \xce\xb1 keeps watching."),
+        P("Why Merlin? Because a good analyzer should feel a little like magic, and then turn out to be nothing but careful math."),
+    });
+
+    column[1].setItems({
+        H("Measurements, Not Guesses"),
+        P("MERLIN \xce\xb1 is a measuring instrument first. No probabilities, no scores, no estimates dressed up as readings: "
+          "every value on screen is computed from the signal itself."),
+        P("Loudness follows ITU-R BS.1770-4 and EBU R128: Momentary, Short Term, gated Integrated loudness, and Loudness "
+          "Range as defined by EBU Tech 3342."),
+        P("True Peak uses the 4x oversampling filter from annex 2 of BS.1770-4, so the inter-sample peaks that a sample "
+          "meter misses are caught."),
+        P("The spectral density runs on a 4096 point FFT with 75% overlap and Welch style averaging. The band spectrum "
+          "offers 15, 31 or 62 bands, extends above 20 kHz up to half the sample rate, and analyzes Stereo, Mid/Side or Side."),
+        P("The oscilloscope locks onto the fundamental and, at its default 25 ms window, draws every single sample."),
+        P("The 3D spectrograms, phosphor vectorscopes and particle spectrums are rendered by the graphics card in OpenGL, "
+          "leaving the processor to your session."),
+        P("In the plugin, MERLIN \xce\xb1 only listens: the audio passes through untouched."),
+    });
+
+    column[2].setItems({
+        H("Features"),
+        B("21 Modules in 4 Families: Spectrum, Spectrogram, Stereo, Level and Time"),
+        B("5 Freely Assignable Slots plus a Fixed Master VU"),
+        B("Standalone App for Windows and macOS, VST3, and AU on macOS"),
+        B("Audio Interface Loopback Capture, plus Direct System Output Capture on Windows"),
+        B("EBU R128 / ITU-R BS.1770-4 Loudness: Momentary, Short Term, Integrated, LRA"),
+        B("True Peak with 4x Oversampling (BS.1770-4 Annex 2)"),
+        B("15 / 31 / 62 Band Spectrum, Stereo, Mid/Side or Side Analysis"),
+        B("4096 Point Spectral Density with Welch Averaging"),
+        B("3D Spectrograms: Lines, Surface, Terrain, Neon, Crystal"),
+        B("Vectorscopes: Classic, Phosphor, Density, Multiband"),
+        B("Multiband Correlator, Panorama and Dot Panorama"),
+        B("Triggered Oscilloscope with Adjustable Trace Width"),
+        B("GPU Modules Rendered in OpenGL, with Anti-Aliasing and V-Sync Options"),
+        B("Detachable Modules: Any Module in its Own Window"),
+        B("Always on Top, Keyboard Left to Your DAW"),
+        B("Live Sample Rate Display"),
+        B("Light and Dark Themes, Accent Palettes"),
+        B("10 Interface Languages"),
+        B("One License for 5 Computers, 15 Day Free Trial"),
+        H("The Side Key System Philosophy"),
+        P("At Side Key System, calibration is not a final adjustment. It is part of the engineering process itself."),
+        P("Every tool is carefully designed, measured, tested and calibrated with meticulous attention to precision, "
+          "stability and measurement consistency. Every reading is meant to be trusted, whether working on a single "
+          "track or a full mastering session."),
+        P("The objective is simple: give engineers instruments they can rely on, where every reading has a purpose and "
+          "every decision serves the music."),
+    });
+
+    for(int i=0;i<3;++i){
+        viewport[i].setScrollBarsShown(true, false);
+        viewport[i].setScrollBarThickness(8);
+        viewport[i].setViewedComponent(&column[i], false);
+        column[i].onAnyClick=[this]{ hideAnimated(); };
+        addAndMakeVisible(viewport[i]);
     }
-    setVisible(false);
+    setWantsKeyboardFocus(true);   // Échap ferme la page
 }
 
-float AboutOverlay::drawParagraph(juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area,
-                                   juce::Font font, juce::Colour colour, float lineSpacing)
+juce::Rectangle<float> AboutOverlay::panelBounds() const
 {
-    juce::AttributedString as;
-    as.append(text, font, colour);
-    as.setWordWrap(juce::AttributedString::byWord);
-    as.setLineSpacing(lineSpacing);
-
-    juce::TextLayout tl;
-    tl.createLayout(as, area.getWidth());
-    tl.draw(g, area.withHeight(tl.getHeight()));
-    return area.getY() + tl.getHeight();
+    const auto b=getLocalBounds().toFloat();
+    return b.reduced(juce::jmax(20.f, b.getWidth()*0.015f), juce::jmax(12.f, b.getHeight()*0.04f));
 }
 
-void AboutOverlay::drawStamp(juce::Graphics& g, juce::Rectangle<float> area) const
+// Une seule mise en page pour le décor (cache) et les colonnes (Viewport)
+AboutOverlay::Layout AboutOverlay::computeLayout() const
 {
-    const auto centre = area.getCentre();
-    const float r = juce::jmin(area.getWidth(), area.getHeight()) * 0.5f;
-    const juce::Colour ink = Col::accent.withAlpha(0.82f);
+    Layout L;
+    auto c=panelBounds().reduced(20.f, 12.f);
+    L.lineX0=c.getX(); L.lineX1=c.getRight();
 
-    g.saveState();
-    g.addTransform(juce::AffineTransform::rotation(juce::degreesToRadians(-8.0f), centre.x, centre.y));
+    L.header=c.removeFromTop(30.f);
+    c.removeFromTop(8.f);
+    L.headerLineY=c.getY();
 
-    g.setColour(ink);
-    g.drawEllipse(centre.x - r, centre.y - r, r * 2.0f, r * 2.0f, 1.8f);
-    g.drawEllipse(centre.x - r * 0.82f, centre.y - r * 0.82f, r * 1.64f, r * 1.64f, 0.9f);
+    L.footer=c.removeFromBottom(54.f);
+    c.removeFromBottom(10.f);
+    L.footerLineY=c.getBottom();
+    c.removeFromBottom(10.f);
 
-    g.setFont(juce::Font(juce::FontOptions(r * 0.30f, juce::Font::bold)).withExtraKerningFactor(0.08f));
-    g.drawFittedText("CALIBRATED",
-                      juce::Rectangle<float>(centre.x - r * 0.78f, centre.y - r * 0.52f, r * 1.56f, r * 0.4f).toNearestInt(),
-                      juce::Justification::centred, 1);
-    g.setFont(juce::Font(juce::FontOptions(r * 0.20f, juce::Font::bold)).withExtraKerningFactor(0.04f));
-    g.drawFittedText("SIDE KEY", juce::Rectangle<float>(centre.x - r * 0.7f, centre.y + r * 0.06f, r * 1.4f, r * 0.32f).toNearestInt(),
-                      juce::Justification::centred, 1);
-    g.drawFittedText("SYSTEM", juce::Rectangle<float>(centre.x - r * 0.7f, centre.y + r * 0.36f, r * 1.4f, r * 0.3f).toNearestInt(),
-                      juce::Justification::centred, 1);
+    // bandeau du duo : 250 px, réduit sur une petite fenêtre pour laisser lire les colonnes
+    c.removeFromTop(14.f);
+    L.team=c.removeFromTop(juce::jlimit(120.f, kTeamH, c.getHeight()*0.42f));
+    c.removeFromTop(14.f);
+    L.teamLineY=c.getY();
+    c.removeFromTop(14.f);
 
-    for(int i = 0; i < 46; ++i)
-    {
-        const float ang = (float)i * 0.151f;
-        const float rr = r * (0.32f + 0.66f * std::abs(std::sin((float)i * 2.3f)));
-        const float px = centre.x + std::cos(ang) * rr;
-        const float py = centre.y + std::sin(ang) * rr;
-        g.setColour(ink.withAlpha(0.16f * std::abs(std::sin((float)i * 1.7f))));
-        g.fillEllipse(px - 0.6f, py - 0.6f, 1.2f, 1.2f);
+    const float gap=18.f, colW=(c.getWidth()-2.f*gap)/3.f;
+    L.colTop=c.getY(); L.colBottom=c.getBottom();
+    const auto a=c.removeFromLeft(colW); c.removeFromLeft(gap);
+    const auto b=c.removeFromLeft(colW); c.removeFromLeft(gap);
+    L.colA=a.toNearestInt(); L.colB=b.toNearestInt(); L.colC=c.toNearestInt();
+    L.dividerX1=a.getRight()+gap*0.5f;
+    L.dividerX2=b.getRight()+gap*0.5f;
+    return L;
+}
+
+void AboutOverlay::resized()
+{
+    const auto L=computeLayout();
+    const juce::Rectangle<int> cols[3]={ L.colA, L.colB, L.colC };
+    for(int i=0;i<3;++i){
+        viewport[i].setBounds(cols[i]);
+        // largeur utile = colonne moins la barre de défilement (pas de double retour à la ligne)
+        column[i].layout(juce::jmax(10, cols[i].getWidth()-viewport[i].getScrollBarThickness()-6));
     }
-    g.restoreState();
-}
-
-void AboutOverlay::drawWebsiteLink(juce::Graphics& g, juce::Rectangle<float> area)
-{
-    websiteBounds = area.withSizeKeepingCentre(area.getWidth(), 16.0f);
-    g.setColour(Col::accent);
-    g.setFont(juce::Font(juce::FontOptions(13.0f, juce::Font::bold)).withExtraKerningFactor(0.04f));
-    g.drawFittedText("sidekeysystem.com", websiteBounds.toNearestInt(), juce::Justification::centredLeft, 1);
-
-    juce::GlyphArrangement ga;
-    ga.addLineOfText(g.getCurrentFont(), "sidekeysystem.com", 0.0f, 0.0f);
-    const float textW = ga.getBoundingBox(0, -1, true).getWidth();
-    g.drawLine(websiteBounds.getX(), websiteBounds.getBottom() - 3.0f,
-               websiteBounds.getX() + textW, websiteBounds.getBottom() - 3.0f, 1.0f);
+    chromeCache={};
 }
 
 void AboutOverlay::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat();
-
-    g.setColour(juce::Colours::black.withAlpha(0.88f));
-    g.fillRect(bounds);
-
-    auto panel = bounds.reduced(juce::jmax(16.0f, bounds.getWidth() * 0.06f),
-                                 juce::jmax(8.0f, bounds.getHeight() * 0.02f));
-    panel = panel.withSizeKeepingCentre(juce::jmin(panel.getWidth(), 560.0f), panel.getHeight());
-
-    g.setColour(Col::panel); g.fillRoundedRectangle(panel, 14.0f);
-    g.setColour(juce::Colours::white.withAlpha(0.05f)); g.drawRoundedRectangle(panel.reduced(1.f), 13.0f, 1.0f);
-    g.setColour(Col::accent.withAlpha(0.5f));
-    g.drawRoundedRectangle(panel.reduced(0.5f), 14.0f, 1.0f);
-
-    auto content = panel.reduced(juce::jmin(30.0f, panel.getWidth() * 0.07f), 14.0f);
-
-    auto copyrightRow = content.removeFromBottom(14.0f);
-    content.removeFromBottom(4.0f);
-
-    auto footer = content.removeFromBottom(58.0f);
-    content.removeFromBottom(8.0f);
-    drawWebsiteLink(g, footer.removeFromLeft(footer.getWidth() - 68.0f));
-    footer.removeFromLeft(10.0f);
-    drawStamp(g, footer);
-
-    if(!photoImage.isNull())
-    {
-        auto photoRow = content.removeFromBottom(76.0f);
-        content.removeFromBottom(10.0f);
-
-        const float photoH = photoRow.getHeight();
-        const float photoW = photoH * ((float)photoImage.getWidth() / (float)photoImage.getHeight());
-        auto photoBounds = juce::Rectangle<float>(photoW, photoH).withCentre(photoRow.getCentre());
-
-        g.saveState();
-        juce::Path clip;
-        clip.addRoundedRectangle(photoBounds, 6.0f);
-        g.reduceClipRegion(clip);
-        g.drawImage(photoImage, photoBounds.getX(), photoBounds.getY(), photoBounds.getWidth(), photoBounds.getHeight(),
-                    0, 0, photoImage.getWidth(), photoImage.getHeight());
-        g.restoreState();
-
-        g.setColour(Col::accent.withAlpha(0.4f));
-        g.drawRoundedRectangle(photoBounds, 6.0f, 1.0f);
-    }
-
-    g.setColour(Col::textMid.withAlpha(0.75f));
-    g.setFont(juce::Font(juce::FontOptions(9.0f, juce::Font::plain)).withExtraKerningFactor(0.06f));
-    g.drawFittedText(TR("\xc2\xa9 2026 Side Key System. All rights reserved.")+juce::String(juce::CharPointer_UTF8("   \xe2\x80\xa2   Made in France")),
-                      copyrightRow.toNearestInt(), juce::Justification::centred, 1);
-
-    auto titleArea = content.removeFromTop(30.0f);
-
-    auto versionArea = titleArea.removeFromRight(70.0f);
-    g.setColour(Col::textMid);
-    g.setFont(juce::Font(juce::FontOptions(10.0f, juce::Font::bold)).withExtraKerningFactor(0.08f));
-    // version du .jucer (ProjectInfo) : suit chaque nouvelle version
-    g.drawFittedText("v" + juce::String(ProjectInfo::versionString), versionArea.toNearestInt(), juce::Justification::centredRight, 1);
-
-    g.setColour(Col::accent);
-    g.setFont(juce::Font(juce::FontOptions(22.0f, juce::Font::bold)).withExtraKerningFactor(0.12f));
-    g.drawFittedText(TR("ABOUT MERLIN MTR 2").replace("MERLIN MTR 2", merlinTitle()), titleArea.toNearestInt(), juce::Justification::centredLeft, 1);
-
-    g.setColour(Col::midCol.withAlpha(0.85f));
-    g.setFont(juce::Font(juce::FontOptions(12.5f, juce::Font::italic)).withExtraKerningFactor(0.10f));
-    auto taglineArea = content.removeFromTop(20.0f);
-    g.drawFittedText(TR("Every frequency, revealed."), taglineArea.toNearestInt(), juce::Justification::centredLeft, 1);
-
-    content.removeFromTop(10.0f);
-    g.setColour(Col::grid);
-    g.drawLine(content.getX(), content.getY(), content.getRight(), content.getY(), 1.0f);
-    content.removeFromTop(10.0f);
-
-    const juce::Font bodyFont(juce::FontOptions(12.5f, juce::Font::plain));
-    const juce::Font bulletFont(juce::FontOptions(11.5f, juce::Font::plain));
-    const juce::Font philoHeadFont(juce::FontOptions(15.0f, juce::Font::bold));
-
-    float y = content.getY();
-    const float bodyWidth = content.getWidth();
-
-    y = drawParagraph(g,
-        TR("Merlin MTR 2 is a six-slot, fully reconfigurable audio analyzer built "
-           "for engineers who want every measurement they need, arranged exactly "
-           "the way they work.").replace("Merlin MTR 2", merlinTitleLc()),
-        { content.getX(), y, bodyWidth, 0.0f }, bodyFont, Col::textHi, 1.3f) + 8.0f;
-
-    y = drawParagraph(g,
-        TR("Any module can be assigned to any slot with a right-click, and "
-           "factory presets instantly reconfigure the whole layout for mixing, "
-           "mastering or sound design. From spectrum and loudness to stereo "
-           "field and transient content, Merlin MTR 2 keeps the full picture "
-           "visible at a glance.").replace("Merlin MTR 2", merlinTitleLc()),
-        { content.getX(), y, bodyWidth, 0.0f }, bodyFont, Col::textHi, 1.3f) + 8.0f;
-
-    y = drawParagraph(g,
-        TR("A complete analysis toolkit, built into a single streamlined window:"),
-        { content.getX(), y, bodyWidth, 0.0f }, bodyFont, Col::textHi, 1.3f) + 6.0f;
-
-    y = drawParagraph(g,
-        TR(
-            "Real-Time Spectrum Analyzer \xe2\x80\xa2 EBU R128 Loudness Metering \xe2\x80\xa2 "
-            "Vectorscope & Oscilloscope \xe2\x80\xa2 Multiband Correlation \xe2\x80\xa2 Stereo "
-            "Panorama \xe2\x80\xa2 Transient Detection \xe2\x80\xa2 Power Spectral Density \xe2\x80\xa2 "
-            "Configurable Presets"),
-        { content.getX(), y, bodyWidth, 0.0f }, bulletFont, Col::accent, 1.3f) + 14.0f;
-
-    g.setColour(Col::midCol);
-    g.setFont(philoHeadFont);
-    g.drawFittedText(TR("The Side Key System Philosophy"),
-                      juce::Rectangle<float>(content.getX(), y, bodyWidth, 18.0f).toNearestInt(),
-                      juce::Justification::centredLeft, 1);
-    y += 22.0f;
-
-    y = drawParagraph(g,
-        TR("At Side Key System, calibration is not a final adjustment. "
-           "It is part of the engineering process itself."),
-        { content.getX(), y, bodyWidth, 0.0f }, bodyFont, Col::textHi, 1.3f) + 8.0f;
-
-    y = drawParagraph(g,
-        TR("Every tool is carefully designed, measured, tested and calibrated "
-           "with meticulous attention to precision, stability and measurement "
-           "consistency. Every reading is meant to be trusted, whether working "
-           "on a single track or a full mastering session."),
-        { content.getX(), y, bodyWidth, 0.0f }, bodyFont, Col::textHi, 1.3f) + 8.0f;
-
-    drawParagraph(g,
-        TR("The objective is simple: give engineers instruments they can rely "
-           "on, where every reading has a purpose and every decision serves "
-           "the music."),
-        { content.getX(), y, bodyWidth, 0.0f }, bodyFont, Col::textHi, 1.3f);
+    g.fillAll(juce::Colours::black.withAlpha(0.60f*animOpacity));
+    if(!chromeCache.isValid()) rebuildChromeCache();
+    if(!chromeCache.isValid()) return;
+    juce::Graphics::ScopedSaveState state(g);
+    g.setOpacity(animOpacity);
+    g.addTransform(panelTransform());
+    g.drawImageTransformed(chromeCache, juce::AffineTransform::scale(1.f/chromeScale));
 }
 
-//==============================================================================
-// SettingsOverlay — voile plein écran (icône engrenage) : palette d'accent
-// + réinitialisation de la disposition des slots.
-//==============================================================================
-SettingsOverlay::SettingsOverlay()
+// Décor statique (feuille, en-tête, duo, filets, pied de page) rendu une fois
+// à la résolution de l'écran ; paint() ne fait que le recopier (défilement
+// des colonnes et animation sans redessiner les ombres et les photos)
+void AboutOverlay::rebuildChromeCache()
 {
-    setInterceptsMouseClicks(true,true);
-}
-
-// Disposition d'une vignette de template : plaque (en retrait du cadre si
-// décor), barre de titre, 3 écrans en haut, spectre en bas, VU à droite.
-namespace {
-struct MiniLayout { juce::Rectangle<float> plate, title, screens[5]; };
-MiniLayout miniLayout(juce::Rectangle<float> r, bool decor)
-{
-    MiniLayout m;
-    m.plate = r.reduced(decor ? r.getWidth()*0.035f : 0.f);
-    auto in = m.plate.reduced(m.plate.getWidth()*0.04f, m.plate.getHeight()*0.05f);
-    m.title = in.removeFromTop(in.getHeight()*0.13f);
-    in.removeFromTop(in.getHeight()*0.04f);
-    const float gap = in.getWidth()*0.035f;
-    auto vu = in.removeFromRight(in.getWidth()*0.12f); in.removeFromRight(gap);
-    auto top = in.removeFromTop(in.getHeight()*0.44f); in.removeFromTop(gap);
-    const float tw = (top.getWidth()-2.f*gap)/3.f;
-    m.screens[0]=top.removeFromLeft(tw); top.removeFromLeft(gap);
-    m.screens[1]=top.removeFromLeft(tw); top.removeFromLeft(gap);
-    m.screens[2]=top;
-    m.screens[3]=in;   // spectre
-    m.screens[4]=vu;   // VU
-    return m;
-}
-
-// Fond fixe d'une vignette (décor + châssis du template), rendu 2x.
-juce::Image renderTemplateThumb(LeakAudioProcessor::UiTemplate t, int w, int h)
-{
-    // dans la teinte et le contraste actuels (Neu::)
-    const auto& info=Templates::get(t);
-    const bool decor=info.decor!=Templates::Decor::None;
-
-    juce::Image img(juce::Image::RGB, w*2, h*2, false);
-    juce::Graphics g(img);
-    g.addTransform(juce::AffineTransform::scale(2.f));
+    const int w=getWidth(), h=getHeight();
+    if(w<4 || h<4) return;
+    double scale=juce::Component::getApproximateScaleFactorForComponent(this);
+    if(auto* d=juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds())) scale*=d->scale;
+    chromeScale=(float)juce::jlimit(1.0, 4.0, scale);
+    chromeCache=juce::Image(juce::Image::ARGB, juce::roundToInt((float)w*chromeScale), juce::roundToInt((float)h*chromeScale), true);
+    juce::Graphics g(chromeCache);
+    g.addTransform(juce::AffineTransform::scale(chromeScale));
     g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-    const juce::Rectangle<float> r(0.f,0.f,(float)w,(float)h);
-    const auto m=miniLayout(r, decor);
-    juce::Path plateP; plateP.addRoundedRectangle(m.plate, decor ? 5.f : 0.f);
 
-    if(decor){
-        g.drawImage(juce::Image() /* saison_ete.jpg retiré avec le template Stadium */,
-                    r, juce::RectanglePlacement::fillDestination);
-        juce::DropShadow(juce::Colours::black.withAlpha(0.55f), 6, {0,2}).drawForPath(g, plateP);
-    }
-    g.setColour(Neu::surface); g.fillPath(plateP);
-    for(const auto& s : m.screens){
-        Neu::drawRaised(g, s.expanded(2.5f), 4.f, 1.2f);
-        Neu::drawInset (g, s.expanded(1.f),  3.f, 0.8f);
-        g.setColour(Col::bg); g.fillRoundedRectangle(s, 2.5f);
-    }
-    g.setColour(Neu::text);
-    g.setFont(Ui::iceland((m.title.getHeight()*0.8f)));
-    g.drawText("MERLIN", m.title, juce::Justification::centred);
+    // feuille en relief, comme la plaque
+    juce::Path sheet;
+    sheet.addRoundedRectangle(panelBounds(), 14.f);
+    juce::DropShadow(Neu::shadowDark,  30, {  10,  10 }).drawForPath(g, sheet);
+    juce::DropShadow(Neu::shadowLight, 20, {  -6,  -6 }).drawForPath(g, sheet);
+    g.setColour(Neu::surface);
+    g.fillPath(sheet);
+    g.setColour(aboutLine());
+    g.strokePath(sheet, juce::PathStrokeType(1.f));
 
-    // décor par-dessus le bord de la plaque, jamais sur les écrans
-    if(decor){
-        g.saveState();
-        g.excludeClipRegion(m.plate.reduced(m.plate.getWidth()*0.012f).getSmallestIntegerContainer());
-        if(info.decor==Templates::Decor::Grass)
-            drawGrassFrame(g, juce::Image() /* herbe.png retiré */,
-                           (float)w, (float)h, (float)w*0.06f);
-        else
-            g.drawImage(juce::Image() /* cadre_vegetal.png retiré avec le template Forest */,
-                        r, juce::RectanglePlacement::stretchToFit);
-        g.restoreState();
-    }
-    return img;
-}
+    const auto L=computeLayout();
+    drawHeader(g, L.header);
+    drawTeam(g, L.team, chromeScale);
+    drawFooter(g, L.footer, chromeScale);
+
+    g.setColour(aboutLine());
+    for(const float y : { L.headerLineY, L.teamLineY, L.footerLineY })
+        g.fillRect(L.lineX0, y, L.lineX1-L.lineX0, 1.f);
+    g.fillRect(L.dividerX1-0.5f, L.colTop, 1.f, L.colBottom-L.colTop);
+    g.fillRect(L.dividerX2-0.5f, L.colTop, 1.f, L.colBottom-L.colTop);
 }
 
-void SettingsOverlay::resized()
+// En-tête : monogramme, ABOUT + logotype MERLIN (Audiowide) + pastille α,
+// accroche, version à droite
+void AboutOverlay::drawHeader(juce::Graphics& g, juce::Rectangle<float> row) const
 {
-    auto bounds = getLocalBounds().toFloat();
-    panelBounds = bounds.withSizeKeepingCentre(juce::jmin(880.0f, bounds.getWidth()*0.94f),
-                                                juce::jmin(606.0f, bounds.getHeight()*0.97f));
-    // colonne gauche : galerie des templates — colonne droite : réglages
-    auto inner = panelBounds;
-    templatesArea = inner.removeFromLeft(inner.getWidth()*0.54f);
-    settingsArea  = inner;
+    const auto ink=aboutInk();
 
-    auto cards = templatesArea.reduced(22.0f, 16.0f);
-    cards.removeFromTop(24.0f + 6.0f + 14.0f);   // titre + filet (voir paint)
-    const float gap=18.0f, labelH=20.0f;
-    const float cw=(cards.getWidth()-gap)*0.5f;
-    const float ch=juce::jmin(cw*0.62f, (cards.getHeight()-gap)*0.5f-labelH);
-    for(int i=0;i<NUM_TEMPLATES;++i)
-        templateRects[i]={ cards.getX()+(float)(i%2)*(cw+gap), cards.getY()+(float)(i/2)*(ch+labelH+gap), cw, ch };
-    for(auto& thumb : templateThumbs) thumb={};   // re-rendues à la prochaine ouverture
+    g.setColour(Neu::textDim);
+    g.setFont(aboutFont(11.f, 2).withExtraKerningFactor(0.08f));
+    g.drawText("v"+juce::String(ProjectInfo::versionString), row.removeFromRight(70.f), juce::Justification::centredRight, false);
+
+    if(monogram.isValid()){
+        const float mh=28.f, mw=mh*(float)monogram.getWidth()/(float)monogram.getHeight();
+        auto img=smoothRescale(monogram, juce::roundToInt(mw*chromeScale), juce::roundToInt(mh*chromeScale));
+        if(Neu::light) darken(img, 0.3f);
+        g.drawImage(img, juce::Rectangle<float>(row.getX(), row.getCentreY()-mh*0.5f, mw, mh));
+        row.removeFromLeft(mw+10.f);
+    }
+
+    const float cap=16.f, base=row.getCentreY()+cap*0.5f;   // ligne de base commune
+    g.setColour(ink);
+    juce::GlyphArrangement about;
+    about.addLineOfText(aboutFont(22.f, 2).withExtraKerningFactor(0.11f), "ABOUT", row.getX(), base);
+    about.draw(g);
+    float x=about.getBoundingBox(0, -1, false).getRight()+11.f;
+
+    juce::Font wf(juce::FontOptions(audiowideTypeface()).withHeight(100.f));
+    {
+        juce::GlyphArrangement m; m.addLineOfText(wf, "M", 0.f, 0.f);
+        wf=wf.withHeight(100.f*cap/juce::jmax(1.f, -m.getBoundingBox(0, -1, false).getY())).withExtraKerningFactor(0.08f);
+    }
+    juce::GlyphArrangement word;
+    word.addLineOfText(wf, "MERLIN", x, base);
+    word.draw(g);
+    x=word.getBoundingBox(0, -1, false).getRight()+8.f;
+    drawAlphaBadge(g, { x+13.f, row.getCentreY() }, 13.f);
+    x+=26.f+14.f;
+
+    g.setColour(ink.withAlpha(0.85f));
+    g.setFont(aboutFont(14.f, 0, true).withExtraKerningFactor(0.10f));
+    g.drawText("Every frequency, revealed.", juce::Rectangle<float>(x, row.getY(), juce::jmax(0.f, row.getRight()-x-8.f), row.getHeight()),
+               juce::Justification::centredLeft, true);
 }
 
-void SettingsOverlay::visibilityChanged()
+// Bandeau du duo : deux portraits (légende nom + rôle sur un dégradé sombre),
+// puis la présentation, centrée verticalement
+void AboutOverlay::drawTeam(juce::Graphics& g, juce::Rectangle<float> row, float scale) const
 {
-    if(isVisible()){
-        // Fonds des vignettes (rendus une fois par taille / teinte)
-        for(int i=0;i<NUM_TEMPLATES;++i)
-            if(!templateThumbs[i].isValid() && !templateRects[i].isEmpty())
-                templateThumbs[i]=renderTemplateThumb((LeakAudioProcessor::UiTemplate)i,
-                                                      juce::roundToInt(templateRects[i].getWidth()),
-                                                      juce::roundToInt(templateRects[i].getHeight()));
-        startTimerHz(30);
+    const float cardW=row.getHeight()*kCardW/kTeamH;
+    static const char* const names[]={ "MIKSHAKE", "SUNNY" };
+    static const char* const roles[]={ "DEVELOPMENT", "DESIGN" };
+    for(int i=0;i<2;++i){
+        const auto card=row.removeFromLeft(cardW);
+        row.removeFromLeft(16.f);
+        {
+            juce::Graphics::ScopedSaveState state(g);
+            juce::Path clip; clip.addRoundedRectangle(card, 10.f);
+            g.reduceClipRegion(clip);
+            g.setColour(juce::Colour(0xff111111));
+            g.fillRect(card);
+            if(const auto& img=portrait[i]; img.isValid()){
+                // remplissage "cover", cadré un peu au-dessus du centre (visages)
+                const float s=juce::jmax(card.getWidth()/(float)img.getWidth(), card.getHeight()/(float)img.getHeight());
+                const float w=(float)img.getWidth()*s, h=(float)img.getHeight()*s;
+                g.drawImage(smoothRescale(img, juce::roundToInt(w*scale), juce::roundToInt(h*scale)),
+                            { card.getX()+(card.getWidth()-w)*0.5f, card.getY()+(card.getHeight()-h)*0.3f, w, h });
+            }
+            // légende à l'échelle de la carte (plus petite sur une fenêtre basse),
+            // le nom rétrécissant au besoin pour tenir en entier
+            const float k=juce::jlimit(0.6f, 1.f, card.getHeight()/kTeamH);
+            const auto cap=card.withTrimmedTop(card.getHeight()-72.f*k);
+            g.setGradientFill(juce::ColourGradient(juce::Colours::black.withAlpha(0.f), 0.f, cap.getY(),
+                                                   juce::Colours::black.withAlpha(0.72f), 0.f, cap.getBottom(), false));
+            g.fillRect(cap);
+            auto text=card.reduced(14.f*k, 12.f*k);
+            g.setColour(juce::Colours::white.withAlpha(0.9f));
+            g.setFont(Ui::fitFont(aboutFont(12.f*k).withExtraKerningFactor(0.12f), roles[i], text.getWidth()));
+            g.drawText(roles[i], text.removeFromBottom(15.f*k), juce::Justification::bottomLeft, false);
+            g.setColour(juce::Colours::white);
+            g.setFont(Ui::fitFont(aboutFont(19.f*k, 2).withExtraKerningFactor(0.14f), names[i], text.getWidth()));
+            g.drawText(names[i], text.removeFromBottom(24.f*k), juce::Justification::bottomLeft, false);
+        }
+        g.setColour(aboutLine());
+        g.drawRoundedRectangle(card, 10.f, 1.f);
+    }
+
+    // présentation : titre, une phrase, puis la devise (empattements, italique)
+    auto intro=row.withTrimmedLeft(10.f).withTrimmedRight(10.f);
+    intro.setWidth(juce::jmin(intro.getWidth(), 620.f));
+    struct Part { juce::String text; juce::Font font; juce::Colour colour; float gapAfter; };
+    const Part parts[]={
+        { "Two people, one window", aboutFont(15.f, 2), aboutInk(), 6.f },
+        { utf8("MERLIN \xce\xb1 is made by two people: Mikshake writes the code, Sunny designs everything you see."),
+          aboutFont(13.f), Neu::text, 10.f },
+        { "One window to rule them all, and in the mix reveal them.",
+          juce::Font(juce::FontOptions().withName("Georgia").withStyle("Italic").withPointHeight(16.f)).withExtraKerningFactor(0.025f),
+          aboutInk(), 0.f },
+    };
+    juce::GlyphArrangement ga[3];
+    float heights[3], total=0.f;
+    for(int i=0;i<3;++i){
+        ga[i].addJustifiedText(parts[i].font, parts[i].text, 0.f, parts[i].font.getAscent(), intro.getWidth(), juce::Justification::left);
+        heights[i]=ga[i].getNumGlyphs()>0 ? ga[i].getBoundingBox(0, -1, true).getBottom() : 0.f;
+        total+=heights[i]+parts[i].gapAfter;
+    }
+    float y=intro.getCentreY()-total*0.5f;
+    for(int i=0;i<3;++i){
+        g.setColour(parts[i].colour);
+        ga[i].draw(g, juce::AffineTransform::translation(intro.getX(), y));
+        y+=heights[i]+parts[i].gapAfter;
+    }
+}
+
+// Pied de page : les deux signatures, liens (site | licence) et copyright, tampon à droite
+void AboutOverlay::drawFooter(juce::Graphics& g, juce::Rectangle<float> area, float scale)
+{
+    const auto ink=Neu::light ? juce::Colours::black : juce::Colours::white;
+    const float sigH[2]={ 50.f, 40.f };   // Sunny Jim, plus large : même poids visuel
+    for(int i=0;i<2;++i){
+        if(!signature[i].isValid()) continue;
+        const float h=sigH[i], w=h*(float)signature[i].getWidth()/(float)signature[i].getHeight();
+        g.drawImage(inked(smoothRescale(signature[i], juce::roundToInt(w*scale), juce::roundToInt(h*scale)), ink),
+                    { area.getX(), area.getCentreY()-h*0.5f, w, h });
+        area.removeFromLeft(w+(i==0 ? 10.f : 16.f));
+    }
+
+    drawStamp(g, area.removeFromRight(58.f));
+    area.removeFromRight(14.f);
+
+    // liens, puis copyright, centrés ensemble verticalement
+    const float top=area.getCentreY()-(16.f+4.f+13.f)*0.5f;
+    const juce::Rectangle<float> linkRow(area.getX(), top, area.getWidth(), 16.f);
+    const juce::Rectangle<float> copyRow(area.getX(), top+20.f, area.getWidth(), 13.f);
+
+    const auto linkFont=aboutFont(13.f, 2).withExtraKerningFactor(0.04f);
+    g.setFont(linkFont);
+    const juce::String site("sidekeysystem.com");
+    const float siteW=juce::GlyphArrangement::getStringWidth(linkFont, site);
+    websiteBounds=linkRow.withWidth(siteW);
+    g.setColour(aboutInk());
+    g.drawText(site, websiteBounds, juce::Justification::centredLeft, false);
+    g.fillRect(websiteBounds.getX(), websiteBounds.getBottom()-2.f, siteW, 1.f);
+
+    const float sepW=18.f;
+    g.setColour(Neu::textDim.withAlpha(0.6f));
+    g.drawText("|", juce::Rectangle<float>(websiteBounds.getRight(), linkRow.getY(), sepW, linkRow.getHeight()), juce::Justification::centred, false);
+
+    // état de la licence (clé active ou jours de démo) : ouvre l'écran de licence
+    const auto lic=licenceText();
+    licenceBounds=linkRow.withX(websiteBounds.getRight()+sepW).withWidth(juce::GlyphArrangement::getStringWidth(linkFont, lic));
+    g.setColour(aboutInk());
+    g.drawText(lic, licenceBounds, juce::Justification::centredLeft, false);
+
+    g.setColour(Neu::textDim.withAlpha(0.8f));
+    g.setFont(aboutFont(9.5f).withExtraKerningFactor(0.04f));
+    g.drawText(utf8("\xc2\xa9 2026 Side Key System. All rights reserved.   \xe2\x80\xa2   Made in France"),
+               copyRow, juce::Justification::centredLeft, true);
+}
+
+juce::String AboutOverlay::licenceText() const
+{
+    if(license==nullptr) return "License";
+    if(const auto key=license->getLicenseKey(); key.isNotEmpty()) return key;
+    if(license->getStatus()==LicenseManager::Status::trial)
+        return "Demo - "+juce::String(license->getTrialDaysLeft())+" day(s) left";
+    return "License";
+}
+
+// Tampon "Calibrated" : double anneau tourné, texte, grain d'encre déterministe
+void AboutOverlay::drawStamp(juce::Graphics& g, juce::Rectangle<float> area) const
+{
+    const auto centre=area.getCentre();
+    const float r=juce::jmin(area.getWidth(), area.getHeight())*0.5f;
+    const auto ink=aboutInk().withAlpha(0.82f);
+
+    juce::Graphics::ScopedSaveState state(g);
+    g.addTransform(juce::AffineTransform::rotation(juce::degreesToRadians(-8.f), centre.x, centre.y));
+
+    g.setColour(ink);
+    g.drawEllipse(centre.x-r, centre.y-r, r*2.f, r*2.f, 1.8f);
+    g.drawEllipse(centre.x-r*0.82f, centre.y-r*0.82f, r*1.64f, r*1.64f, 0.9f);
+
+    g.setFont(juce::Font(juce::FontOptions(r*0.30f, juce::Font::bold)).withExtraKerningFactor(0.08f));
+    g.drawFittedText("CALIBRATED", juce::Rectangle<float>(centre.x-r*0.78f, centre.y-r*0.52f, r*1.56f, r*0.4f).toNearestInt(),
+                     juce::Justification::centred, 1);
+    g.setFont(juce::Font(juce::FontOptions(r*0.20f, juce::Font::bold)).withExtraKerningFactor(0.04f));
+    g.drawFittedText("SIDE KEY", juce::Rectangle<float>(centre.x-r*0.7f, centre.y+r*0.06f, r*1.4f, r*0.32f).toNearestInt(),
+                     juce::Justification::centred, 1);
+    g.drawFittedText("SYSTEM", juce::Rectangle<float>(centre.x-r*0.7f, centre.y+r*0.36f, r*1.4f, r*0.3f).toNearestInt(),
+                     juce::Justification::centred, 1);
+
+    for(int i=0;i<46;++i){
+        const float ang=(float)i*0.151f;
+        const float rr=r*(0.32f+0.66f*std::abs(std::sin((float)i*2.3f)));
+        g.setColour(ink.withAlpha(0.16f*std::abs(std::sin((float)i*1.7f))));
+        g.fillEllipse(centre.x+std::cos(ang)*rr-0.6f, centre.y+std::sin(ang)*rr-0.6f, 1.2f, 1.2f);
+    }
+}
+
+//------------------------------------------------------------------------------
+void AboutOverlay::mouseDown(const juce::MouseEvent& e)
+{
+    if(animating && !animatingIn) return;   // déjà en train de se fermer
+    if(websiteBounds.contains(e.position)){ juce::URL("https://sidekeysystem.com/").launchInDefaultBrowser(); return; }
+    if(licenceBounds.contains(e.position)){ if(onOpenLicence) onOpenLicence(); return; }
+    hideAnimated();
+}
+
+void AboutOverlay::mouseMove(const juce::MouseEvent& e)
+{
+    const bool overLink=websiteBounds.contains(e.position) || licenceBounds.contains(e.position);
+    setMouseCursor(overLink ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+}
+
+bool AboutOverlay::keyPressed(const juce::KeyPress& key)
+{
+    if(key!=juce::KeyPress::escapeKey) return false;
+    hideAnimated();
+    return true;
+}
+
+void AboutOverlay::visibilityChanged()
+{
+    if(isVisible()){ grabKeyboardFocus(); return; }
+    // fermée (fin d'animation, ou cachée d'un coup par l'éditeur) : état de repos
+    stopTimer();
+    animating=false;
+    animOpacity=animScale=1.f;
+    for(auto& v : viewport){ v.setTransform({}); v.setAlpha(1.f); }
+}
+
+// Apparition : voile fondu, panneau qui grandit de 92 % à 100 % en montant de
+// 16 px avec un léger rebond (280 ms) ; disparition inverse (170 ms)
+void AboutOverlay::showAnimated()
+{
+    chromeCache={};   // thème, accent et licence relus
+    for(int i=0;i<3;++i){
+        viewport[i].getVerticalScrollBar().setColour(juce::ScrollBar::thumbColourId, Neu::text.withAlpha(0.28f));
+        viewport[i].setViewPosition(0, 0);
+        column[i].repaint();
+    }
+    animOpacity=0.f; animScale=0.f;
+    for(auto& v : viewport){ v.setTransform(panelTransform()); v.setAlpha(0.f); }
+    setVisible(true);
+    startAnimation(true);
+}
+
+void AboutOverlay::hideAnimated()
+{
+    if(isVisible() && !(animating && !animatingIn))
+        startAnimation(false);
+}
+
+juce::AffineTransform AboutOverlay::panelTransform() const
+{
+    const auto c=panelBounds().getCentre();
+    const float s=0.92f+0.08f*animScale;
+    return juce::AffineTransform::scale(s, s, c.x, c.y).translated(0.f, (1.f-animScale)*16.f);
+}
+
+void AboutOverlay::startAnimation(bool in)
+{
+    animatingIn=in;
+    animating=true;
+    animStartMs=juce::Time::getMillisecondCounterHiRes();
+    animFrom=animOpacity;
+    startTimerHz(60);
+    timerCallback();
+}
+
+void AboutOverlay::timerCallback()
+{
+    const double dur=animatingIn ? 280.0 : 170.0;
+    const float t=(float)juce::jlimit(0.0, 1.0, (juce::Time::getMillisecondCounterHiRes()-animStartMs)/dur);
+    if(animatingIn){
+        constexpr float c1=1.2f, c3=c1+1.f;   // rebond discret
+        animScale=1.f+c3*std::pow(t-1.f, 3.f)+c1*std::pow(t-1.f, 2.f);
+        animOpacity=animFrom+(1.f-animFrom)*(1.f-(1.f-t)*(1.f-t));
     } else {
-        stopTimer();
-        setHoveredTemplate(-1);
+        const float e=t*t;   // accélère vers la sortie
+        animOpacity=animFrom*(1.f-e);
+        animScale=1.f-e;
     }
-}
-
-void SettingsOverlay::timerCallback()
-{
-    if(processor==nullptr) return;
-    float bands[LeakAudioProcessor::N_BANDS] {};
-    const int n=processor->getNumActiveBands();
-    processor->getBandLevels(bands, n);
-    for(int i=0;i<LeakAudioProcessor::N_BANDS_31;++i)   // ramené à 31 colonnes
-        liveBands[i]=bands[juce::jlimit(0, n-1, i*n/LeakAudioProcessor::N_BANDS_31)];
-    processor->getVuData(liveVu);
-    repaint(templatesArea.getSmallestIntegerContainer());
-}
-
-void SettingsOverlay::setHoveredTemplate(int t)
-{
-    if(t==hoveredTemplate) return;
-    hoveredTemplate=t;
-    if(onTemplateHover) onTemplateHover(t);
+    const auto tr=panelTransform();
+    for(auto& v : viewport){ v.setTransform(tr); v.setAlpha(animOpacity); }
     repaint();
-}
 
-void SettingsOverlay::mouseExit(const juce::MouseEvent&)
-{
-    setHoveredTemplate(-1);
-}
-
-// Vignette : fond fixe (décor + châssis) puis mesures en direct sur les écrans.
-void SettingsOverlay::drawTemplateCard(juce::Graphics& g, int t, juce::Rectangle<float> r)
-{
-    const auto& info=Templates::get((LeakAudioProcessor::UiTemplate)t);
-    const auto m=miniLayout(r, info.decor!=Templates::Decor::None);
-    const bool hovered=hoveredTemplate==t, active=currentTemplate==t;
-
-    juce::Path cardP; cardP.addRoundedRectangle(r, 6.f);
-    juce::DropShadow(juce::Colours::black.withAlpha(hovered ? 0.8f : 0.5f), hovered ? 14 : 8, {0, hovered ? 5 : 3}).drawForPath(g, cardP);
-    g.saveState();
-    g.reduceClipRegion(cardP);
-    if(templateThumbs[t].isValid()) g.drawImage(templateThumbs[t], r);
-
-    auto dbTo01=[](float db){ return juce::jlimit(0.f, 1.f, (db+60.f)/60.f); };
-
-    // spectre
-    {
-        const auto s=m.screens[3].reduced(2.f);
-        const float bw=s.getWidth()/(float)LeakAudioProcessor::N_BANDS_31;
-        for(int i=0;i<LeakAudioProcessor::N_BANDS_31;++i){
-            const float hgt=s.getHeight()*dbTo01(liveBands[i]);
-            juce::ColourGradient cg(Col::accent, 0.f, s.getBottom()-hgt, Col::accent.darker(0.8f), 0.f, s.getBottom(), false);
-            g.setGradientFill(cg);
-            g.fillRect(s.getX()+(float)i*bw+0.5f, s.getBottom()-hgt, juce::jmax(1.f,bw-1.f), hgt);
-        }
-    }
-    // VU L/R
-    {
-        const auto s=m.screens[4].reduced(2.f);
-        const float bw=(s.getWidth()-2.f)*0.5f;
-        const float lv[2]={ dbTo01(liveVu.rmsL), dbTo01(liveVu.rmsR) };
-        const float pk[2]={ dbTo01(liveVu.peakL), dbTo01(liveVu.peakR) };
-        for(int c=0;c<2;++c){
-            const float x=s.getX()+(float)c*(bw+2.f);
-            g.setColour(Col::accent.withAlpha(0.85f));
-            g.fillRect(x, s.getBottom()-s.getHeight()*lv[c], bw, s.getHeight()*lv[c]);
-            g.setColour(Col::textHi);
-            g.fillRect(x, s.getBottom()-s.getHeight()*pk[c], bw, 1.f);
-        }
-    }
-    // goniomètre (fixe), aiguille, valeur crête
-    {
-        const auto s=m.screens[0];
-        const float rr=juce::jmin(s.getWidth(), s.getHeight())*0.38f;
-        g.setColour(Col::grid); g.drawEllipse(s.withSizeKeepingCentre(rr*2.f, rr*2.f), 1.f);
-        g.drawLine(s.getCentreX(), s.getCentreY()-rr, s.getCentreX(), s.getCentreY()+rr, 0.8f);
-        const float amp=dbTo01(juce::jmax(liveVu.peakL, liveVu.peakR))*rr*0.8f;
-        g.setColour(Col::accent.withAlpha(0.8f));
-        g.drawLine(s.getCentreX(), s.getCentreY()-amp, s.getCentreX(), s.getCentreY()+amp, 2.f);
-
-        const auto n=m.screens[1];
-        const float a=juce::jmap(dbTo01((liveVu.rmsL+liveVu.rmsR)*0.5f+12.f), -0.8f, 0.8f);
-        const juce::Point<float> pivot(n.getCentreX(), n.getBottom()-n.getHeight()*0.12f);
-        const float len=n.getHeight()*0.7f;
-        g.setColour(Col::textHi.withAlpha(0.9f));
-        g.drawLine(pivot.x, pivot.y, pivot.x+std::sin(a)*len, pivot.y-std::cos(a)*len, 1.2f);
-
-        const auto v=m.screens[2];
-        g.setColour(Col::accent);
-        g.setFont(Ui::iceland((juce::jmin(16.f, v.getHeight()*0.42f))));
-        const float pkDb=juce::jmax(liveVu.peakL, liveVu.peakR);
-        g.drawText(pkDb<=-119.f ? juce::String("-inf") : juce::String(pkDb,1), v, juce::Justification::centred);
-    }
-    g.restoreState();
-
-    // contour : accent si actif, clair au survol
-    if(active || hovered){
-        g.setColour(active ? Col::accent : juce::Colours::white.withAlpha(0.6f));
-        g.drawRoundedRectangle(r.reduced(0.5f), 6.f, active ? 2.f : 1.4f);
-    }
-    // nom du template
-    auto label=juce::Rectangle<float>(r.getX(), r.getBottom()+3.f, r.getWidth(), 16.f);
-    g.setColour(active ? Col::accent : Col::textHi.withAlpha(hovered ? 1.f : 0.75f));
-    g.setFont(Ui::iceland((12.5f)).withExtraKerningFactor(0.08f));
-    g.drawText(juce::String(info.name) + (active ? juce::String(juce::CharPointer_UTF8("  \xe2\x80\xa2  "))+TR("ACTIVE") : juce::String()),
-               label, juce::Justification::centredLeft);
-}
-
-void SettingsOverlay::mouseMove(const juce::MouseEvent& e)
-{
-    int newTemplate=-1;
-    for(int i=0;i<NUM_TEMPLATES;++i)
-        if(templateRects[i].contains(e.position)) { newTemplate=i; break; }
-    setHoveredTemplate(newTemplate);
-
-    int newHover = -1;
-    for(int i=0;i<Theme::NUM_PALETTES;++i)
-        if(swatchRects[i].contains(e.position)) { newHover = i; break; }
-    if(newHover != hoveredSwatch) { hoveredSwatch = newHover; repaint(); }
-
-    int newColorHover = -1;
-    for(int i=0;i<NUM_COLOR_ROLES;++i)
-        if(colorSwatchRects[i].contains(e.position)) { newColorHover = i; break; }
-    if(newColorHover != hoveredColorRow) { hoveredColorRow = newColorHover; repaint(); }
-}
-
-void SettingsOverlay::mouseDown(const juce::MouseEvent& e)
-{
-    for(int i=0;i<NUM_TEMPLATES;++i)
-        if(templateRects[i].contains(e.position)){
-            currentTemplate=i;
-            if(onTemplateSelected) onTemplateSelected(i);
-            repaint();
-            return;
-        }
-    for(int i=0;i<Theme::NUM_PALETTES;++i)
-        if(swatchRects[i].contains(e.position)) { if(onAccentSelected) onAccentSelected(i); return; }
-    for(int i=0;i<NUM_COLOR_ROLES;++i)
-        if(colorSwatchRects[i].contains(e.position)) { openColorPicker(i); return; }
-    if(lightCpuBounds.contains(e.position)) {
-        lightCpu = !lightCpu;
-        if(onLightCpuToggled) onLightCpuToggled(lightCpu);
-        repaint();
-        return;
-    }
-    if(resetBtnBounds.contains(e.position)) { if(onResetLayout) onResetLayout(); return; }
-    if(resetColorsBtnBounds.contains(e.position)) { if(onColorsReset) onColorsReset(); return; }
-    if(!panelBounds.contains(e.position)) setVisible(false);
-}
-
-void SettingsOverlay::openColorPicker(int role)
-{
-    activeColorRole = role;
-    auto selector = std::make_unique<juce::ColourSelector>(
-        juce::ColourSelector::showColourAtTop | juce::ColourSelector::showSliders | juce::ColourSelector::showColourspace);
-    selector->setCurrentColour(roleColors[role]);
-    selector->setSize(260,300);
-    selector->addChangeListener(this);
-    auto screenRect = localAreaToGlobal(colorSwatchRects[role].toNearestInt());
-    juce::CallOutBox::launchAsynchronously(std::move(selector), screenRect, nullptr);
-}
-
-void SettingsOverlay::changeListenerCallback(juce::ChangeBroadcaster* source)
-{
-    if(auto* cs = dynamic_cast<juce::ColourSelector*>(source)){
-        if(activeColorRole>=0 && activeColorRole<NUM_COLOR_ROLES){
-            const auto c = cs->getCurrentColour();
-            roleColors[activeColorRole] = c;
-            if(onColorRoleChanged) onColorRoleChanged(activeColorRole, c);
-            repaint();
-        }
+    if(t<1.f) return;
+    stopTimer();
+    animating=false;
+    if(animatingIn){
+        animOpacity=animScale=1.f;
+        for(auto& v : viewport){ v.setTransform({}); v.setAlpha(1.f); }
+    } else {
+        setVisible(false);   // visibilityChanged() remet l'état de repos
     }
 }
-
-void SettingsOverlay::paint(juce::Graphics& g)
-{
-    // voile plus léger pendant le survol d'un template : l'aperçu reste visible
-    auto bounds = getLocalBounds().toFloat();
-    g.setColour(juce::Colours::black.withAlpha(hoveredTemplate>=0 ? 0.25f : 0.82f));
-    g.fillRect(bounds);
-
-    g.setColour(Col::panel.withAlpha(hoveredTemplate>=0 ? 0.92f : 1.f)); g.fillRoundedRectangle(panelBounds, 10.0f);
-    g.setColour(Col::accent.withAlpha(0.45f));
-    g.drawRoundedRectangle(panelBounds.reduced(0.5f), 10.0f, 1.0f);
-
-    // ── Colonne gauche : galerie des templates ────────────────────────────
-    {
-        auto col = templatesArea.reduced(22.0f, 16.0f);
-        auto titleArea = col.removeFromTop(24.0f);
-        g.setColour(Col::accent);
-        g.setFont(Ui::iceland((17.0f)).withExtraKerningFactor(0.08f));
-        g.drawFittedText(TR("TEMPLATES"), titleArea.toNearestInt(), juce::Justification::centredLeft, 1);
-        g.setColour(Col::textMid.withAlpha(0.6f));
-        g.setFont(Ui::plain(10.0f));
-        g.drawFittedText(TR("Hover to preview, click to apply"), titleArea.toNearestInt(), juce::Justification::centredRight, 1);
-        col.removeFromTop(6.0f);
-        g.setColour(Col::grid);
-        g.drawLine(col.getX(), col.getY(), col.getRight(), col.getY(), 1.0f);
-        for(int i=0;i<NUM_TEMPLATES;++i)
-            drawTemplateCard(g, i, templateRects[i]);
-        // séparation des colonnes
-        g.setColour(Col::grid);
-        g.drawLine(templatesArea.getRight(), panelBounds.getY()+16.f, templatesArea.getRight(), panelBounds.getBottom()-24.f, 1.0f);
-    }
-
-    // ── Colonne droite : réglages ─────────────────────────────────────────
-    auto content = settingsArea.reduced(22.0f, 16.0f);
-
-    auto titleArea = content.removeFromTop(24.0f);
-    g.setColour(Col::accent);
-    g.setFont(Ui::iceland((17.0f)).withExtraKerningFactor(0.08f));
-    g.drawFittedText(TR("SETTINGS"), titleArea.toNearestInt(), juce::Justification::centredLeft, 1);
-
-    content.removeFromTop(6.0f);
-    g.setColour(Col::grid);
-    g.drawLine(content.getX(), content.getY(), content.getRight(), content.getY(), 1.0f);
-    content.removeFromTop(14.0f);
-
-    auto labelArea = content.removeFromTop(16.0f);
-    g.setColour(Col::textMid);
-    g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.1f));
-    g.drawFittedText(TR("ACCENT COLOUR"), labelArea.toNearestInt(), juce::Justification::centredLeft, 1);
-
-    content.removeFromTop(8.0f);
-    auto swatchRow = content.removeFromTop(38.0f);
-    const float sw = 40.0f, gap = 10.0f;
-    float sx = swatchRow.getX();
-    for(int i=0;i<Theme::NUM_PALETTES;++i)
-    {
-        juce::Rectangle<float> r(sx, swatchRow.getY(), sw, sw);
-        swatchRects[i] = r;
-        const juce::Colour c(Theme::palettes[i].accent);
-        g.setColour(c); g.fillRoundedRectangle(r, 5.0f);
-        const bool active = std::abs(c.getFloatRed()-Col::accent.getFloatRed())<0.01f
-                          && std::abs(c.getFloatGreen()-Col::accent.getFloatGreen())<0.01f
-                          && std::abs(c.getFloatBlue()-Col::accent.getFloatBlue())<0.01f;
-        g.setColour(juce::Colours::white.withAlpha(active ? 0.9f : (hoveredSwatch==i ? 0.5f : 0.15f)));
-        g.drawRoundedRectangle(r.reduced(0.5f), 5.0f, active ? 2.0f : 1.0f);
-        sx += sw + gap;
-    }
-
-    content.removeFromTop(48.0f);
-    g.setColour(Col::grid);
-    g.drawLine(content.getX(), content.getY(), content.getRight(), content.getY(), 1.0f);
-    content.removeFromTop(14.0f);
-
-    auto colorLabelArea = content.removeFromTop(16.0f);
-    g.setColour(Col::textMid);
-    g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.1f));
-    g.drawFittedText(TR("CUSTOM COLOURS"), colorLabelArea.toNearestInt(), juce::Justification::centredLeft, 1);
-    content.removeFromTop(8.0f);
-
-    static const char* roleNames[SettingsOverlay::NUM_COLOR_ROLES] = {
-        "ACCENT", "GRID", "BACKGROUND", "TEXT", "SIDE CHANNEL", "SPECTRO VALLEY", "SPECTRO MID", "SPECTRO PEAK" };
-    const float rowH=22.0f, rowGap=4.0f;
-    for(int i=0;i<NUM_COLOR_ROLES;++i){
-        auto row = content.removeFromTop(rowH);
-        juce::Rectangle<float> swatchR(row.getX(), row.getY(), rowH, rowH);
-        colorSwatchRects[i]=swatchR;
-        g.setColour(roleColors[i]); g.fillRoundedRectangle(swatchR,3.0f);
-        g.setColour(juce::Colours::white.withAlpha(hoveredColorRow==i?0.55f:0.2f));
-        g.drawRoundedRectangle(swatchR.reduced(0.5f),3.0f,1.0f);
-        g.setColour(Col::textHi.withAlpha(0.85f));
-        g.setFont(Ui::iceland((11.0f)));
-        g.drawFittedText(TR(roleNames[i]), row.withTrimmedLeft(rowH+10.0f).withTrimmedRight(70.0f).toNearestInt(),
-                          juce::Justification::centredLeft, 1);
-        g.setColour(Col::textMid.withAlpha(0.7f));
-        g.setFont(Ui::plain(9.0f));
-        g.drawFittedText("#"+roleColors[i].toDisplayString(false).toUpperCase(),
-                          row.withTrimmedLeft(row.getWidth()-64.0f).toNearestInt(), juce::Justification::centredRight, 1);
-        content.removeFromTop(rowGap);
-    }
-    content.removeFromTop(4.0f);
-    resetColorsBtnBounds = content.removeFromTop(22.0f).withWidth(140.0f);
-    g.setColour(juce::Colours::white.withAlpha(0.04f));
-    g.fillRoundedRectangle(resetColorsBtnBounds, 4.0f);
-    g.setColour(Col::border);
-    g.drawRoundedRectangle(resetColorsBtnBounds.reduced(0.5f), 4.0f, 1.0f);
-    g.setColour(Col::textHi);
-    g.setFont(Ui::iceland((10.5f)));
-    g.drawFittedText(TR("RESET COLOURS"), resetColorsBtnBounds.toNearestInt(), juce::Justification::centred, 1);
-    content.removeFromTop(10.0f);
-
-    g.setColour(Col::grid);
-    g.drawLine(content.getX(), content.getY(), content.getRight(), content.getY(), 1.0f);
-    content.removeFromTop(14.0f);
-
-    auto perfLabelArea = content.removeFromTop(16.0f);
-    g.setColour(Col::textMid);
-    g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.1f));
-    g.drawFittedText(TR("PERFORMANCE"), perfLabelArea.toNearestInt(), juce::Justification::centredLeft, 1);
-
-    content.removeFromTop(8.0f);
-    auto cbRow = content.removeFromTop(22.0f);
-    const float boxSize = 16.0f;
-    lightCpuBounds = cbRow.withWidth(boxSize).withHeight(boxSize);
-    g.setColour(juce::Colours::white.withAlpha(0.04f));
-    g.fillRoundedRectangle(lightCpuBounds, 3.0f);
-    g.setColour(lightCpu ? Col::accent : Col::border);
-    g.drawRoundedRectangle(lightCpuBounds.reduced(0.5f), 3.0f, 1.2f);
-    if(lightCpu){
-        g.setColour(Col::accent);
-        juce::Path tick;
-        tick.startNewSubPath(lightCpuBounds.getX()+3.5f, lightCpuBounds.getCentreY());
-        tick.lineTo(lightCpuBounds.getCentreX()-1.0f, lightCpuBounds.getBottom()-4.0f);
-        tick.lineTo(lightCpuBounds.getRight()-3.0f, lightCpuBounds.getY()+3.5f);
-        g.strokePath(tick, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    }
-    g.setColour(Col::textHi.withAlpha(0.85f));
-    g.setFont(Ui::iceland((11.5f)));
-    g.drawFittedText(TR("LIGHT CPU MODE (30 FPS)"),
-                      cbRow.withTrimmedLeft(boxSize+8.0f).toNearestInt(), juce::Justification::centredLeft, 1);
-    content.removeFromTop(4.0f);
-    g.setColour(Col::textMid.withAlpha(0.45f));
-    g.setFont(Ui::plain(8.5f));
-    g.drawFittedText(TR("Reduces analysis refresh rate to lighten CPU/GPU load"),
-                      content.removeFromTop(14.0f).toNearestInt(), juce::Justification::centredLeft, 1);
-
-    content.removeFromTop(8.0f);
-    g.setColour(Col::grid);
-    g.drawLine(content.getX(), content.getY(), content.getRight(), content.getY(), 1.0f);
-    content.removeFromTop(14.0f);
-
-    resetBtnBounds = content.removeFromTop(26.0f).withWidth(150.0f);
-    g.setColour(juce::Colours::white.withAlpha(0.04f));
-    g.fillRoundedRectangle(resetBtnBounds, 4.0f);
-    g.setColour(Col::border);
-    g.drawRoundedRectangle(resetBtnBounds.reduced(0.5f), 4.0f, 1.0f);
-    g.setColour(Col::textHi);
-    g.setFont(Ui::iceland((11.0f)));
-    g.drawFittedText(TR("RESET SLOT LAYOUT"), resetBtnBounds.toNearestInt(), juce::Justification::centred, 1);
-
-    g.setColour(Col::textMid.withAlpha(0.5f));
-    g.setFont(Ui::plain(9.0f));
-    auto footerArea = panelBounds; // copie locale — ne jamais muter le membre panelBounds ici
-    g.drawFittedText(TR("Click outside this panel to close"),
-                      footerArea.removeFromBottom(16.0f).toNearestInt(), juce::Justification::centred, 1);
-}
-
 
 //==============================================================================
 // MultibandCorrDisplay
@@ -4328,13 +4295,11 @@ void MultibandCorrDisplay::mouseDown(const juce::MouseEvent& e)
         if(band>=0){
             multiSelectMask ^= LeakAudioProcessor::bandBit(band);
             lastDragBand=band;
-            processor.setAuditionBands(multiSelectMask);
         }
     } else {
-        // Clic simple : audition mono-bande momentanée, efface la sélection multi
+        // Clic simple : bande isolée tant que le bouton est enfoncé, efface la sélection multi
         multiSelectMask=0;
         soloBand=band;
-        processor.setAuditionBand(soloBand);
     }
     if(onSelectionChanged) onSelectionChanged();
     repaint();
@@ -4346,7 +4311,6 @@ void MultibandCorrDisplay::mouseUp(const juce::MouseEvent& e)
     if(soloBand!=-1){
         soloBand=-1;
         // Relâcher le clic mono-bande retombe sur la sélection multi-bandes (vide si aucune)
-        processor.setAuditionBands(multiSelectMask);
         repaint();
     }
 }
@@ -4358,7 +4322,6 @@ void MultibandCorrDisplay::mouseDrag(const juce::MouseEvent& e)
     if(band>=0 && band!=lastDragBand){
         multiSelectMask |= LeakAudioProcessor::bandBit(band);
         lastDragBand=band;
-        processor.setAuditionBands(multiSelectMask);
         repaint();
     }
 }
@@ -4371,7 +4334,7 @@ void MultibandCorrDisplay::mouseMove(const juce::MouseEvent& e)
 void MultibandCorrDisplay::mouseExit(const juce::MouseEvent&)
 {
     bool needsRepaint=false;
-    if(soloBand!=-1){soloBand=-1;processor.setAuditionBands(multiSelectMask);needsRepaint=true;}
+    if(soloBand!=-1){soloBand=-1;needsRepaint=true;}
     if(hoveredBand!=-1){hoveredBand=-1;needsRepaint=true;}
     if(needsRepaint) repaint();
 }
@@ -4457,7 +4420,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
 
         if(c >= 0.f){
             // Corrélation positive : cyan → blanc selon intensité
-            const juce::Colour col=Col::accent.interpolatedWith(juce::Colours::white,c*0.35f);
+            const juce::Colour col=Col::hot(Col::accent,c*0.35f);
             g.setColour(col.withAlpha(0.78f));
             g.fillRect(x0+0.5f, cy-barH, bw, barH);
             g.setColour(col.brighter(0.2f));
@@ -4465,7 +4428,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
         } else {
             // Corrélation négative : rouge-orange selon intensité
             const float nc=-c;
-            const juce::Colour col=juce::Colour(0xFFFF2200).interpolatedWith(juce::Colour(0xFFFF7700),nc*0.5f);
+            const juce::Colour col=Col::ink(juce::Colour(0xFFFF2200)).interpolatedWith(Col::ink(juce::Colour(0xFFFF7700)),nc*0.5f);
             g.setColour(col.withAlpha(0.78f));
             g.fillRect(x0+0.5f, cy, bw, barH);
             g.setColour(col.brighter(0.2f));
@@ -4513,7 +4476,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
     g.drawFittedText(TR("MULTIBAND CORRELATOR"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
     g.setColour(Col::accent.withAlpha(0.4f));
     g.drawText("+",(int)(W-14),4,10,9,juce::Justification::centred);
-    g.setColour(juce::Colour(0xFFFF3300).withAlpha(0.4f));
+    g.setColour(Col::ink(juce::Colour(0xFFFF3300)).withAlpha(0.4f));
     g.drawText("-",(int)(W-14),(int)(H-14),10,9,juce::Justification::centred);
 }
 
@@ -4588,12 +4551,10 @@ void MultipanoramaDisplay::mouseDown(const juce::MouseEvent& e)
         if(band>=0){
             multiSelectMask ^= LeakAudioProcessor::bandBit(band);
             lastDragBand=band;
-            processor.setAuditionBands(multiSelectMask);
         }
     } else {
         multiSelectMask=0;
         soloBand=band;
-        processor.setAuditionBand(soloBand);
     }
     if(onSelectionChanged) onSelectionChanged();
     repaint();
@@ -4604,7 +4565,6 @@ void MultipanoramaDisplay::mouseUp(const juce::MouseEvent& e)
     lastDragBand=-1;
     if(soloBand!=-1){
         soloBand=-1;
-        processor.setAuditionBands(multiSelectMask);
         repaint();
     }
 }
@@ -4616,7 +4576,6 @@ void MultipanoramaDisplay::mouseDrag(const juce::MouseEvent& e)
     if(band>=0 && band!=lastDragBand){
         multiSelectMask |= LeakAudioProcessor::bandBit(band);
         lastDragBand=band;
-        processor.setAuditionBands(multiSelectMask);
         repaint();
     }
 }
@@ -4629,7 +4588,7 @@ void MultipanoramaDisplay::mouseMove(const juce::MouseEvent& e)
 void MultipanoramaDisplay::mouseExit(const juce::MouseEvent&)
 {
     bool needsRepaint=false;
-    if(soloBand!=-1){soloBand=-1;processor.setAuditionBands(multiSelectMask);needsRepaint=true;}
+    if(soloBand!=-1){soloBand=-1;needsRepaint=true;}
     if(hoveredBand!=-1){hoveredBand=-1;needsRepaint=true;}
     if(needsRepaint) repaint();
 }
@@ -4637,12 +4596,12 @@ void MultipanoramaDisplay::mouseExit(const juce::MouseEvent&)
 juce::Colour MultipanoramaDisplay::heatColor(float amp01)
 {
     amp01=juce::jlimit(0.f,1.f,amp01);
-    static const juce::Colour stops[5] = {
+    const juce::Colour stops[5] = {   // (pas static : suit la palette, écrans Papier compris)
         Col::accent,                 // cyan — centré / mono
-        juce::Colour(0xFF30FF40),    // vert
-        juce::Colour(0xFFFFE030),    // jaune
-        juce::Colour(0xFFFF8800),    // orange
-        juce::Colour(0xFFFF2020)     // rouge — hard L/R
+        Col::ink(juce::Colour(0xFF30FF40)),    // vert
+        Col::ink(juce::Colour(0xFFFFE030)),    // jaune
+        Col::ink(juce::Colour(0xFFFF8800)),    // orange
+        Col::ink(juce::Colour(0xFFFF2020))     // rouge — hard L/R
     };
     const float seg=amp01*4.f;
     const int   i=juce::jlimit(0,3,(int)seg);
@@ -4785,7 +4744,7 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
 
     // ── Labels L / C / R (gauche) ─────────────────────────────────────────
     g.setFont(Ui::iceland((8.f)));
-    g.setColour(juce::Colour(0xFF3090FF).withAlpha(0.7f));
+    g.setColour(Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.7f));
     g.drawText("L", 0,(int)padT-6,(int)padL,10,juce::Justification::centredRight);
     g.setColour(Col::textMid.withAlpha(0.6f));
     g.drawText("C", 0,(int)cy-5, (int)padL,10,juce::Justification::centredRight);
@@ -4844,8 +4803,8 @@ void PanoramaLedDisplay::resized()
 juce::Colour PanoramaLedDisplay::ledColour(float dev)
 {
     dev=juce::jlimit(0.f, 1.f, std::abs(dev));
-    const juce::Colour stops[5] = { Col::accent, juce::Colour(0xFF30FF40), juce::Colour(0xFFFFE030),
-                                    juce::Colour(0xFFFF8800), juce::Colour(0xFFFF2020) };
+    const juce::Colour stops[5] = { Col::accent, Col::ink(juce::Colour(0xFF30FF40)), Col::ink(juce::Colour(0xFFFFE030)),
+                                    Col::ink(juce::Colour(0xFFFF8800)), Col::ink(juce::Colour(0xFFFF2020)) };
     const float seg=dev*4.f;
     const int   i=juce::jlimit(0,3,(int)seg);
     return stops[i].interpolatedWith(stops[i+1], seg-(float)i);
@@ -4906,7 +4865,7 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
     g.drawText("50", (int)(padL+gw)+2,(int)(cy+gh*0.25f)-5,30,9,juce::Justification::left);
     g.drawText("100",(int)(padL+gw)+2,(int)(padT+gh)-5,30,9,juce::Justification::left);
     g.setFont(Ui::iceland((8.f)));
-    g.setColour(juce::Colour(0xFF3090FF).withAlpha(0.7f));
+    g.setColour(Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.7f));
     g.drawText("L", 0,(int)padT-6,(int)padL,10,juce::Justification::centredRight);
     g.setColour(Col::textMid.withAlpha(0.6f));
     g.drawText("C", 0,(int)cy-5, (int)padL,10,juce::Justification::centredRight);
@@ -4932,13 +4891,13 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
 
     // grille éteinte en cache
     const float scale=g.getInternalContext().getPhysicalPixelScaleFactor();
-    const int key=W*131+H*7+N*3+L+juce::roundToInt(scale*100.f)*17;
+    const int key=W*131+H*7+N*3+L+juce::roundToInt(scale*100.f)*17+Col::generation*7919;
     if(key!=offKey || !offGrid.isValid()){
         offKey=key;
         offGrid=juce::Image(juce::Image::ARGB, juce::jmax(1,juce::roundToInt((float)W*scale)), juce::jmax(1,juce::roundToInt((float)H*scale)), true);
         juce::Graphics og(offGrid);
         og.addTransform(juce::AffineTransform::scale(scale));
-        og.setColour(juce::Colours::white.withAlpha(0.05f));
+        og.setColour(Col::light(Col::paper ? 0.07f : 0.05f));
         for(int b=0;b<N;++b)
             for(int k=0;k<L;++k) og.fillRoundedRectangle(ledRect(b,k), 1.5f);
         // repère du centre
@@ -5104,7 +5063,7 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
         if(!pStarted){ peakPath.startNewSubPath(x,y); pStarted=true; } else peakPath.lineTo(x,y);
     }
     if(pStarted){
-        g.setColour(juce::Colour(0xFFFFD200).withAlpha(0.45f));
+        g.setColour(Col::ink(juce::Colour(0xFFFFD200)).withAlpha(0.45f));
         g.strokePath(peakPath, juce::PathStrokeType(0.9f));
     }
 
@@ -5138,7 +5097,7 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
 //==============================================================================
 LeakEditor::LeakEditor(LeakAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p),
-      vectorscope(p), oscilloscope(p), transient(p),
+      vectorscope(p), oscilloscope(p),
       loudnessPanel(p), vuMeter(p),
       spectrum(p), corrDisplay(p), panoDisplay(p), panoLed(p),
       spectralDensity(p), needleVu(p), mbVectorscope(p),
@@ -5159,25 +5118,17 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     // langue : choix mémorisé, sinon celle de Windows au premier lancement
     if(audioProcessor.language<0) audioProcessor.language=Lang::fromSystem();
     Lang::set(audioProcessor.language);
-    natureImage = juce::Image() /* saison_ete.jpg retiré avec le template Stadium */;
-    foliageImage= juce::Image() /* cadre_vegetal.png retiré avec le template Forest */;
-    grassImage  = juce::Image() /* herbe.png retiré */;
-    Neu::apply(audioProcessor.lightTint, audioProcessor.highContrast);
+    Neu::apply(audioProcessor.lightTint, audioProcessor.highContrast, audioProcessor.plateTint==1, audioProcessor.lightScreens!=0);
     Ui::textScale = audioProcessor.largeText ? Ui::kLargeTextScale : 1.0f;
-    Theme::applyCustom({audioProcessor.customAccentColor, audioProcessor.customGridColor,
-                         audioProcessor.customBgColor, audioProcessor.customTextColor,
-                         audioProcessor.customSideColor, audioProcessor.customSpectroLowColor,
-                         audioProcessor.customSpectroMidColor, audioProcessor.customSpectroHighColor});
+    applyColours();
 
     addAndMakeVisible(topBar);
-    addAndMakeVisible(controlsDrawer);
-    controlsDrawer.setInterceptsMouseClicks(false, true);
-    controlsDrawer.addAndMakeVisible(controls);
+    addAndMakeVisible(controls);
 
     // Tous les modules passent par addChildComponent — c'est updateLayout()
     // qui décide lesquels sont visibles et où ils se placent
     juce::Component* const allModules[] = {
-        &vectorscope, &oscilloscope, &transient,
+        &vectorscope, &oscilloscope,
         &loudnessPanel, &vuMeter, &spectrum,
         &corrDisplay, &panoDisplay, &panoLed,
         &spectralDensity, &needleVu, &mbVectorscope,
@@ -5199,11 +5150,9 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     overlayLayer.painter = [this](juce::Graphics& g){ paintChassisOverlay(g); };
     addAndMakeVisible(overlayLayer);
     addChildComponent(aboutOverlay);
-    addChildComponent(settingsOverlay);
     addChildComponent(optionsOverlay);
     addChildComponent(licenseOverlay);   // au-dessus de tout
     aboutOverlay.addComponentListener(this);
-    settingsOverlay.addComponentListener(this);
     optionsOverlay.addComponentListener(this);
     licenseOverlay.addComponentListener(this);
 
@@ -5221,37 +5170,34 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
         drawAlphaBadge(g, { x0+ink.getRight()+0.47f*cap+0.79f*cap, base-cap*0.5f }, 0.79f*cap);
     };
     licenseOverlay.onDismiss = [this]{ updateLicenseUi(); };
+    aboutOverlay.setLicenseManager(*license);   // pied de page de l'À propos : clé ou jours de démo
+    aboutOverlay.onOpenLicence = [this]{ openLicence(); };
     topBar.onDemoClicked = [this]{ openLicence(); };
     license->addChangeListener(this);
     updateLicenseUi();
 
-    // Galerie des templates (panneau Settings) : survol = aperçu, clic = appliquer
-    settingsOverlay.setProcessor(&audioProcessor);
-    settingsOverlay.setCurrentTemplate((int)audioProcessor.uiTemplate);
-    settingsOverlay.onTemplateHover = [this](int t){
-        if(t==previewTemplate) return;
-        previewTemplate=t;
-        refreshChassis();
+    topBar.onAboutClicked    = [this]{
+        closeOptions();
+        if(aboutOverlay.isVisible()) aboutOverlay.hideAnimated(); else aboutOverlay.showAnimated();
     };
-    settingsOverlay.onTemplateSelected = [this](int t){ setTemplate((LeakAudioProcessor::UiTemplate)t); };
-
-    topBar.onAboutClicked    = [this]{ settingsOverlay.setVisible(false); closeOptions(); aboutOverlay.setVisible(!aboutOverlay.isVisible()); };
-    topBar.onTitleClicked    = [this]{
-        // Duplique exactement l'action du bouton RESET de la barre de contrôles.
+    // RESET de l'en-tête (v1.73) — un clic sur le titre fait la même chose
+    topBar.onResetClicked    = [this]{
         audioProcessor.resetLoudness();
         spectrum.resetAll();
         vuMeter.resetAll();
     };
+    topBar.onTitleClicked    = [this]{ if(topBar.onResetClicked) topBar.onResetClicked(); };
     topBar.onFullScreenClicked = [this]{ if(onToggleFullScreen) onToggleFullScreen(); };
     topBar.onKeyboardToggled   = [this](bool on){ if(host.setKeyboardInMerlin) host.setKeyboardInMerlin(on); };
     topBar.onSettingsClicked = [this]{ openOptions(); };   // menu Options (trois points)
-    topBar.onPresetSelected  = [this](int idx){ applyPreset(idx); };
-    // presets utilisateur (menu PRESET)
+    // presets : au centre de la bande du bas (v1.73)
+    auto& pb=controls.presets;
+    pb.onPresetSelected = [this](int idx){ applyPreset(idx); };
     refreshPresetList();
-    topBar.onUserPresetSelected    = [this](const juce::String& n){ loadUserPreset(n); };
-    topBar.onSavePresetRequested   = [this]{ askSavePreset(); };
-    topBar.onDeletePresetRequested = [this](const juce::String& n){ askDeletePreset(n); };
-    topBar.onOpenPresetFolder      = []{ auto f=LeakAudioProcessor::getPresetFolder(); f.createDirectory(); f.startAsProcess(); };
+    pb.onUserPresetSelected    = [this](const juce::String& n){ loadUserPreset(n); };
+    pb.onSavePresetRequested   = [this]{ askSavePreset(); };
+    pb.onDeletePresetRequested = [this](const juce::String& n){ askDeletePreset(n); };
+    pb.onOpenPresetFolder      = []{ auto f=LeakAudioProcessor::getPresetFolder(); f.createDirectory(); f.startAsProcess(); };
 
     // Interrupteurs thème (lune) / contraste, indépendants du template
     topBar.setLookState(!audioProcessor.lightTint, audioProcessor.highContrast, audioProcessor.modules3D,
@@ -5278,68 +5224,7 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     corrDisplay.onSelectionChanged = [this]{ spectrum.clearBandSelection();    panoDisplay.clearBandSelection(); };
     panoDisplay.onSelectionChanged = [this]{ spectrum.clearBandSelection();    corrDisplay.clearBandSelection(); };
 
-    settingsOverlay.onAccentSelected = [this](int idx){
-        idx = juce::jlimit(0, Theme::NUM_PALETTES-1, idx);
-        audioProcessor.customAccentColor = Theme::palettes[idx].accent;
-        audioProcessor.customGridColor   = Theme::palettes[idx].grid;
-        Theme::applyCustom({audioProcessor.customAccentColor, audioProcessor.customGridColor,
-                             audioProcessor.customBgColor, audioProcessor.customTextColor,
-                             audioProcessor.customSideColor, audioProcessor.customSpectroLowColor,
-                             audioProcessor.customSpectroMidColor, audioProcessor.customSpectroHighColor});
-        settingsOverlay.setColorRoles(Col::accent, Col::grid, Col::bg, Col::textHi, Col::sideCol,
-                                       Col::spectroLow, Col::spectroMid, Col::spectroHigh);
-        repaint();
-    };
-    settingsOverlay.onColorRoleChanged = [this](int role, juce::Colour c){
-        switch(role){
-            case 0: audioProcessor.customAccentColor = c.getARGB(); break;
-            case 1: audioProcessor.customGridColor   = c.getARGB(); break;
-            case 2: audioProcessor.customBgColor     = c.getARGB(); break;
-            case 3: audioProcessor.customTextColor   = c.getARGB(); break;
-            case 4: audioProcessor.customSideColor   = c.getARGB(); break;
-            case 5: audioProcessor.customSpectroLowColor  = c.getARGB(); break;
-            case 6: audioProcessor.customSpectroMidColor  = c.getARGB(); break;
-            case 7: audioProcessor.customSpectroHighColor = c.getARGB(); break;
-            default: return;
-        }
-        Theme::applyCustom({audioProcessor.customAccentColor, audioProcessor.customGridColor,
-                             audioProcessor.customBgColor, audioProcessor.customTextColor,
-                             audioProcessor.customSideColor, audioProcessor.customSpectroLowColor,
-                             audioProcessor.customSpectroMidColor, audioProcessor.customSpectroHighColor});
-        repaint();
-    };
-    settingsOverlay.onColorsReset = [this]{
-        audioProcessor.customAccentColor = 0xFF00FFB2;
-        audioProcessor.customGridColor   = 0xFF0B3030;
-        audioProcessor.customBgColor     = 0xFF030A0A;
-        audioProcessor.customTextColor   = 0xFFC8FFE8;
-        audioProcessor.customSideColor   = 0xFFB266FF;
-        audioProcessor.customSpectroLowColor  = 0xFF333333;
-        audioProcessor.customSpectroMidColor  = 0xFFB0B0B0;
-        audioProcessor.customSpectroHighColor = 0xFF470000;
-        Theme::applyCustom({audioProcessor.customAccentColor, audioProcessor.customGridColor,
-                             audioProcessor.customBgColor, audioProcessor.customTextColor,
-                             audioProcessor.customSideColor, audioProcessor.customSpectroLowColor,
-                             audioProcessor.customSpectroMidColor, audioProcessor.customSpectroHighColor});
-        settingsOverlay.setColorRoles(Col::accent, Col::grid, Col::bg, Col::textHi, Col::sideCol,
-                                       Col::spectroLow, Col::spectroMid, Col::spectroHigh);
-        repaint();
-    };
-    settingsOverlay.onResetLayout = [this]{
-        static const int def[LeakAudioProcessor::NUM_SLOTS] = {1,7,12,4,6,5};
-        for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s) audioProcessor.slotModule[s]=def[s];
-        settingsOverlay.setVisible(false);
-        updateLayout();
-        repaint();
-    };
-    settingsOverlay.onLightCpuToggled = [this](bool on){
-        audioProcessor.lightCpuMode = on;
-        audioProcessor.uiFps = on ? 30 : 60;
-        applyGraphics();
-    };
-    settingsOverlay.setLightCpuMode(audioProcessor.lightCpuMode);
-    settingsOverlay.setColorRoles(Col::accent, Col::grid, Col::bg, Col::textHi, Col::sideCol,
-                                   Col::spectroLow, Col::spectroMid, Col::spectroHigh);
+
     setupOptions();
     applyGraphics();
     applyLanguage();   // textes posés à la construction -> langue choisie
@@ -5352,16 +5237,34 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     setSize(w,h);
     setResizable(true,true);
     setResizeLimits(1024,576,2400,1400);
+    applyUiScale();   // plugin : taille de l'interface (écran principal tant que l'éditeur n'est pas affiché)
     startTimerHz(60);
+}
+
+void LeakEditor::setScaleFactor(float newScale)
+{
+    hostScale=newScale;
+    appliedUiScale=0.f;   // à réappliquer, combinée à la taille choisie
+    applyUiScale();
+}
+
+void LeakEditor::applyUiScale()
+{
+    if(!AppMode::isPlugin){ if(host.uiScaleChanged) host.uiScaleChanged(); return; }
+    const auto& displays=juce::Desktop::getInstance().getDisplays();
+    const auto* d=isShowing() ? displays.getDisplayForRect(getScreenBounds()) : displays.getPrimaryDisplay();
+    const float s=Ui::uiScaleFor(audioProcessor.uiScale, d);
+    if(std::abs(s-appliedUiScale)<0.001f) return;
+    appliedUiScale=s;
+    juce::AudioProcessorEditor::setScaleFactor(hostScale*s);   // la DAW redimensionne sa fenêtre
 }
 LeakEditor::~LeakEditor()
 {
     stopTimer();
-    for(auto& w : detached) w.reset();   // fenêtres détachées fermées (les modules restent à l'éditeur)
+    floating.clear();                    // fenêtres détachées fermées (les modules restent à l'éditeur)
     optionsWindow.reset();               // idem pour la fenêtre des Options
     license->removeChangeListener(this);
     aboutOverlay.removeComponentListener(this);
-    settingsOverlay.removeComponentListener(this);
     optionsOverlay.removeComponentListener(this);
     licenseOverlay.removeComponentListener(this);
     setLookAndFeel(nullptr);
@@ -5397,7 +5300,9 @@ OptionsOverlay::State LeakEditor::optionsState() const
     s.oscPersist = audioProcessor.oscPersist;
     s.oscLineWidth = audioProcessor.oscLineWidth;
     s.oscTraceMode = audioProcessor.oscTraceMode;
-    s.uiTemplate = (int)audioProcessor.uiTemplate;
+    s.uiScale = audioProcessor.uiScale;
+    s.plateTint = audioProcessor.plateTint;
+    s.lightScreens = audioProcessor.lightScreens;
     for(int i=0;i<Theme::NUM_PALETTES;++i){
         s.accentPalette.add(juce::Colour(Theme::palettes[i].accent));
         if(Theme::palettes[i].accent==audioProcessor.customAccentColor) s.accentIndex=i;
@@ -5422,7 +5327,6 @@ void LeakEditor::openOptions()
 {
     if(optionsOverlay.isVisible()){ closeOptions(); return; }
     aboutOverlay.setVisible(false);
-    settingsOverlay.setVisible(false);
     optionsOverlay.refreshTheme(audioProcessor.lightTint);
     optionsOverlay.setState(optionsState());
 
@@ -5497,26 +5401,23 @@ void LeakEditor::setupOptions()
     o.onOscFpsSelected   = [this](int fps){ audioProcessor.oscFps=fps; oscilloscope.syncFromProcessor(); };
     o.onOscLineWidthChanged  = [this](int w){ audioProcessor.oscLineWidth=w; oscilloscope.syncFromProcessor(); };   // curseur, en direct
     o.onOscTraceModeSelected = [this](int m){ audioProcessor.oscTraceMode=m; oscilloscope.syncFromProcessor(); };
+    o.onUiScaleSelected      = [this](int pct){ audioProcessor.uiScale=pct; appliedUiScale=0.f; applyUiScale(); };
+    o.onPlateTintSelected    = [this](int i){ audioProcessor.plateTint=i; applyLook(); };
+    o.onLightScreensSelected = [this](bool on){ audioProcessor.lightScreens=on ? 1 : 0; applyLook(); };
     o.onOscPersistChanged= [this](bool on){ audioProcessor.oscPersist=on; oscilloscope.syncFromProcessor(); };
     o.onMasterConsoleChanged = [this](bool on){
         audioProcessor.masterConsole=on; vuMeter.setConsoleStyle(on);
         masterStyleToggle.setToggleState(on, juce::dontSendNotification);
     };
-    // Apparence (mêmes actions que le panneau des templates)
-    o.onTemplateSelected    = [this](int t){ setTemplate((LeakAudioProcessor::UiTemplate)t); };
-    o.onOpenTemplateGallery = [this]{ closeOptions(); settingsOverlay.setVisible(true); };
-    o.onAccentSelected      = [this](int i){ if(settingsOverlay.onAccentSelected) settingsOverlay.onAccentSelected(i); optionsOverlay.setState(optionsState()); };
-    o.onColourRoleChanged   = [this](int r, juce::Colour c){
-        if(settingsOverlay.onColorRoleChanged) settingsOverlay.onColorRoleChanged(r, c);
-        settingsOverlay.setColorRoles(Col::accent, Col::grid, Col::bg, Col::textHi, Col::sideCol,
-                                       Col::spectroLow, Col::spectroMid, Col::spectroHigh);
-    };
-    o.onColoursReset = [this]{ if(settingsOverlay.onColorsReset) settingsOverlay.onColorsReset(); optionsOverlay.setState(optionsState()); };
+    // Apparence : couleurs des modules
+    o.onAccentSelected    = [this](int i){ selectAccentPalette(i); optionsOverlay.setState(optionsState()); };
+    o.onColourRoleChanged = [this](int r, juce::Colour c){ setColourRole(r, c); };
+    o.onColoursReset      = [this]{ resetColours(); optionsOverlay.setState(optionsState()); };
     // Presets / à propos
     o.onSavePreset       = [this]{ askSavePreset(); };
     o.onOpenPresetFolder = []{ auto f=LeakAudioProcessor::getPresetFolder(); f.createDirectory(); f.startAsProcess(); };
-    o.onResetLayout      = [this]{ if(settingsOverlay.onResetLayout) settingsOverlay.onResetLayout(); closeOptions(); };
-    o.onOpenAbout        = [this]{ closeOptions(); aboutOverlay.setVisible(true); };
+    o.onResetLayout      = [this]{ resetLayout(); closeOptions(); };
+    o.onOpenAbout        = [this]{ closeOptions(); aboutOverlay.showAnimated(); };
     o.onOpenLicence      = [this]{ openLicence(); };
     // ligne Version : pastille α de Merlin au format des pictogrammes (carré arrondi 28 px)
     o.drawAppBadge = [](juce::Graphics& g, juce::Rectangle<float> r){
@@ -5541,7 +5442,7 @@ void LeakEditor::setupOptions()
 //==============================================================================
 void LeakEditor::refreshPresetList()
 {
-    topBar.setPresetList(audioProcessor.getUserPresetNames(), audioProcessor.currentPresetName);
+    controls.presets.setPresetList(audioProcessor.getUserPresetNames(), audioProcessor.currentPresetName);
 }
 
 void LeakEditor::loadUserPreset(const juce::String& name)
@@ -5557,12 +5458,7 @@ void LeakEditor::reloadFromProcessor()
 {
     reattachAll();   // preset rappelé : disposition d'origine, modules dans l'éditeur
     // apparence
-    Theme::applyCustom({audioProcessor.customAccentColor, audioProcessor.customGridColor,
-                         audioProcessor.customBgColor, audioProcessor.customTextColor,
-                         audioProcessor.customSideColor, audioProcessor.customSpectroLowColor,
-                         audioProcessor.customSpectroMidColor, audioProcessor.customSpectroHighColor});
-    settingsOverlay.setColorRoles(Col::accent, Col::grid, Col::bg, Col::textHi, Col::sideCol,
-                                   Col::spectroLow, Col::spectroMid, Col::spectroHigh);
+    applyColours();
     syncTopBarLook();
     masterStyleToggle.setToggleState(audioProcessor.masterConsole, juce::dontSendNotification);
     vuMeter.setConsoleStyle(audioProcessor.masterConsole);
@@ -5581,7 +5477,7 @@ void LeakEditor::reloadFromProcessor()
 
     // teinte, template, taille du texte et disposition des slots
     applyLook();
-    setTemplate(audioProcessor.uiTemplate);
+    refreshChassis();
     applyTextScale();
     updateLayout();
     repaint();
@@ -5642,6 +5538,9 @@ void LeakEditor::timerCallback()
     loudnessPanel.update();
     topBar.setSampleRate(audioProcessor.getCurrentSampleRate());   // LCD sous le titre
     followDetachDrag();   // module qu'on est en train de détacher : la fenêtre suit la souris
+    // plugin en taille Auto : l'écran (donc l'échelle) peut changer quand la DAW
+    // déplace sa fenêtre — vérifié une fois par seconde
+    if(AppMode::isPlugin && audioProcessor.uiScale==0 && ++uiScaleCheckTicks>=60){ uiScaleCheckTicks=0; applyUiScale(); }
     // le Spectrum caché ne calcule plus : seul son état visible compte
     topBar.setGlitch(vuMeter.isClipping() || (spectrum.isVisible() && spectrum.isGlobalClipping()));
 }
@@ -5653,7 +5552,6 @@ juce::Component* LeakEditor::getComponentForModule(int id)
     switch((M)id){
         case M::Vectorscope:   return &vectorscope;
         case M::Oscilloscope:  return &oscilloscope;
-        case M::Transient:     return &transient;
         case M::Loudness:      return &loudnessPanel;
         case M::VuMeter:       return &vuMeter;
         case M::Spectrum:      return &spectrum;
@@ -5690,13 +5588,14 @@ void LeakEditor::mouseDown(const juce::MouseEvent& e)
     if(!isOwnMouseEvent(e)) return;   // module détaché : sa fenêtre n'est plus dans l'éditeur
     const auto pt = e.getEventRelativeTo(this).getPosition();
     if(!e.mods.isRightButtonDown()){
-        if(rcCollapseHandle.contains(pt)){
-            startCollapseAnimation(!controlsCollapsed);
+        const int slot = hitTestSlot(pt);
+        // emplacement d'un module détaché, partagé en deux : le ramener, ou en
+        // mettre un autre (la fenêtre reste ouverte)
+        if(isDetached(slot)){
+            if(detachedHalf(slot, true).contains(pt)) showModuleMenu(slot, e.getScreenPosition());
+            else                                       reattachSlot(slot);
             return;
         }
-        const int slot = hitTestSlot(pt);
-        // emplacement d'un module détaché : le clic le ramène
-        if(isDetached(slot)){ reattachSlot(slot); return; }
         // titre d'un module (bande du haut) : candidat au détachement, si on tire
         if(!AppMode::isPlugin && slot>=0 && slot!=5 && e.eventComponent!=this
            && getComponentForModule(audioProcessor.slotModule[slot])!=nullptr
@@ -5738,18 +5637,20 @@ void LeakEditor::mouseUp(const juce::MouseEvent&)
 
 void LeakEditor::detachSlot(int s)
 {
-    auto* comp=getComponentForModule(audioProcessor.slotModule[s]);
-    if(comp==nullptr || isDetached(s) || s==5){ dragFollowing=false; dragSlot=-1; return; }
+    const int module=audioProcessor.slotModule[s];
+    auto* comp=getComponentForModule(module);
+    if(comp==nullptr || isDetached(s) || s==5 || floatingFor(module)!=nullptr){ dragFollowing=false; dragSlot=-1; return; }
 
     beginWindowSwap();   // contextes OpenGL lâchés pendant le transfert, comme pour le plein écran
     removeChildComponent(comp);
-    const auto title=juce::String(juce::CharPointer_UTF8("Merlin \xce\xb1 \xc2\xb7 "))+slotModuleName(audioProcessor.slotModule[s]);
-    detached[(size_t)s]=std::make_unique<DetachedWindow>(title, *comp,
-        [sp=juce::Component::SafePointer<LeakEditor>(this), s]{
-            // fermeture : retour à l'emplacement (hors du rappel de la fenêtre qui va disparaître)
-            juce::MessageManager::callAsync([sp, s]{ if(sp!=nullptr) sp->reattachSlot(s); });
-        });
-    auto& w=*detached[(size_t)s];
+    const auto title=juce::String(juce::CharPointer_UTF8("Merlin \xce\xb1 \xc2\xb7 "))+slotModuleName(module);
+    // fermeture : le module revient à l'éditeur, dans son emplacement s'il l'attend
+    // encore, sinon il disparaît (hors du rappel de la fenêtre qui va disparaître)
+    floating.push_back(FloatingModule{ module, s, std::make_unique<DetachedWindow>(title, *comp,
+        [sp=juce::Component::SafePointer<LeakEditor>(this), module]{
+            juce::MessageManager::callAsync([sp, module]{ if(sp!=nullptr) sp->dockFloating(module); });
+        }) });
+    auto& w=*floating.back().window;
     w.setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab);
     comp->setVisible(true);
     w.addToDesktop();
@@ -5770,7 +5671,8 @@ void LeakEditor::detachSlot(int s)
 void LeakEditor::followDetachDrag()
 {
     if(!dragFollowing) return;
-    auto* w=isDetached(dragSlot) ? detached[(size_t)dragSlot].get() : nullptr;
+    auto* f=dragSlot>=0 ? floatingFor(audioProcessor.slotModule[dragSlot]) : nullptr;
+    auto* w=f!=nullptr ? f->window.get() : nullptr;
     if(!juce::ModifierKeys::getCurrentModifiersRealtime().isLeftButtonDown()){
         dragFollowing=false;
         dragSlot=-1;
@@ -5780,17 +5682,39 @@ void LeakEditor::followDetachDrag()
         w->setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab);
 }
 
+LeakEditor::FloatingModule* LeakEditor::floatingFor(int module)
+{
+    for(auto& f : floating)
+        if(f.module==module) return &f;
+    return nullptr;
+}
+
+bool LeakEditor::isDetached(int s) const
+{
+    if(s<0 || s>=LeakAudioProcessor::NUM_SLOTS) return false;
+    for(const auto& f : floating)
+        if(f.homeSlot==s && f.module==audioProcessor.slotModule[s]) return true;
+    return false;
+}
+
 void LeakEditor::reattachSlot(int s)
 {
-    if(!isDetached(s)) return;
-    if(dragSlot==s){ dragFollowing=false; dragSlot=-1; }
+    if(isDetached(s)) dockFloating(audioProcessor.slotModule[s]);
+}
+
+void LeakEditor::dockFloating(int module)
+{
+    const auto it=std::find_if(floating.begin(), floating.end(), [module](const FloatingModule& f){ return f.module==module; });
+    if(it==floating.end()) return;
+    if(dragSlot>=0 && audioProcessor.slotModule[dragSlot]==module){ dragFollowing=false; dragSlot=-1; }
     beginWindowSwap();
-    detached[(size_t)s]->clearContentComponent();
-    detached[(size_t)s].reset();
-    if(auto* comp=getComponentForModule(audioProcessor.slotModule[s]))
+    it->window->clearContentComponent();
+    floating.erase(it);
+    if(auto* comp=getComponentForModule(module))
         addChildComponent(comp, getIndexOfChildComponent(&overlayLayer));   // sous le calque des bords et les panneaux
+    if(hoverDetachedSlot>=0){ hoverDetachedSlot=-1; setMouseCursor(juce::MouseCursor::NormalCursor); }
     layoutDirty=true;
-    updateLayout();
+    updateLayout();   // affiché s'il a un emplacement, caché sinon
     repaint();
     juce::Timer::callAfterDelay(150, [sp=juce::Component::SafePointer<LeakEditor>(this)]{
         if(sp!=nullptr) sp->endWindowSwap();
@@ -5801,9 +5725,9 @@ void LeakEditor::setKeyboardState(bool b)
 {
     topBar.setKeyboardState(b);
     keyboardState=b;
-    for(auto& w : detached)
-        if(w!=nullptr)
-            if(auto* peer=w->getPeer())
+    for(auto& f : floating)
+        if(f.window!=nullptr)
+            if(auto* peer=f.window->getPeer())
                 WindowsDisplay::setNoActivate(peer->getNativeHandle(), !b);
     if(optionsWindow!=nullptr)
         if(auto* peer=optionsWindow->getPeer())
@@ -5812,38 +5736,100 @@ void LeakEditor::setKeyboardState(bool b)
 
 void LeakEditor::reattachAll()
 {
-    for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
-        reattachSlot(s);
+    while(!floating.empty())
+        dockFloating(floating.front().module);
 }
 
-// emplacement d'un module détaché : creux de la plaque + rappel cliquable
+// creux partagé : côte à côte dans un emplacement large, l'une au-dessus de
+// l'autre dans un étroit ; « ramener » à gauche / en haut
+juce::Rectangle<int> LeakEditor::detachedHalf(int s, bool addHalf) const
+{
+    const auto r=rcSlot[s];
+    if(r.getWidth()>=r.getHeight())
+        return addHalf ? r.withTrimmedLeft(r.getWidth()/2) : r.withWidth(r.getWidth()/2);
+    return addHalf ? r.withTrimmedTop(r.getHeight()/2) : r.withHeight(r.getHeight()/2);
+}
+
+// emplacement d'un module détaché : un seul creux, partagé par un filet
 void LeakEditor::drawDetachedSlot(juce::Graphics& g, int s)
 {
     const auto r=rcSlot[s].toFloat();
     Neu::drawInset(g, r, kScreenRadius, 3.f);
+    g.setColour(Neu::light ? juce::Colours::black.withAlpha(0.12f) : juce::Colours::white.withAlpha(0.10f));
+    if(r.getWidth()>=r.getHeight()) g.fillRect(r.getCentreX()-0.5f, r.getY()+r.getHeight()*0.18f, 1.f, r.getHeight()*0.64f);
+    else                            g.fillRect(r.getX()+r.getWidth()*0.14f, r.getCentreY()-0.5f, r.getWidth()*0.72f, 1.f);
+    drawDetachedHalf(g, s, false, false);
+    drawDetachedHalf(g, s, true,  false);
+}
 
+// une moitié : pictogramme, titre, légende (courte si la moitié est étroite) ;
+// survolée : teinte claire et accent, peinte par-dessus le châssis en cache
+void LeakEditor::drawDetachedHalf(juce::Graphics& g, int s, bool addHalf, bool hover)
+{
+    const auto r=detachedHalf(s, addHalf).toFloat();
     const float sc=Ui::textScale;
+    if(hover){
+        const auto tint=r.reduced(8.f);
+        g.setColour(Neu::well);
+        g.fillRoundedRectangle(tint, 10.f);
+        g.setColour(juce::Colours::white.withAlpha(Neu::light ? 0.35f : 0.035f));
+        g.fillRoundedRectangle(tint, 10.f);
+    }
+    const auto ink=hover ? Neu::accentInk() : Neu::textDim;
     const auto c=r.getCentre();
-    // pictogramme « fenêtre » (deux fenêtres + flèche vers l'extérieur), viewBox 24
-    static const juce::Path icon=[]{
+    // pictogrammes viewBox 24 : fenêtre (deux fenêtres + flèche vers l'extérieur) / carré « + »
+    static const juce::Path windowIcon=[]{
         juce::Path p=juce::Drawable::parseSVGPath("M8 7V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-3M14 10l5-5M15 5h4v4");
         p.addRoundedRectangle(3.f, 7.f, 13.f, 12.f, 2.f);
         return p;
     }();
+    static const juce::Path addIcon=[]{
+        juce::Path p=juce::Drawable::parseSVGPath("M12 8v8M8 12h8");
+        p.addRoundedRectangle(3.f, 3.f, 18.f, 18.f, 4.f);
+        return p;
+    }();
     const float k=30.f*sc/24.f;
-    auto ic=icon;
+    auto ic=addHalf ? addIcon : windowIcon;
     ic.applyTransform(juce::AffineTransform::scale(k).translated(c.x-12.f*k, c.y-34.f*sc));
-    g.setColour(Neu::textDim);
+    g.setColour(ink);
     g.strokePath(ic, juce::PathStrokeType(1.6f*k, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-    g.setColour(Neu::text);
-    g.setFont(Ui::iceland(13.f).withExtraKerningFactor(0.12f));
-    g.drawText(slotModuleName(audioProcessor.slotModule[s]).toUpperCase(),
-               juce::Rectangle<float>(r.getX(), c.y+2.f*sc, r.getWidth(), 18.f*sc), juce::Justification::centred, true);
+    const bool wide=r.getWidth()>=230.f*sc;
+    const juce::String title=addHalf ? TR(wide ? "Ajouter un module" : "Ajouter").toUpperCase()
+                                     : slotModuleName(audioProcessor.slotModule[s]).toUpperCase();
+    const juce::String caption=addHalf ? TR(wide ? "la fenêtre reste ouverte" : "un autre module")
+                                       : TR(wide ? "dans une fenêtre · cliquer pour le ramener" : "ramener");
+    const float tw=r.getWidth()-16.f;
+    g.setColour(hover ? Neu::accentInk() : Neu::text);
+    g.setFont(Ui::fitFont(Ui::iceland(13.f).withExtraKerningFactor(0.12f), title, tw));
+    g.drawText(title, juce::Rectangle<float>(r.getX()+8.f, c.y+2.f*sc, tw, 18.f*sc), juce::Justification::centred, false);
     g.setColour(Neu::textDim);
-    g.setFont(Ui::plain(11.f));
-    g.drawText(TR("dans une fenêtre · cliquer pour le ramener"),
-               juce::Rectangle<float>(r.getX()+8.f, c.y+22.f*sc, r.getWidth()-16.f, 16.f*sc), juce::Justification::centred, true);
+    g.setFont(Ui::fitFont(Ui::plain(11.f), caption, tw));
+    g.drawText(caption, juce::Rectangle<float>(r.getX()+8.f, c.y+22.f*sc, tw, 16.f*sc), juce::Justification::centred, false);
+}
+
+void LeakEditor::mouseMove(const juce::MouseEvent& e)
+{
+    int slot=-1; bool add=false;
+    if(isOwnMouseEvent(e)){
+        const auto pt=e.getEventRelativeTo(this).getPosition();
+        const int s=hitTestSlot(pt);
+        if(isDetached(s)){ slot=s; add=detachedHalf(s, true).contains(pt); }
+    }
+    if(slot==hoverDetachedSlot && (slot<0 || add==hoverDetachedAdd)) return;
+    if(hoverDetachedSlot>=0) repaint(rcSlot[hoverDetachedSlot]);
+    hoverDetachedSlot=slot;
+    hoverDetachedAdd=add;
+    if(slot>=0) repaint(rcSlot[slot]);
+    setMouseCursor(slot>=0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+}
+
+void LeakEditor::mouseExit(const juce::MouseEvent& e)
+{
+    if(e.eventComponent!=this || hoverDetachedSlot<0) return;   // sortie d'un module : rien à effacer
+    repaint(rcSlot[hoverDetachedSlot]);
+    hoverDetachedSlot=-1;
+    setMouseCursor(juce::MouseCursor::NormalCursor);
 }
 
 //==============================================================================
@@ -5928,9 +5914,10 @@ void SlotMenuLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Recta
         const float bw=juce::GlyphArrangement::getStringWidth(bf, badge)+12.f*s;
         const auto chip=r.removeFromRight(bw).withSizeKeepingCentre(bw, 15.f*s);
         const bool gpu=badge=="GPU";
-        g.setColour(juce::Colour(gpu ? 0xFF2D2550 : 0xFF173A35));
+        const bool win=badge==TR("Fenêtre").toUpperCase();   // module détaché
+        g.setColour(win ? Col::accent.withAlpha(0.16f) : juce::Colour(gpu ? 0xFF2D2550 : 0xFF173A35));
         g.fillRoundedRectangle(chip, 4.f);
-        g.setColour(juce::Colour(gpu ? 0xFFC4B5FF : 0xFF7DFFD9));
+        g.setColour(win ? Col::accent : juce::Colour(gpu ? 0xFFC4B5FF : 0xFF7DFFD9));
         g.setFont(bf);
         g.drawText(badge, chip, juce::Justification::centred, false);
         r.removeFromRight(6.f*s);
@@ -6035,14 +6022,6 @@ static std::unique_ptr<juce::Drawable> makeModuleIcon(int moduleId)
             p.startNewSubPath(0.f,S*0.5f);
             p.cubicTo(S*0.18f,0.f,   S*0.32f,0.f,   S*0.5f,S*0.5f);
             p.cubicTo(S*0.68f,S,     S*0.82f,S,     S,S*0.5f);
-            break;
-
-        case M::Transient:
-            p.startNewSubPath(0.f,S*0.82f);
-            p.lineTo(S*0.36f,S*0.82f);
-            p.lineTo(S*0.5f,S*0.08f);
-            p.lineTo(S*0.64f,S*0.82f);
-            p.lineTo(S,S*0.82f);
             break;
 
         case M::Spectrum:
@@ -6239,9 +6218,9 @@ static std::unique_ptr<juce::Drawable> makeModuleIcon(int moduleId)
 
 void LeakEditor::showModuleMenu(int slot, juce::Point<int> screenPos)
 {
-    reattachAll();   // un module ne change de place que s'il est dans l'éditeur
     // Design A "liste sectionnée" : en-tête (slot + module en place), modules
-    // rangés par famille avec badges GPU / 3D, "Vider le slot" à part en bas.
+    // rangés par famille avec badges GPU / 3D (ou FENÊTRE pour un module
+    // détaché, que le choisir ramène ici), "Vider le slot" à part en bas.
     juce::PopupMenu m;
     m.setLookAndFeel(&slotMenuLaf);
     // Numérotation séquentielle des slots configurables (1 à 5) — le slot fixe F
@@ -6249,7 +6228,8 @@ void LeakEditor::showModuleMenu(int slot, juce::Point<int> screenPos)
     static const int configurableSlots[] = {0,1,2,3,4};
     int displayNum = slot+1;
     for(int i=0;i<5;++i) if(configurableSlots[i]==slot) { displayNum=i+1; break; }
-    const int cur = audioProcessor.slotModule[slot];
+    // emplacement quitté par son module (dans une fenêtre) : vide pour le menu
+    const int cur = isDetached(slot) ? 0 : audioProcessor.slotModule[slot];
 
     {
         juce::PopupMenu::Item header;
@@ -6265,7 +6245,8 @@ void LeakEditor::showModuleMenu(int slot, juce::Point<int> screenPos)
             item.itemID = e.id+1;
             item.isTicked = (cur==e.id);
             item.image = makeModuleIcon(e.id);
-            item.shortcutKeyDescription = e.badge;   // dessiné en badge par SlotMenuLookAndFeel
+            // dessiné en badge par SlotMenuLookAndFeel
+            item.shortcutKeyDescription = floatingFor(e.id)!=nullptr ? TR("Fenêtre").toUpperCase() : juce::String(e.badge);
             m.addItem(std::move(item));
         }
     }
@@ -6295,6 +6276,8 @@ void LeakEditor::showModuleMenu(int slot, juce::Point<int> screenPos)
         [this, slot](int result){
             if(result <= 0) return;
             const int newId = result - 1;
+            // module dans une fenêtre : sa fenêtre se ferme, il vient ici
+            if(newId != 0) dockFloating(newId);
             // Si le module demandé est déjà dans un autre slot → le vider
             for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
                 if(s!=slot && audioProcessor.slotModule[s]==newId)
@@ -6311,14 +6294,16 @@ void LeakEditor::updateLayout()
     // Toute la mise en page se fait dans la plaque, en retrait du cadre nature.
     // Marges et écarts laissent la place aux cartes neumorphiques (saillie de
     // kCardPad + ombres) autour de chaque écran.
-    const auto plate=getLocalBounds().reduced(frameWidth());
+    const auto plate=getLocalBounds();
     const int W=plate.getWidth(), H=plate.getHeight();
-    const int titleH=juce::jlimit(36,52,H*8/100);
-    const int ctrlH =juce::roundToInt((float)juce::jlimit(54,68,H*10/100)*Ui::textScale);   // suit la taille de texte
-    const int handleH=12;   // poignée toujours visible, même repliée
-    const int gapHC  =8;    // espace entre la poignée et la barre de paramètres
-    // repli animé : la hauteur de la barre suit collapseAnim (0 = dépliée)
-    const int bottomH=handleH+juce::roundToInt((1.f-collapseAnim)*(float)(gapHC+ctrlH));
+    // v1.74 : la bande du bas rend 16 px de marges vides à l'en-tête ; les
+    // modules gardent la même hauteur
+    constexpr int kBandToHeader=16;
+    const int titleH=juce::jlimit(36,52,H*8/100)+kBandToHeader;
+    // bande du bas fixe (design de Sunny, v1.73) : une rangée de contrôles,
+    // plus de tiroir repliable ; suit la taille de texte
+    const int ctrlH =juce::roundToInt((float)juce::jlimit(30,36,H*5/100)*Ui::textScale);
+    const int bandSpace=ctrlH+26-kBandToHeader;   // du bas de l'écran E au bas de la plaque
     const int M=18, G=20;
     const int topH  =juce::jlimit(140,300,H*34/100);
     const int innerW=W-2*M;
@@ -6343,30 +6328,30 @@ void LeakEditor::updateLayout()
     rcSlot[3]={x,topY,loudW,topH};               // slot D (LUFS)
 
     const int specY   =topY+topH+G;
-    const int ctrlYtop=H-bottomH-M;
-    const int specH   =juce::jmax(40, ctrlYtop-specY-G);
+    const int specH   =juce::jmax(40, H-bandSpace-specY);
+    // bande centrée sur la hauteur entre la carte de l'écran E (qui déborde de
+    // kCardPad) et le bas de la plaque
+    const int ctrlYtop=juce::roundToInt(((float)(specY+specH)+kCardPad+(float)H-(float)ctrlH)*0.5f);
     rcSlot[4]={M,            specY, topInnerW,        specH};          // slot E (configurable, prend toute la largeur en bas)
     // slot F (VU Meter, pleine hauteur, à droite du LUFS, aussi bas que le slot E) ;
-    // l'interrupteur de style de la section master est posé dessous, dans la
-    // rangée de la poignée de repli : le VU garde toute la hauteur
-    const int mtH=juce::jlimit(20,26,titleH*55/100), mtW=juce::roundToInt((float)mtH*2.3f);
+    // l'interrupteur de style de la section master est au bout de la bande,
+    // sous la colonne du VU : le VU garde toute la hauteur
+    const int mtH=juce::jlimit(20,26,(titleH-kBandToHeader)*55/100), mtW=juce::roundToInt((float)mtH*2.3f);
     rcSlot[5]={M+innerW-vuW, topY,  vuW, topH+G+specH};
-    juce::Rectangle<int> rcMasterToggle(rcSlot[5].getCentreX()-mtW/2, ctrlYtop+(handleH-mtH)/2, mtW, mtH);
+    juce::Rectangle<int> rcMasterToggle(rcSlot[5].getCentreX()-mtW/2, ctrlYtop+(ctrlH-mtH)/2, mtW, mtH);
 
     rcTitle={0,0,W,titleH};
-    rcCollapseHandle={M,ctrlYtop,innerW,handleH};
-    rcCtrl ={M,ctrlYtop+handleH+gapHC,innerW,ctrlH};
+    rcCtrl ={M,ctrlYtop,juce::jmax(100, rcMasterToggle.getX()-14-M),ctrlH};
 
     for(auto& r : rcSlot) r.translate(plate.getX(),plate.getY());
     rcMasterToggle  .translate(plate.getX(),plate.getY());
     masterStyleToggle.setBounds(rcMasterToggle);
     rcTitle         .translate(plate.getX(),plate.getY());
-    rcCollapseHandle.translate(plate.getX(),plate.getY());
     rcCtrl          .translate(plate.getX(),plate.getY());
 
     // Masquer tous les modules configurables
     juce::Component* const allModules[] = {
-        &vectorscope, &oscilloscope, &transient,
+        &vectorscope, &oscilloscope,
         &spectrum, &corrDisplay, &panoDisplay, &panoLed,
         &spectralDensity, &needleVu, &mbVectorscope,
         &spectro3dPeaks, &spectro3dSurface,
@@ -6381,6 +6366,7 @@ void LeakEditor::updateLayout()
     for(auto* c : allModules){
         bool used=false;
         for(int s : configurableSlots) used = used || getComponentForModule(audioProcessor.slotModule[s])==c;
+        for(const auto& f : floating)  used = used || getComponentForModule(f.module)==c;   // vit dans sa fenêtre
         if(!used) c->setVisible(false);
     }
     for(int s : configurableSlots){
@@ -6395,19 +6381,9 @@ void LeakEditor::updateLayout()
     vuMeter      .setBounds(rcSlot[5]); vuMeter      .setVisible(true);
 
     topBar      .setBounds(rcTitle);
-    // la barre garde sa taille et glisse sous le bord de la plaque : le tiroir
-    // la découpe, elle s'efface en même temps
-    {
-        const int drawerBottom=plate.getBottom()-4;
-        controlsDrawer.setBounds(rcCtrl.withBottom(juce::jmax(rcCtrl.getY(), juce::jmin(rcCtrl.getBottom(), drawerBottom))));
-        controls.setBounds(0, 0, rcCtrl.getWidth(), rcCtrl.getHeight());
-        const float open=1.f-collapseAnim;
-        controls.setAlpha(collapseAnimating ? juce::jlimit(0.f, 1.f, open*open) : 1.f);
-        controlsDrawer.setVisible(open>0.001f);
-    }
+    controls       .setBounds(rcCtrl);   // bande du bas (fixe)
     overlayLayer   .setBounds(getLocalBounds());
     aboutOverlay   .setBounds(getLocalBounds());
-    settingsOverlay.setBounds(getLocalBounds());
     if(optionsWindow==nullptr)   // sinon le panneau suit sa propre fenêtre
         optionsOverlay.setBounds(getLocalBounds());
     licenseOverlay .setBounds(getLocalBounds());
@@ -6458,7 +6434,7 @@ void LeakEditor::applyFrameRate(int hz)
         appliedFrameRate[&m]=want;
         m.setFrameRateHz(want);
     };
-    rate(vectorscope);  rate(transient);   // oscilloscope : GPU, cadence via applyGraphics
+    rate(vectorscope);   // oscilloscope : GPU, cadence via applyGraphics
     rate(spectrum);     rate(corrDisplay);  rate(panoDisplay);  rate(panoLed);
     rate(spectralDensity); rate(needleVu);  rate(mbVectorscope);
     rate(spectro3dPeaks);  rate(spectro3dSurface);
@@ -6471,7 +6447,6 @@ void LeakEditor::applyGraphics()
     applyFrameRate(audioProcessor.uiFps);
     for(auto* g : gpuModules())
         g->setGraphics(audioProcessor.gpuMsaa, audioProcessor.gpuVsync, audioProcessor.uiFps);
-    settingsOverlay.setLightCpuMode(audioProcessor.lightCpuMode);
 }
 
 // Licence : pastille DÉMO, feuille imposée tant que Merlin n'est ni activé ni en démo
@@ -6488,7 +6463,6 @@ void LeakEditor::updateLicenseUi()
 void LeakEditor::openLicence()
 {
     aboutOverlay.setVisible(false);
-    settingsOverlay.setVisible(false);
     closeOptions();
     OptionsUi::lightTheme()=audioProcessor.lightTint;   // feuille au thème de Merlin
     licenseOverlay.open();
@@ -6498,7 +6472,7 @@ void LeakEditor::updateGpuSuspension()
 {
     // Options dans leur propre fenêtre (appli) : rien ne recouvre les modules
     const bool optionsOver=optionsOverlay.isVisible() && optionsWindow==nullptr;
-    const bool covered=aboutOverlay.isVisible() || settingsOverlay.isVisible() || optionsOver
+    const bool covered=aboutOverlay.isVisible() || optionsOver
                        || licenseOverlay.isVisible() || windowSwaps>0;
     for(auto* g : gpuModules())
         g->setSuspended(covered);
@@ -6506,29 +6480,23 @@ void LeakEditor::updateGpuSuspension()
 
 void LeakEditor::resized()
 {
-    audioProcessor.editorWidth  = getWidth();
-    audioProcessor.editorHeight = getHeight();
+    // pas pendant la construction : applyTextScale() relance la mise en page
+    // alors que l'éditeur fait encore 0×0, ce qui effaçait la taille mémorisée
+    // (l'éditeur rouvrait toujours en 1024×576)
+    if(getWidth()>0 && getHeight()>0){
+        audioProcessor.editorWidth  = getWidth();
+        audioProcessor.editorHeight = getHeight();
+    }
     updateLayout();
 }
 
 //==============================================================================
 // Templates : châssis neumorphique (sombre / clair) + décor nature éventuel
 //==============================================================================
-LeakAudioProcessor::UiTemplate LeakEditor::shownTemplate() const
-{
-    return previewTemplate>=0 ? (LeakAudioProcessor::UiTemplate)previewTemplate : audioProcessor.uiTemplate;
-}
-
-int LeakEditor::frameWidth() const
-{
-    return Templates::get(shownTemplate()).decor==Templates::Decor::None ? 0 : kFrameWidthDecor;
-}
-
 void LeakEditor::refreshChassis()
 {
-    // le template affiché est lu par shownTemplate() (aperçu ou mémorisé)
-    cacheTemplate=-1;   // force la reconstruction des caches du châssis
-    updateLayout();     // la largeur du cadre dépend du template
+    layoutDirty=true;   // force la reconstruction des caches du châssis
+    updateLayout();
     repaint();
 }
 
@@ -6543,7 +6511,7 @@ void LeakEditor::applyTextScale()
         c.resized();
     };
     relayout(*this);
-    cacheTemplate=-1;
+    layoutDirty=true;
     repaint();
 }
 
@@ -6555,6 +6523,7 @@ void LeakEditor::applyLanguage()
 {
     Lang::set(audioProcessor.language);
     topBar.retranslate();
+    controls.presets.retranslate();
     licenseOverlay.refresh();
     updateLicenseUi();   // pastille DÉMO
     masterStyleToggle.setTooltip(TR("Master meter: Instrument / Console"));
@@ -6569,11 +6538,69 @@ void LeakEditor::applyLanguage()
     repaintAll(*this);
 }
 
+// palette des modules depuis les couleurs mémorisées (écrans Papier compris)
+void LeakEditor::applyColours()
+{
+    Theme::applyCustom({audioProcessor.customAccentColor, audioProcessor.customGridColor,
+                         audioProcessor.customBgColor, audioProcessor.customTextColor,
+                         audioProcessor.customSideColor, audioProcessor.customSpectroLowColor,
+                         audioProcessor.customSpectroMidColor, audioProcessor.customSpectroHighColor});
+}
+
+void LeakEditor::selectAccentPalette(int idx)
+{
+    idx = juce::jlimit(0, Theme::NUM_PALETTES-1, idx);
+    audioProcessor.customAccentColor = Theme::palettes[idx].accent;
+    audioProcessor.customGridColor   = Theme::palettes[idx].grid;
+    applyColours();
+    repaint();
+}
+
+void LeakEditor::setColourRole(int role, juce::Colour c)
+{
+    switch(role){
+        case 0: audioProcessor.customAccentColor = c.getARGB(); break;
+        case 1: audioProcessor.customGridColor   = c.getARGB(); break;
+        case 2: audioProcessor.customBgColor     = c.getARGB(); break;
+        case 3: audioProcessor.customTextColor   = c.getARGB(); break;
+        case 4: audioProcessor.customSideColor   = c.getARGB(); break;
+        case 5: audioProcessor.customSpectroLowColor  = c.getARGB(); break;
+        case 6: audioProcessor.customSpectroMidColor  = c.getARGB(); break;
+        case 7: audioProcessor.customSpectroHighColor = c.getARGB(); break;
+        default: return;
+    }
+    applyColours();
+    repaint();
+}
+
+void LeakEditor::resetColours()
+{
+    audioProcessor.customAccentColor = 0xFF00FFB2;
+    audioProcessor.customGridColor   = 0xFF0B3030;
+    audioProcessor.customBgColor     = 0xFF030A0A;
+    audioProcessor.customTextColor   = 0xFFC8FFE8;
+    audioProcessor.customSideColor   = 0xFFB266FF;
+    audioProcessor.customSpectroLowColor  = 0xFF333333;
+    audioProcessor.customSpectroMidColor  = 0xFFB0B0B0;
+    audioProcessor.customSpectroHighColor = 0xFF470000;
+    applyColours();
+    repaint();
+}
+
+void LeakEditor::resetLayout()
+{
+    static const int def[LeakAudioProcessor::NUM_SLOTS] = {1,7,12,4,6,5};
+    for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s) audioProcessor.slotModule[s]=def[s];
+    updateLayout();
+    repaint();
+}
+
 void LeakEditor::applyLook()
 {
-    Neu::apply(audioProcessor.lightTint, audioProcessor.highContrast);
-    settingsOverlay.invalidateThumbs();
-    cacheTemplate=-1;
+    Neu::apply(audioProcessor.lightTint, audioProcessor.highContrast, audioProcessor.plateTint==1, audioProcessor.lightScreens!=0);
+    // écrans Papier ou noirs : la palette des modules suit le thème
+    applyColours();
+    layoutDirty=true;
     updateLayout();
     repaint();
     // modules OpenGL : leur calque 2D (coins de la lunette) n'est refait que
@@ -6582,19 +6609,8 @@ void LeakEditor::applyLook()
     if(licenseOverlay.isVisible()){ OptionsUi::lightTheme()=audioProcessor.lightTint; licenseOverlay.refresh(); }
 }
 
-void LeakEditor::setTemplate(LeakAudioProcessor::UiTemplate t)
-{
-    audioProcessor.uiTemplate=t;
-    previewTemplate=-1;
-    settingsOverlay.setCurrentTemplate((int)t);
-    refreshChassis();
-}
-
 // Châssis mis en cache à la résolution physique : rien de ce qui suit n'est
 // redessiné à chaque image des modules.
-// Écrans qui bougent quand la barre de contrôles se replie (E = bas, F = master)
-static bool isDynamicSlot(int s) { return s==4 || s==5; }
-
 // carte en saillie + lunette sombre autour d'un écran
 static void drawScreenCard(juce::Graphics& g, juce::Rectangle<float> r)
 {
@@ -6608,40 +6624,25 @@ static void drawScreenCaps(juce::Graphics& g, juce::Rectangle<float> r)
     Neu::drawScreenGlass(g, r);
 }
 
-void LeakEditor::rebuildChassisCaches(float pxScale, bool withDynamic)
+void LeakEditor::rebuildChassisCaches(float pxScale)
 {
-    using Decor=Templates::Decor;
-    const auto& info=Templates::get(shownTemplate());
-    const bool  decor=info.decor!=Decor::None;
     const int W=getWidth(), H=getHeight();
     const int pw=juce::jmax(1,juce::roundToInt((float)W*pxScale));
     const int ph=juce::jmax(1,juce::roundToInt((float)H*pxScale));
-    cacheScale=pxScale; cacheW=W; cacheH=H; cacheTemplate=(int)shownTemplate(); layoutDirty=false;
+    cacheScale=pxScale; cacheW=W; cacheH=H; layoutDirty=false;
 
-    const auto plateR=getLocalBounds().toFloat().reduced((float)frameWidth());
-    juce::Path plateP; plateP.addRoundedRectangle(plateR, decor ? kPlateCornerRadius : 0.f);
+    const auto plateR=getLocalBounds().toFloat();
+    juce::Path plateP; plateP.addRectangle(plateR);
 
     juce::Array<juce::Rectangle<float>> screens;   // écrans des modules
     for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
-        if(!rcSlot[s].isEmpty() && !isDetached(s) && (withDynamic || !isDynamicSlot(s))) screens.add(rcSlot[s].toFloat());
+        if(!rcSlot[s].isEmpty() && !isDetached(s)) screens.add(rcSlot[s].toFloat());
 
-    // ── 1) Châssis opaque : décor, plaque, cartes en saillie, creux ─────────
+    // ── 1) Châssis opaque : plaque, cartes en saillie, creux ───────────────
     chassisCache=juce::Image(juce::Image::RGB,pw,ph,false);
     {
         juce::Graphics g(chassisCache);
         g.addTransform(juce::AffineTransform::scale(pxScale));
-        if(decor){
-            // photo nature en cadrage "cover", vignette, ombre portée de la plaque
-            if(natureImage.isValid())
-                g.drawImage(natureImage,getLocalBounds().toFloat(),juce::RectanglePlacement::fillDestination);
-            else
-                g.fillAll(Neu::frame);
-            juce::ColourGradient vig(juce::Colours::transparentBlack,(float)W*0.5f,(float)H*0.5f,
-                                     juce::Colours::black.withAlpha(0.30f),0.f,0.f,true);
-            g.setGradientFill(vig); g.fillAll();
-            juce::DropShadow(juce::Colours::black.withAlpha(0.55f),18,{0,6}).drawForPath(g,plateP);
-        }
-
         // plaque : surface neumorphique, lumière venant du haut-gauche
         juce::ColourGradient face(Neu::surface.brighter(Neu::light ? 0.02f : 0.04f), plateR.getX(), plateR.getY(),
                                   Neu::surface.darker  (Neu::light ? 0.03f : 0.06f), plateR.getRight(), plateR.getBottom(), false);
@@ -6657,34 +6658,18 @@ void LeakEditor::rebuildChassisCaches(float pxScale, bool withDynamic)
 
         // une carte en saillie par écran, l'écran étant posé dans un creux
         for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
-            if(!rcSlot[s].isEmpty() && (withDynamic || !isDynamicSlot(s))){
+            if(!rcSlot[s].isEmpty()){
                 if(isDetached(s)) drawDetachedSlot(g, s);   // module dans sa fenêtre : creux cliquable
                 else              drawScreenCard(g, rcSlot[s].toFloat());
             }
 
         // slots configurables vides : un "+" en relief au centre (clic = menu des modules)
         for(int s : { 0, 1, 2, 3, 4 })
-            if(withDynamic || !isDynamicSlot(s))
-                drawEmptySlotPlus(g, s);
-
-        if(withDynamic)
-            drawControlsCardAndHandle(g, controlsCollapsed ? 1.f : 0.f, 0.f);
+            drawEmptySlotPlus(g, s);
     }
 
-    // ── 2) Calque au-dessus des modules : décor débordant + bords des écrans ─
-    juce::Image overlay(juce::Image::ARGB,pw,ph,true,juce::SoftwareImageType());
-    if(decor){
-        juce::Graphics og(overlay);
-        og.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        if(info.decor==Decor::Ivy && foliageImage.isValid())
-            og.drawImage(foliageImage,overlay.getBounds().toFloat(),juce::RectanglePlacement::stretchToFit);
-        else if(info.decor==Decor::Grass && grassImage.isValid()){
-            og.addTransform(juce::AffineTransform::scale(pxScale));
-            drawGrassFrame(og,grassImage,(float)W,(float)H,kGrassThickness);
-        }
-    }
-    overlayCache = decor ? fadeOverPlate(overlay,plateR*pxScale,(float)kFoliageReach*pxScale)
-                         : juce::NativeImageType().convert(overlay);
+    // ── 2) Calque au-dessus des modules : bords des écrans ──────────────────
+    overlayCache=juce::Image(juce::Image::ARGB,pw,ph,true);
     {
         juce::Graphics og(overlayCache);
         og.addTransform(juce::AffineTransform::scale(pxScale));
@@ -6692,13 +6677,8 @@ void LeakEditor::rebuildChassisCaches(float pxScale, bool withDynamic)
             drawScreenCaps(og, r);   // coins arrondis (les modules peignent des rectangles)
     }
 
-    // zones utiles du calque : bandes du décor + pourtour des écrans
+    // zones utiles du calque : pourtour des écrans
     overlayRegions.clear();
-    if(decor){
-        const int b=frameWidth()+kFoliageReach;
-        overlayRegions.add({0,0,W,b});     overlayRegions.add({0,H-b,W,b});
-        overlayRegions.add({0,b,b,H-2*b}); overlayRegions.add({W-b,b,b,H-2*b});
-    }
     const int e=(int)kScreenRadius+2;
     for(const auto& r : screens){
         const auto ri=r.getSmallestIntegerContainer().expanded(1);
@@ -6710,22 +6690,12 @@ void LeakEditor::rebuildChassisCaches(float pxScale, bool withDynamic)
 void LeakEditor::paint(juce::Graphics& g)
 {
     const float pxScale=g.getInternalContext().getPhysicalPixelScaleFactor();
-    if(collapseAnimating){
-        // pendant le repli : fond figé (sans les éléments mobiles) construit une
-        // seule fois, le reste est peint en direct à chaque image
-        if(!animBaseValid || !chassisCache.isValid() || cacheScale!=pxScale
-           || cacheW!=getWidth() || cacheH!=getHeight()){
-            rebuildChassisCaches(pxScale, false);
-            animBaseValid=true;
-        }
-        g.drawImage(chassisCache,getLocalBounds().toFloat());
-        paintDynamicChassis(g);
-        return;
-    }
     if(layoutDirty || !chassisCache.isValid() || cacheScale!=pxScale
-       || cacheW!=getWidth() || cacheH!=getHeight() || cacheTemplate!=(int)shownTemplate())
+       || cacheW!=getWidth() || cacheH!=getHeight())
         rebuildChassisCaches(pxScale);
     g.drawImage(chassisCache,getLocalBounds().toFloat());
+    // moitié survolée d'un creux partagé, par-dessus le châssis en cache
+    if(isDetached(hoverDetachedSlot)) drawDetachedHalf(g, hoverDetachedSlot, hoverDetachedAdd, true);
 }
 
 // Calque au-dessus des modules (OverlayLayer) : seules les zones utiles sont
@@ -6733,22 +6703,8 @@ void LeakEditor::paint(juce::Graphics& g)
 void LeakEditor::paintChassisOverlay(juce::Graphics& g)
 {
     if(!overlayCache.isValid()) return;
-    juce::RectangleList<int> regions(overlayRegions);
-    if(collapseAnimating){
-        // bords des écrans mobiles, à leur position du moment
-        const int e=(int)kScreenRadius+2;
-        for(int s : { 4, 5 }){
-            if(rcSlot[s].isEmpty()) continue;
-            const auto ri=rcSlot[s].expanded(1);
-            regions.add(ri.withHeight(e)); regions.add(ri.withTop(ri.getBottom()-e));
-            regions.add(ri.withWidth(e));  regions.add(ri.withLeft(ri.getRight()-e));
-        }
-    }
-    g.reduceClipRegion(regions);
+    g.reduceClipRegion(overlayRegions);
     g.drawImage(overlayCache,getLocalBounds().toFloat());
-    if(collapseAnimating)
-        for(int s : { 4, 5 })
-            if(!rcSlot[s].isEmpty() && !isDetached(s)) drawScreenCaps(g, rcSlot[s].toFloat());
 }
 
 // slot configurable vide : "+" en relief au centre
@@ -6765,87 +6721,3 @@ void LeakEditor::drawEmptySlotPlus(juce::Graphics& g, int s)
     g.fillRoundedRectangle(juce::Rectangle<float>(th, bar).withCentre(plus.getCentre()), th*0.5f);
 }
 
-// Carte de la barre de contrôles + poignée de repli. collapse : 0 dépliée ->
-// 1 repliée (la carte s'efface, la flèche pivote d'un demi-tour) ; pulse :
-// halo d'accent juste après le clic.
-void LeakEditor::drawControlsCardAndHandle(juce::Graphics& g, float collapse, float pulse)
-{
-    const float open=1.f-collapse;
-    if(open>0.001f){
-        // découpée au bas de la plaque, comme la barre qu'elle porte
-        juce::Graphics::ScopedSaveState ss(g);
-        const auto plate=getLocalBounds().reduced(frameWidth());
-        g.reduceClipRegion(plate.withBottom(plate.getBottom()-4));
-        if(open<0.999f) g.beginTransparencyLayer(open*open);
-        Neu::drawRaised(g, rcCtrl.toFloat().expanded(2.f), 12.f, 4.f);
-        if(open<0.999f) g.endTransparencyLayer();
-    }
-
-    // poignée : rainure sur toute la largeur + pilule centrale
-    const auto hr=rcCollapseHandle.toFloat();
-    Neu::drawInset(g, hr.withSizeKeepingCentre(hr.getWidth()-4.f, 4.f), 2.f, 1.f);
-    const auto pill=hr.withSizeKeepingCentre(70.f, hr.getHeight());
-    if(pulse>0.001f){
-        // halo qui s'étend puis s'éteint
-        const auto halo=pill.expanded(2.f+(1.f-pulse)*6.f);
-        g.setColour(Neu::accentInk().withAlpha(0.35f*pulse));
-        g.fillRoundedRectangle(halo, halo.getHeight()*0.5f);
-    }
-    Neu::drawRaised(g, pill, pill.getHeight()*0.5f, 1.6f);
-    const float cxh=pill.getCentreX(), cyh=pill.getCentreY(), s=3.5f;
-    juce::Path tri;   // ▼ replier ; pivote jusqu'à ▲ déplier
-    tri.addTriangle(cxh-s,cyh-s*0.5f, cxh+s,cyh-s*0.5f, cxh,cyh+s*0.6f);
-    tri.applyTransform(juce::AffineTransform::rotation(collapse*juce::MathConstants<float>::pi, cxh, cyh+s*0.03f));
-    g.setColour(Neu::accentInk()); g.fillPath(tri);
-}
-
-void LeakEditor::paintDynamicChassis(juce::Graphics& g)
-{
-    for(int s : { 4, 5 })
-        if(!rcSlot[s].isEmpty()){
-            if(isDetached(s)) drawDetachedSlot(g, s);
-            else              drawScreenCard(g, rcSlot[s].toFloat());
-        }
-    drawEmptySlotPlus(g, 4);
-    drawControlsCardAndHandle(g, collapseAnim, handlePulse);
-}
-
-void LeakEditor::startCollapseAnimation(bool collapse)
-{
-    controlsCollapsed=collapse;   // état visé (les clics suivants repartent d'ici)
-    animFrom=collapseAnim;
-    animTo=collapse ? 1.f : 0.f;
-    animStartMs=juce::Time::getMillisecondCounterHiRes();
-    handlePulse=1.f;
-    if(!collapseAnimating){
-        collapseAnimating=true;
-        animBaseValid=false;
-    }
-    if(collapseVBlank==nullptr)
-        collapseVBlank=std::make_unique<juce::VBlankAttachment>(this, [this]{ collapseAnimStep(); });
-    collapseAnimStep();
-}
-
-// Une étape par rafraîchissement d'écran : courbe "ease in-out" cubique sur
-// 340 ms (départ et arrivée en douceur, durée proportionnelle au trajet
-// restant si on reclique en cours de route).
-void LeakEditor::collapseAnimStep()
-{
-    if(!collapseAnimating) return;
-    const double durMs=340.0*juce::jmax(0.35, (double)std::abs(animTo-animFrom));
-    const float t=(float)juce::jlimit(0.0, 1.0, (juce::Time::getMillisecondCounterHiRes()-animStartMs)/durMs);
-    const float e=t<0.5f ? 4.f*t*t*t : 1.f-std::pow(-2.f*t+2.f, 3.f)*0.5f;
-    collapseAnim=animFrom+(animTo-animFrom)*e;
-    handlePulse=std::pow(1.f-t, 2.f);
-    if(t>=1.f){
-        collapseAnim=animTo;
-        handlePulse=0.f;
-        collapseAnimating=false;
-        // l'attache vblank est libérée hors de son propre rappel
-        juce::MessageManager::callAsync([sp=juce::Component::SafePointer<LeakEditor>(this)]{
-            if(sp!=nullptr && !sp->collapseAnimating) sp->collapseVBlank.reset();
-        });
-    }
-    updateLayout();   // à la fin : layoutDirty -> caches complets reconstruits
-    repaint();
-}

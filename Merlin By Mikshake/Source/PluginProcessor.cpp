@@ -89,7 +89,6 @@ LeakAudioProcessor::LeakAudioProcessor()
     }
     std::fill(std::begin(momBuf),std::end(momBuf),-120.f);
     std::fill(std::begin(stBuf), std::end(stBuf), -120.f);
-    std::fill(std::begin(transientCols),std::end(transientCols),-120.f);
     std::fill(std::begin(corrAccLL),std::end(corrAccLL),0.f);
     std::fill(std::begin(corrAccRR),std::end(corrAccRR),0.f);
     std::fill(std::begin(corrAccLR),std::end(corrAccLR),0.f);
@@ -138,9 +137,6 @@ void LeakAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     for(int i=0;i<numActiveBands;++i){ corrL[i].reset(); corrR[i].reset(); }
 
     updateCounter=vuExportCounter=decimCounter=0;
-    transientSampPerCol = juce::jmax(1,(int)(sampleRate / 50.0));
-    std::fill(std::begin(transientCols),std::end(transientCols),-120.f);
-    transientWrite=transientSampCount=0; transientAccum=0.f;
     std::fill(std::begin(scopeBuf.L),std::end(scopeBuf.L),0.f);
     std::fill(std::begin(scopeBuf.R),std::end(scopeBuf.R),0.f);
     scopeBuf.writePos=0;
@@ -155,13 +151,6 @@ void LeakAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         std::fill(std::begin(mbVectorBuf[b]),std::end(mbVectorBuf[b]),VectorPoint{0.f,0.f});
         mbVectorWrite[b]=mbVectorCount[b]=0;
     }
-    auto tc=[&](float ms){ return std::exp(-1.f/((ms*0.001f)*(float)sampleRate)); };
-    trAtkFast=tc(0.5f); trRelFast=tc(25.f);
-    trAtkSlow=tc(8.0f); trRelSlow=tc(180.f);
-    trEnvFastL=trEnvSlowL=trEnvFastR=trEnvSlowR=0.f;
-    trGainL=trGainR=0.f;
-    auditionStatesConfigBands=-1; // force le redesign de tous les filtres (la fréquence d'échantillonnage a changé)
-    for(auto& st : auditionStates) st.designed=false;
 
     // ── PSD : reset du ring-buffer FFT et recalcul du coefficient de lissage ──
     std::fill(std::begin(psdRing),std::end(psdRing),0.f);
@@ -347,22 +336,6 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 
         if(++vuExportCounter>=VU_EXPORT_INTERVAL){vuExportCounter=0;updateVuExport();}
 
-        // Transitoires
-        {
-            const float peak=std::max(al,ar);
-            if(peak>transientAccum) transientAccum=peak;
-            if(++transientSampCount>=transientSampPerCol){
-                transientSampCount=0;
-                const float dbPeak=(transientAccum<1e-10f)?-120.f:20.f*std::log10(transientAccum);
-                juce::SpinLock::ScopedTryLockType sl(transientLock);
-                if(sl.isLocked()){
-                    transientCols[transientWrite]=dbPeak;
-                    transientWrite=(transientWrite+1)%TRANSIENT_W;
-                }
-                transientAccum=0.f;
-            }
-        }
-
         // Filterbank spectre et corrélation/panorama — traités à chaque
         // échantillon (plus de décimation, voir note dans rebuildFilters()).
         const float mid=(l+r)*0.5f, side=(l-r)*0.5f;
@@ -429,8 +402,6 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     }
 
     // ── Densité spectrale (PSD) : alimentation du ring-buffer FFT ─────────
-    // (placé avant le bloc audition pour lire le signal avant qu'il ne soit
-    //  potentiellement remplacé par le monitoring solo-bande)
     for(int s=0;s<numSamples;++s){
         psdRing[psdRingWrite] = (numChannels>1) ? (L[s]+R[s])*0.5f : L[s];
         psdRingWrite=(psdRingWrite+1)%PSD_FFT_SIZE;
@@ -439,92 +410,6 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
             computePSDFrame();
         }
     }
-
-    // ── Audition : multi-bandes (bitmask) / transitoires ─────────────────
-    // jamais en plugin : Merlin mesure sans altérer le signal de la piste
-    const uint64_t aMask  = AppMode::isPlugin ? 0ULL : auditionMask.load(std::memory_order_relaxed);
-    const bool     aTrans = ! AppMode::isPlugin && auditionTransient.load(std::memory_order_relaxed);
-    float* outL = buffer.getWritePointer(0);
-    float* outR = (numChannels>1) ? buffer.getWritePointer(1) : nullptr;
-
-    if(aMask != 0ULL)
-    {
-        // Si la résolution de bandes a changé depuis le dernier design, on
-        // invalide tous les filtres (les fréquences centrales ont changé).
-        if(auditionStatesConfigBands != numActiveBands){
-            for(int i=0;i<N_BANDS;++i) auditionStates[i].designed=false;
-            auditionStatesConfigBands = numActiveBands;
-        }
-
-        // Liste des bandes actives pour ce bloc (construite une fois, pas par échantillon)
-        int activeList[N_BANDS]; int nActive=0;
-        for(int b=0;b<nBands && b<64; ++b)
-            if(aMask & bandBit(b)) activeList[nActive++]=b;
-
-        const float Q=(bandMode==62)?6.f:(bandMode==15)?2.f:3.f;
-        for(int k=0;k<nActive;++k){
-            auto& st = auditionStates[activeList[k]];
-            if(!st.designed){
-                const float fc=getBandFreqs()[activeList[k]];
-                const float gv=std::tan(juce::MathConstants<float>::pi*fc/(float)currentSampleRate);
-                const float kk=1.f/Q;
-                st.a1=1.f/(1.f+gv*(gv+kk));
-                st.a2=gv*st.a1;
-                st.a3=gv*st.a2;
-                st.g=gv; st.makeup=kk;
-                st.ic1L=st.ic2L=st.ic1R=st.ic2R=0.f;
-                st.designed=true;
-            }
-        }
-
-        // Compensation de niveau : évite que la somme explose quand on
-        // sélectionne beaucoup de bandes (gain énergétique en 1/√n).
-        const float norm = (nActive>1) ? 1.f/std::sqrt((float)nActive) : 1.f;
-
-        for(int s=0;s<numSamples;++s){
-            float sumL=0.f, sumR=0.f;
-            for(int k=0;k<nActive;++k){
-                auto& st = auditionStates[activeList[k]];
-                {
-                    const float v3=L[s]-st.ic2L;
-                    const float v1=st.a1*st.ic1L+st.a2*v3;
-                    const float v2=st.ic2L+st.a2*st.ic1L+st.a3*v3;
-                    st.ic1L=2.f*v1-st.ic1L; st.ic2L=2.f*v2-st.ic2L;
-                    sumL += v1*st.makeup;
-                }
-                if(outR){
-                    const float v3=R[s]-st.ic2R;
-                    const float v1=st.a1*st.ic1R+st.a2*v3;
-                    const float v2=st.ic2R+st.a2*st.ic1R+st.a3*v3;
-                    st.ic1R=2.f*v1-st.ic1R; st.ic2R=2.f*v2-st.ic2R;
-                    sumR += v1*st.makeup;
-                }
-            }
-            outL[s]=sumL*norm;
-            if(outR) outR[s]=sumR*norm;
-        }
-    }
-    else if(aTrans)
-    {
-        for(int i=0;i<N_BANDS;++i) auditionStates[i].designed=false;
-        for(int s=0;s<numSamples;++s){
-            const float xl=L[s], al2=std::abs(xl);
-            trEnvFastL = al2 + (trEnvFastL-al2)*((al2>trEnvFastL)?trAtkFast:trRelFast);
-            trEnvSlowL = al2 + (trEnvSlowL-al2)*((al2>trEnvSlowL)?trAtkSlow:trRelSlow);
-            const float tgtL = juce::jlimit(0.f,1.f,(trEnvFastL-trEnvSlowL)*9.f);
-            trGainL += (tgtL-trGainL)*((tgtL>trGainL)?0.6f:0.05f);
-            outL[s]=xl*trGainL;
-            if(outR){
-                const float xr=R[s], ar2=std::abs(xr);
-                trEnvFastR = ar2 + (trEnvFastR-ar2)*((ar2>trEnvFastR)?trAtkFast:trRelFast);
-                trEnvSlowR = ar2 + (trEnvSlowR-ar2)*((ar2>trEnvSlowR)?trAtkSlow:trRelSlow);
-                const float tgtR = juce::jlimit(0.f,1.f,(trEnvFastR-trEnvSlowR)*9.f);
-                trGainR += (tgtR-trGainR)*((tgtR>trGainR)?0.6f:0.05f);
-                outR[s]=xr*trGainR;
-            }
-        }
-    }
-    else { for(int i=0;i<N_BANDS;++i) auditionStates[i].designed=false; }
 }
 
 void LeakAudioProcessor::updateLevels()
@@ -835,13 +720,6 @@ void LeakAudioProcessor::getMultibandVectorData(int band,VectorPoint* out,int& c
     for(int i=0;i<n;++i){out[i]=mbVectorBuf[band][rd];rd=(rd+1)%MB_VECTOR_SIZE;}
     count=n;
 }
-void LeakAudioProcessor::getTransientData(float* outPeak,int n) const
-{
-    juce::SpinLock::ScopedTryLockType sl(transientLock);
-    if(!sl.isLocked()){std::fill(outPeak,outPeak+n,-120.f);return;}
-    int rd=(transientWrite-n+TRANSIENT_W)%TRANSIENT_W;
-    for(int i=0;i<n;++i){outPeak[i]=transientCols[rd];rd=(rd+1)%TRANSIENT_W;}
-}
 
 juce::AudioProcessorEditor* LeakAudioProcessor::createEditor(){return new LeakEditor(*this);}
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter(){return new LeakAudioProcessor();}
@@ -853,7 +731,6 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("editorH",     editorHeight);
     xml.setAttribute("numBands",    bandMode);
     xml.setAttribute("analysisMode",(int)analysisMode);
-    xml.setAttribute("transientThr",(double)transientThreshold);
     for(int i=0;i<NUM_SLOTS;++i)
         xml.setAttribute("slot"+juce::String(i), slotModule[i]);
     xml.setAttribute("customAccentColor", (int)customAccentColor);
@@ -866,11 +743,13 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("gpuMsaa", gpuMsaa);
     xml.setAttribute("gpuVsync", gpuVsync);
     if(language>=0) xml.setAttribute("language", language);
-    xml.setAttribute("uiTemplate", (int)uiTemplate);
     xml.setAttribute("lightTint", lightTint);
     xml.setAttribute("highContrast", highContrast);
     xml.setAttribute("modules3D", modules3D);
     xml.setAttribute("largeText", largeText);
+    xml.setAttribute("uiScale", uiScale);
+    xml.setAttribute("plateTint", plateTint);
+    xml.setAttribute("lightScreens", lightScreens);
     xml.setAttribute("masterConsole", masterConsole);
     xml.setAttribute("peakHoldOn", peakHoldOn);
     xml.setAttribute("peakHoldIdx", peakHoldIdx);
@@ -1071,7 +950,6 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             editorHeight =xml->getIntAttribute("editorH",620);
             setNumActiveBands(xml->getIntAttribute("numBands",31));
             setAnalysisMode((AnalysisMode)xml->getIntAttribute("analysisMode",0));
-            transientThreshold=(float)xml->getDoubleAttribute("transientThr",-18.0);
             static const int def[NUM_SLOTS]={1,7,12,4,6,5};
             for(int i=0;i<NUM_SLOTS;++i)
                 slotModule[i]=xml->getIntAttribute("slot"+juce::String(i),def[i]);
@@ -1086,22 +964,15 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             gpuMsaa  = juce::jlimit(0, 8, xml->getIntAttribute("gpuMsaa", 4));
             gpuVsync = xml->getBoolAttribute("gpuVsync", true);
             language = xml->getIntAttribute("language", -1);
-            if(xml->hasAttribute("uiTemplate"))
-            {
-                const int t = xml->getIntAttribute("uiTemplate");
-                uiTemplate = (UiTemplate)juce::jlimit(0, (int)UiTemplate::Count-1, t);
-                // v1.6 : "Neumorphic Light" (3) était un template à part
-                lightTint  = xml->getBoolAttribute("lightTint", t == 3);
-            }
-            else   // v1.5 : ancien réglage "decor" (0 aucun, 1 lierre, 2 herbe)
-            {
-                static const UiTemplate fromDecor[] = { UiTemplate::Neumorphic, UiTemplate::Forest, UiTemplate::Stadium };
-                uiTemplate = fromDecor[juce::jlimit(0, 2, xml->getIntAttribute("decor", 2))];
-            }
-            uiTemplate = UiTemplate::Neumorphic;   // v1.44 : seul template gardé (Stadium et Forest retirés)
+            // (avant la v1.6, « Neumorphic Light » était un template à part : uiTemplate 3)
+            lightTint = xml->getBoolAttribute("lightTint", xml->getIntAttribute("uiTemplate", 2) == 3);
             highContrast = true;   // mode contraste permanent (v1.51) : l'ancien réglage est ignoré
             modules3D = xml->getBoolAttribute("modules3D", false);
             largeText = true;   // gros texte toujours activé à l'ouverture (réglable ensuite dans Options › Affichage)
+            uiScale = xml->getIntAttribute("uiScale", uiScale);   // absent (presets d'usine) : inchangé
+            if(uiScale!=0) uiScale=juce::jlimit(100, 200, uiScale);
+            plateTint = juce::jlimit(0, 1, xml->getIntAttribute("plateTint", plateTint));   // absent : inchangé
+            lightScreens = juce::jlimit(0, 1, xml->getIntAttribute("lightScreens", lightScreens));
             masterConsole = xml->getBoolAttribute("masterConsole", false);
             peakHoldOn  = xml->getBoolAttribute("peakHoldOn", true);
             peakHoldIdx = xml->getIntAttribute("peakHoldIdx", 2);

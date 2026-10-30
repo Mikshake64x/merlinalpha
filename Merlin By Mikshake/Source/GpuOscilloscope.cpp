@@ -203,9 +203,9 @@ namespace
     // zone d'une voie de "Deux voies" : grille légère et ligne du zéro
     void scopeLane(juce::Graphics& g, juce::Rectangle<float> r)
     {
-        g.setColour(juce::Colour::fromRGBA(120,180,220,31));
+        g.setColour(Col::pick(juce::Colour::fromRGBA(120,180,220,31), Col::textHi.withAlpha(0.10f)));
         for(int i=0;i<=8;++i) g.fillRect(std::round(r.getX()+r.getWidth()*(float)i/8.f), r.getY(), 1.f, r.getHeight());
-        g.setColour(juce::Colour::fromRGBA(120,200,240,77));
+        g.setColour(Col::pick(juce::Colour::fromRGBA(120,200,240,77), Col::textHi.withAlpha(0.30f)));
         g.fillRect(r.getX(), std::round(r.getCentreY()), r.getWidth(), 1.f);
     }
 
@@ -225,67 +225,67 @@ void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool 
         g.setColour(c); g.drawText(t, juce::Rectangle<float>(x, y, 60.f, 11.f), juce::Justification::left, false); };
 
     if(style==0){            // tube cathodique
-        g.fillAll(juce::Colour(0xFF02121A));
-        g.setGradientFill(juce::ColourGradient(juce::Colour::fromRGBA(20,90,110,89), W*0.5f, H*0.55f,
+        g.fillAll(Col::pick(juce::Colour(0xFF02121A), Col::bg));
+        g.setGradientFill(juce::ColourGradient(Col::pick(juce::Colour::fromRGBA(20,90,110,89), Col::accent.withAlpha(0.05f)), W*0.5f, H*0.55f,
                                                juce::Colours::transparentBlack, W*1.2f, H*0.55f, true));
         g.fillAll();
-        scopeGraticule(g, pr, juce::Colour::fromRGBA(90,220,255,41), false, true);
+        scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(90,220,255,41), Col::textHi.withAlpha(0.13f)), false, true);
         // légendes placées selon leur largeur réelle ; la base de temps (« 2.50
         // ms/div », calque 2D, à droite) garde sa place : sinon « L » / « R »
         auto tw=[&](const juce::String& t){ return juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), t); };
         const float gap=6.f*Ui::textScale, perDivW=tw("00.00 ms/div")+8.f;
         const bool roomy=pr.getWidth() >= tw("CH1 L")+gap+tw("CH2 R")+perDivW;
         const juce::String l1=mono ? "L+R" : (roomy ? "CH1 L" : "L"), l2=roomy ? "CH2 R" : "R";
-        label(l1, pr.getX(), pr.getBottom()+3.f, juce::Colour(0xFF8FF6FF));
-        if(!mono) label(l2, pr.getX()+tw(l1)+gap, pr.getBottom()+3.f, juce::Colour(0xFF4AA3FF));
+        label(l1, pr.getX(), pr.getBottom()+3.f, Col::ink(juce::Colour(0xFF8FF6FF)));
+        if(!mono) label(l2, pr.getX()+tw(l1)+gap, pr.getBottom()+3.f, Col::ink(juce::Colour(0xFF4AA3FF)));
     }
     else if(style==1){       // numérique (DSO)
-        g.fillAll(juce::Colour(0xFF050607));
-        scopeGraticule(g, pr, juce::Colour::fromRGBA(200,200,200,72), true, false);
-        g.setColour(juce::Colour::fromRGBA(200,200,200,90));
+        g.fillAll(Col::pick(juce::Colour(0xFF050607), Col::bg));
+        scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(200,200,200,72), Col::textHi.withAlpha(0.28f)), true, false);
+        g.setColour(Col::pick(juce::Colour::fromRGBA(200,200,200,90), Col::textHi.withAlpha(0.35f)));
         g.fillRect(pr.getX(), std::round(pr.getCentreY()), pr.getWidth(), 1.f);
         auto chip=[&](const juce::String& t, float x, juce::Colour bg, juce::Colour fg){
             const juce::Rectangle<float> r(x, pr.getBottom()+4.f, 38.f, 11.f);
             g.setColour(bg); g.fillRoundedRectangle(r, 2.f);
             g.setColour(fg); g.drawText(t, r, juce::Justification::centred, false); };
-        if(mono) chip("L+R", pr.getX(), juce::Colour(0xFF00E5FF), juce::Colour(0xFF03181C));
-        else   { chip("CH1 L", pr.getX(), juce::Colour(0xFF00E5FF), juce::Colour(0xFF03181C));
-                 chip("CH2 R", pr.getX()+42.f, juce::Colour(0xFFFF4FD8), juce::Colour(0xFF2A0622)); }
+        if(mono) chip("L+R", pr.getX(), Col::ink(juce::Colour(0xFF00E5FF)), Col::pick(juce::Colour(0xFF03181C), juce::Colours::white));
+        else   { chip("CH1 L", pr.getX(), Col::ink(juce::Colour(0xFF00E5FF)), Col::pick(juce::Colour(0xFF03181C), juce::Colours::white));
+                 chip("CH2 R", pr.getX()+42.f, Col::ink(juce::Colour(0xFFFF4FD8)), Col::pick(juce::Colour(0xFF2A0622), juce::Colours::white)); }
     }
     else if(style==2){       // vintage à lunette
-        g.fillAll(juce::Colour(0xFF16181B));
+        g.fillAll(Col::pick(juce::Colour(0xFF16181B), Col::panel));
         const auto tube=tubeAreaFor(W, H);
         juce::Path p; p.addRoundedRectangle(tube, 16.f);
-        g.setColour(juce::Colour(0xFF030B09)); g.fillPath(p);
+        g.setColour(Col::pick(juce::Colour(0xFF030B09), Col::bg)); g.fillPath(p);
         {
             juce::Graphics::ScopedSaveState ss(g);
             g.reduceClipRegion(p);
-            g.setGradientFill(juce::ColourGradient(juce::Colour::fromRGBA(40,140,110,72), tube.getCentreX(), tube.getCentreY(),
-                                                   juce::Colour::fromRGBA(0,0,0,128), tube.getRight()+tube.getWidth()*0.1f, tube.getCentreY(), true));
+            g.setGradientFill(juce::ColourGradient(Col::pick(juce::Colour::fromRGBA(40,140,110,72), Col::accent.withAlpha(0.04f)), tube.getCentreX(), tube.getCentreY(),
+                                                   Col::pick(juce::Colour::fromRGBA(0,0,0,128), juce::Colour(0x1A283C5A)), tube.getRight()+tube.getWidth()*0.1f, tube.getCentreY(), true));
             g.fillPath(p);
-            scopeGraticule(g, pr, juce::Colour::fromRGBA(120,255,210,33), false, false);
+            scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(120,255,210,33), Col::textHi.withAlpha(0.12f)), false, false);
             if(!mono){
-                g.setColour(juce::Colour::fromRGBA(120,255,210,70));
+                g.setColour(Col::pick(juce::Colour::fromRGBA(120,255,210,70), Col::textHi.withAlpha(0.30f)));
                 g.fillRect(pr.getX(), std::round(pr.getCentreY()), pr.getWidth(), 1.f);
-                label("L", pr.getX()+3.f, pr.getY()+2.f, juce::Colour(0xFF7DFFD8));
-                label("R", pr.getX()+3.f, pr.getCentreY()+3.f, juce::Colour(0xFF5FD3FF));
+                label("L", pr.getX()+3.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF7DFFD8)));
+                label("R", pr.getX()+3.f, pr.getCentreY()+3.f, Col::ink(juce::Colour(0xFF5FD3FF)));
             }
             // reflet du verre bombé
-            g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(0.07f), 0.f, tube.getY(),
+            g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(Col::paper ? 0.f : 0.07f), 0.f, tube.getY(),
                                                    juce::Colours::transparentWhite, 0.f, tube.getCentreY(), false));
             g.fillRect(tube.withHeight(tube.getHeight()*0.5f));
         }
-        g.setColour(juce::Colour(0xFF2C3036)); g.strokePath(p, juce::PathStrokeType(3.f));
+        g.setColour(Col::pick(juce::Colour(0xFF2C3036), Col::border)); g.strokePath(p, juce::PathStrokeType(3.f));
     }
     else {                   // deux voies
-        g.fillAll(juce::Colour(0xFF04090D));
-        if(mono){ scopeLane(g, pr); label("L+R", pr.getX()+4.f, pr.getY()+2.f, juce::Colour(0xFF22E0FF)); }
+        g.fillAll(Col::pick(juce::Colour(0xFF04090D), Col::bg));
+        if(mono){ scopeLane(g, pr); label("L+R", pr.getX()+4.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF22E0FF))); }
         else {
             scopeLane(g, upperLane(pr)); scopeLane(g, lowerLane(pr));
-            g.setColour(juce::Colours::white.withAlpha(0.08f));
+            g.setColour(Col::light(0.08f));
             g.fillRect(pr.getX(), std::round(pr.getCentreY()), pr.getWidth(), 1.f);
-            label("L", pr.getX()+4.f, upperLane(pr).getY()+2.f, juce::Colour(0xFF22E0FF));
-            label("R", pr.getX()+4.f, lowerLane(pr).getY()+2.f, juce::Colour(0xFF3D8BFF));
+            label("L", pr.getX()+4.f, upperLane(pr).getY()+2.f, Col::ink(juce::Colour(0xFF22E0FF)));
+            label("R", pr.getX()+4.f, lowerLane(pr).getY()+2.f, Col::ink(juce::Colour(0xFF3D8BFF)));
         }
     }
 }
@@ -301,7 +301,7 @@ void GpuOscilloscopeDisplay::rebuildBackgroundIfNeeded()
     scale=juce::jlimit(1.0, 4.0, scale);
     const int style=styleA.load();
     const bool mono=monoA.load();
-    const int key=(((W*4099+H)*5+style)*2+(mono ? 1 : 0))*131+juce::roundToInt(scale*100.0);
+    const int key=((((W*4099+H)*5+style)*2+(mono ? 1 : 0))*131+juce::roundToInt(scale*100.0))*31+Col::generation;
     if(key==bgKey) return;
     bgKey=key;
     juce::Image img(juce::Image::ARGB, juce::jmax(1, juce::roundToInt((double)W*scale)), juce::jmax(1, juce::roundToInt((double)H*scale)),
@@ -349,9 +349,9 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
     const auto pr=plotAreaFor(style, (float)W, (float)H);
 
     if(triggerMode.load() && style!=3){
-        const juce::Colour c = style==1 ? juce::Colour(0xFFFF9F0A)
-                             : style==2 ? juce::Colour(0xFF7DFFD8).withAlpha(0.8f)
-                                        : juce::Colour(0xFF8FF6FF).withAlpha(0.8f);
+        const juce::Colour c = style==1 ? Col::ink(juce::Colour(0xFFFF9F0A))
+                             : style==2 ? Col::ink(juce::Colour(0xFF7DFFD8)).withAlpha(0.8f)
+                                        : Col::ink(juce::Colour(0xFF8FF6FF)).withAlpha(0.8f);
         // en ST dans le tube, sur le zéro de la voie L
         const float cy=(style==2 && !mono) ? upperHalf(pr).getCentreY() : pr.getCentreY();
         juce::Path tri; tri.addTriangle(pr.getX(), cy-4.f, pr.getX()+6.f, cy, pr.getX(), cy+4.f);
@@ -362,10 +362,10 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
     const juce::String perDiv=juce::String((double)nPts.load()/sr*100.0, 2)+" ms/div";   // 10 divisions
     g.setFont(Ui::iceland(9.f));
     if(style==0){
-        g.setColour(juce::Colour(0xB38FF6FF));
+        g.setColour(Col::ink(juce::Colour(0xFF8FF6FF)).withAlpha(0.7f));
         g.drawText(perDiv, juce::Rectangle<float>(pr.getRight()-90.f, pr.getBottom()+3.f, 90.f, 11.f), juce::Justification::right, false);
     } else if(style==1){
-        g.setColour(juce::Colour(0xD9DCDCDC));
+        g.setColour(Col::pick(juce::Colour(0xD9DCDCDC), Col::textMid));
         const float left=mono ? 44.f : 86.f;
         g.drawText(shownMeas+"   "+perDiv, juce::Rectangle<float>(pr.getX()+left, pr.getBottom()+3.f, pr.getWidth()-left, 12.f),
                    juce::Justification::right, false);
@@ -712,7 +712,7 @@ void GpuOscilloscopeDisplay::renderOpenGL()
             if(halo>0.f){   // halo serré (tube, vintage), proportionné à l'épaisseur choisie
                 lineShader->setUniform("halfW", width*0.5f+2.4f*juce::jmin(1.f, widthMul));
                 lineShader->setUniform("sharp", 1.3f);
-                colourUniform(*lineShader, c, 0.22f*halo*alpha);
+                colourUniform(*lineShader, c, (Col::paper ? 0.12f : 0.22f)*halo*alpha);
                 glDrawArrays(GL_LINE_STRIP, 0, nv);
             }
             // marge de lissage des bords : 0,6 px, réduite pour les traits fins
@@ -737,24 +737,24 @@ void GpuOscilloscopeDisplay::renderOpenGL()
         auto frame=[&](const float* L, const float* R, const float* M, float alpha, bool current){
             const float halo=current ? 1.f : 0.f;
             if(style==0){
-                if(!mono) line(R, pr, juce::Colour(0xFF4AA3FF), alpha, 1.4f, halo);
-                line(M, pr, juce::Colour(0xFF8FF6FF), alpha, 1.6f, halo);
+                if(!mono) line(R, pr, Col::ink(juce::Colour(0xFF4AA3FF)), alpha, 1.4f, halo);
+                line(M, pr, Col::ink(juce::Colour(0xFF8FF6FF)), alpha, 1.6f, halo);
             } else if(style==1){
-                line(M, pr, juce::Colour(0xFF00E5FF), alpha, 1.5f, 0.f);
-                if(!mono) line(R, pr, juce::Colour(0xFFFF4FD8), alpha, 1.3f, 0.f);
+                line(M, pr, Col::ink(juce::Colour(0xFF00E5FF)), alpha, 1.5f, 0.f);
+                if(!mono) line(R, pr, Col::ink(juce::Colour(0xFFFF4FD8)), alpha, 1.3f, 0.f);
             } else if(style==2){
-                if(mono) line(M, pr, juce::Colour(0xFF7DFFD8), alpha, 1.7f, 1.3f*halo);
+                if(mono) line(M, pr, Col::ink(juce::Colour(0xFF7DFFD8)), alpha, 1.7f, 1.3f*halo);
                 else {
-                    line(L, upperHalf(pr), juce::Colour(0xFF7DFFD8), alpha, 1.6f, 1.2f*halo);
-                    line(R, lowerHalf(pr), juce::Colour(0xFF5FD3FF), alpha, 1.6f, 1.2f*halo);
+                    line(L, upperHalf(pr), Col::ink(juce::Colour(0xFF7DFFD8)), alpha, 1.6f, 1.2f*halo);
+                    line(R, lowerHalf(pr), Col::ink(juce::Colour(0xFF5FD3FF)), alpha, 1.6f, 1.2f*halo);
                 }
             } else {
                 auto lane=[&](const float* buf, juce::Rectangle<float> r, juce::Colour c){
                     if(current) fill(buf, r, c, 0.13f*alpha);
                     line(buf, r, c, alpha, 1.5f, 0.f);
                 };
-                if(mono) lane(M, pr, juce::Colour(0xFF22E0FF));
-                else { lane(L, upperLane(pr), juce::Colour(0xFF22E0FF)); lane(R, lowerLane(pr), juce::Colour(0xFF3D8BFF)); }
+                if(mono) lane(M, pr, Col::ink(juce::Colour(0xFF22E0FF)));
+                else { lane(L, upperLane(pr), Col::ink(juce::Colour(0xFF22E0FF))); lane(R, lowerLane(pr), Col::ink(juce::Colour(0xFF3D8BFF))); }
             }
         };
 
