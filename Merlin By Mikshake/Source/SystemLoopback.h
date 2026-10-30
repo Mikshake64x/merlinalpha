@@ -48,6 +48,33 @@ private:
 };
 
 //==============================================================================
+// CardRateProbe — fréquence réelle d'une entrée de la carte (format du
+// mélangeur Windows). En mode partagé, WASAPI convertit en silence vers la
+// fréquence demandée : sans ce contrôle, Merlin peut rester sur l'ancienne
+// après un changement sur la carte. Lue sur un thread à part, une fois par
+// seconde (interroger un périphérique occupé peut bloquer). Mac : CoreAudio
+// suit tout seul, poll() renvoie 0.
+//==============================================================================
+class CardRateProbe : private juce::Thread
+{
+public:
+    CardRateProbe() : juce::Thread("Merlin card rate") {}
+    ~CardRateProbe() override { stopThread(3000); }
+
+    // entrée à suivre ; renvoie sa fréquence (0 tant qu'elle est inconnue)
+    double poll(const juce::String& inputName);
+
+private:
+    void run() override;
+
+    juce::CriticalSection nameLock;
+    juce::String wanted;
+    std::atomic<double> rate { 0.0 };
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CardRateProbe)
+};
+
+//==============================================================================
 // Volume général de la sortie Windows par défaut (le curseur de la barre des
 // tâches), réglable depuis Merlin. Appels depuis le thread de messages.
 //==============================================================================

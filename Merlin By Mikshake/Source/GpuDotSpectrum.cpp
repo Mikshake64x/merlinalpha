@@ -275,6 +275,7 @@ void GpuDotSpectrumDisplay::paint(juce::Graphics& g)
         g.drawText(juce::String((int)db), juce::Rectangle<float>(kReleaseFaderW, y-7.f, pr.getX()-kReleaseFaderW-5.f, 14.f), juce::Justification::centredRight, false);
     }
 
+    Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR(title()), 6, 5, W-12, 13, juce::Justification::left, 1, 0.7f);
@@ -653,6 +654,7 @@ void GpuDotPanoramaDisplay::paint(juce::Graphics& g)
     g.drawText("C", juce::Rectangle<float>(2.f, yForPan(0.f)-7.f,    pr.getX()-4.f, 14.f), juce::Justification::centredRight, false);
     g.drawText("R", juce::Rectangle<float>(2.f, pr.getBottom()-13.f, pr.getX()-4.f, 14.f), juce::Justification::centredRight, false);
 
+    Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("PANORAMA - CHROMA"), 6, 5, W-12, 13, juce::Justification::left, 1, 0.7f);

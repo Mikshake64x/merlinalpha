@@ -92,6 +92,7 @@ private:
     std::shared_ptr<GpuFramePacer> pacer;
     double lastTickTs { 0.0 }, framePeriod { 1.0/60.0 }, nextFrameTs { 0.0 };   // fil de cadence uniquement
     int    uiTickDiv { 0 };
+    double shownSampleRate { 0.0 };   // fréquence des graduations du calque 2D
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GpuModuleBase)
 };
@@ -114,6 +115,8 @@ struct PsdLogMap
     // toujours 20 Hz–20 kHz.
     static float topHz(double sampleRate) { return sampleRate>0.0 ? (float)(sampleRate*0.5) : 20000.f; }
     void setExtendedAxis(bool b) { if(b!=extendedAxis){ extendedAxis=b; mappedSampleRate=0.0; } }
+    // change quand l'axe est refait : l'historique tracé sur l'ancien n'a plus de sens
+    int axisVersion() const { return axisVersionCount; }
 
 private:
     void rebuild(double sampleRate);
@@ -121,5 +124,6 @@ private:
     float  binFrac[N] {};
     bool   extendedAxis { false };
     double mappedSampleRate { 0.0 };
+    int    axisVersionCount { 0 };
     float  psd[LeakAudioProcessor::PSD_NUM_BINS] {};
 };

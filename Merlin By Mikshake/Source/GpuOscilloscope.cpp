@@ -65,7 +65,7 @@ uniform float sharp;
 void main() { fragColour = col*exp(-vSide*vSide*sharp); }
 )";
 
-// Aire sous la courbe (style deux voies)
+// Aire sous la courbe (style rempli)
 static const char* kOscFillVS = R"(#version 150
 in vec2 fv;
 uniform vec2 view;
@@ -89,6 +89,13 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
     // ST : traces L et R ; MONO : une trace (L+R)/2
     monoBtn.onClick=[this]{ processor.oscMono=!processor.oscMono; syncFromProcessor(); };
     addAndMakeVisible(monoBtn);
+    // L et R superposées ou l'une au-dessus de l'autre (aussi dans les Options)
+    splitBtn.onClick=[this]{
+        processor.oscSplit=!processor.oscSplit;
+        syncFromProcessor();
+        if(onSplitChanged) onSplitChanged();
+    };
+    addAndMakeVisible(splitBtn);
 
     // AMP (vertical, à gauche) et TIME (horizontal, en bas) : mêmes plages que
     // les boutons de la barre du bas
@@ -134,8 +141,11 @@ int GpuOscilloscopeDisplay::maxFrameRate() const
 void GpuOscilloscopeDisplay::syncFromProcessor()
 {
     monoBtn.setButtonText(processor.oscMono ? "MONO" : "ST");
+    splitBtn.setButtonText(processor.oscSplit ? "SPLIT" : "OVER");
+    splitBtn.setEnabled(!processor.oscMono);   // une seule trace en mono
     styleA=juce::jlimit(0, 3, processor.oscStyle);
     monoA=processor.oscMono;
+    splitA=processor.oscSplit;
     persistA=processor.oscPersist;
     // curseur 0..100 → ×0,12 (trait d'un pixel) à ×2,52 ; 20 par défaut (×0,6)
     widthMulA=0.12f+0.024f*(float)juce::jlimit(0, 100, processor.oscLineWidth);
@@ -153,6 +163,7 @@ void GpuOscilloscopeDisplay::resized()
     {   // bouton ST/MONO à l'échelle du texte (illisible en gros texte)
         const int bw=juce::roundToInt(34.f*Ui::textScale), bh=juce::roundToInt(12.f*Ui::textScale);
         monoBtn.setBounds(getWidth()-bw-4, 2, bw, bh);
+        splitBtn.setBounds(monoBtn.getX()-bw-3, 2, bw, bh);
     }
     // faders : AMP le long du bord gauche, TIME le long du bas
     if(ampFader)  ampFader ->setBounds(2, 22, (int)kFaderL-4, juce::jmax(10, getHeight()-22-(int)kFaderB-4));
@@ -200,7 +211,7 @@ namespace
         }
     }
 
-    // zone d'une voie de "Deux voies" : grille légère et ligne du zéro
+    // zone d'une voie du style rempli : grille légère et ligne du zéro
     void scopeLane(juce::Graphics& g, juce::Rectangle<float> r)
     {
         g.setColour(Col::pick(juce::Colour::fromRGBA(120,180,220,31), Col::textHi.withAlpha(0.10f)));
@@ -216,13 +227,21 @@ namespace
 }
 
 // fond, graticule et légendes fixes
-void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool mono) const
+void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool mono, bool split) const
 {
     const float W=(float)getWidth(), H=(float)getHeight();
     const auto pr=plotAreaFor(style, W, H);
     g.setFont(Ui::iceland(9.f));
     auto label=[&](const juce::String& t, float x, float y, juce::Colour c){
         g.setColour(c); g.drawText(t, juce::Rectangle<float>(x, y, 60.f, 11.f), juce::Justification::left, false); };
+    // voies séparées : filet entre les deux moitiés et repères L / R
+    auto splitMarks=[&](juce::Colour line, juce::Colour cl, juce::Colour cr){
+        if(!split) return;
+        g.setColour(line);
+        g.fillRect(pr.getX(), std::round(pr.getCentreY()), pr.getWidth(), 1.f);
+        label("L", pr.getX()+3.f, pr.getY()+2.f, cl);
+        label("R", pr.getX()+3.f, pr.getCentreY()+3.f, cr);
+    };
 
     if(style==0){            // tube cathodique
         g.fillAll(Col::pick(juce::Colour(0xFF02121A), Col::bg));
@@ -230,6 +249,8 @@ void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool 
                                                juce::Colours::transparentBlack, W*1.2f, H*0.55f, true));
         g.fillAll();
         scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(90,220,255,41), Col::textHi.withAlpha(0.13f)), false, true);
+        splitMarks(Col::pick(juce::Colour::fromRGBA(90,220,255,90), Col::textHi.withAlpha(0.30f)),
+                   Col::ink(juce::Colour(0xFF8FF6FF)), Col::ink(juce::Colour(0xFF4AA3FF)));
         // légendes placées selon leur largeur réelle ; la base de temps (« 2.50
         // ms/div », calque 2D, à droite) garde sa place : sinon « L » / « R »
         auto tw=[&](const juce::String& t){ return juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), t); };
@@ -244,6 +265,7 @@ void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool 
         scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(200,200,200,72), Col::textHi.withAlpha(0.28f)), true, false);
         g.setColour(Col::pick(juce::Colour::fromRGBA(200,200,200,90), Col::textHi.withAlpha(0.35f)));
         g.fillRect(pr.getX(), std::round(pr.getCentreY()), pr.getWidth(), 1.f);
+        splitMarks(juce::Colours::transparentBlack, Col::ink(juce::Colour(0xFF00E5FF)), Col::ink(juce::Colour(0xFFFF4FD8)));
         auto chip=[&](const juce::String& t, float x, juce::Colour bg, juce::Colour fg){
             const juce::Rectangle<float> r(x, pr.getBottom()+4.f, 38.f, 11.f);
             g.setColour(bg); g.fillRoundedRectangle(r, 2.f);
@@ -264,11 +286,11 @@ void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool 
                                                    Col::pick(juce::Colour::fromRGBA(0,0,0,128), juce::Colour(0x1A283C5A)), tube.getRight()+tube.getWidth()*0.1f, tube.getCentreY(), true));
             g.fillPath(p);
             scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(120,255,210,33), Col::textHi.withAlpha(0.12f)), false, false);
-            if(!mono){
-                g.setColour(Col::pick(juce::Colour::fromRGBA(120,255,210,70), Col::textHi.withAlpha(0.30f)));
-                g.fillRect(pr.getX(), std::round(pr.getCentreY()), pr.getWidth(), 1.f);
+            splitMarks(Col::pick(juce::Colour::fromRGBA(120,255,210,70), Col::textHi.withAlpha(0.30f)),
+                       Col::ink(juce::Colour(0xFF7DFFD8)), Col::ink(juce::Colour(0xFF5FD3FF)));
+            if(!mono && !split){
                 label("L", pr.getX()+3.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF7DFFD8)));
-                label("R", pr.getX()+3.f, pr.getCentreY()+3.f, Col::ink(juce::Colour(0xFF5FD3FF)));
+                label("R", pr.getX()+13.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF5FD3FF)));
             }
             // reflet du verre bombé
             g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(Col::paper ? 0.f : 0.07f), 0.f, tube.getY(),
@@ -277,9 +299,14 @@ void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool 
         }
         g.setColour(Col::pick(juce::Colour(0xFF2C3036), Col::border)); g.strokePath(p, juce::PathStrokeType(3.f));
     }
-    else {                   // deux voies
+    else {                   // rempli
         g.fillAll(Col::pick(juce::Colour(0xFF04090D), Col::bg));
         if(mono){ scopeLane(g, pr); label("L+R", pr.getX()+4.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF22E0FF))); }
+        else if(!split){
+            scopeLane(g, pr);
+            label("L", pr.getX()+4.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF22E0FF)));
+            label("R", pr.getX()+14.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF3D8BFF)));
+        }
         else {
             scopeLane(g, upperLane(pr)); scopeLane(g, lowerLane(pr));
             g.setColour(Col::light(0.08f));
@@ -300,8 +327,8 @@ void GpuOscilloscopeDisplay::rebuildBackgroundIfNeeded()
     if(auto* d=juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds())) scale*=d->scale;
     scale=juce::jlimit(1.0, 4.0, scale);
     const int style=styleA.load();
-    const bool mono=monoA.load();
-    const int key=((((W*4099+H)*5+style)*2+(mono ? 1 : 0))*131+juce::roundToInt(scale*100.0))*31+Col::generation;
+    const bool mono=monoA.load(), split=splitA.load() && !mono;
+    const int key=((((W*4099+H)*5+style)*4+(mono ? 1 : 0)+(split ? 2 : 0))*131+juce::roundToInt(scale*100.0))*31+Col::generation;
     if(key==bgKey) return;
     bgKey=key;
     juce::Image img(juce::Image::ARGB, juce::jmax(1, juce::roundToInt((double)W*scale)), juce::jmax(1, juce::roundToInt((double)H*scale)),
@@ -309,7 +336,7 @@ void GpuOscilloscopeDisplay::rebuildBackgroundIfNeeded()
     {
         juce::Graphics g(img);
         g.addTransform(juce::AffineTransform::scale((float)scale));
-        paintBackground(g, style, mono);
+        paintBackground(g, style, mono, split);
     }
     {
         const juce::SpinLock::ScopedLockType sl(bgLock);
@@ -352,8 +379,8 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
         const juce::Colour c = style==1 ? Col::ink(juce::Colour(0xFFFF9F0A))
                              : style==2 ? Col::ink(juce::Colour(0xFF7DFFD8)).withAlpha(0.8f)
                                         : Col::ink(juce::Colour(0xFF8FF6FF)).withAlpha(0.8f);
-        // en ST dans le tube, sur le zéro de la voie L
-        const float cy=(style==2 && !mono) ? upperHalf(pr).getCentreY() : pr.getCentreY();
+        // voies séparées : sur le zéro de la voie L
+        const float cy=(splitA.load() && !mono) ? upperHalf(pr).getCentreY() : pr.getCentreY();
         juce::Path tri; tri.addTriangle(pr.getX(), cy-4.f, pr.getX()+6.f, cy, pr.getX(), cy+4.f);
         g.setColour(c); g.fillPath(tri);
     }
@@ -371,9 +398,10 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
                    juce::Justification::right, false);
     }
 
+    Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
-    g.drawFittedText(TR("OSCILLOSCOPE"), 6, 5, juce::jmax(20, monoBtn.getX()-10), 13, juce::Justification::left, 1, 0.6f);
+    g.drawFittedText(TR("OSCILLOSCOPE"), 6, 5, juce::jmax(20, splitBtn.getX()-10), 13, juce::Justification::left, 1, 0.6f);
 
     paintGlFailure(g);
     paintScreenFrame(g);
@@ -660,8 +688,9 @@ void GpuOscilloscopeDisplay::renderOpenGL()
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         const int  style=styleA.load();
-        const bool mono=monoA.load();
+        const bool mono=monoA.load(), split=splitA.load() && !mono;
         const auto pr=plotAreaFor(style, (float)w, (float)h);
+        const auto top=split ? upperHalf(pr) : pr, bottom=split ? lowerHalf(pr) : pr;   // L, R
         const float gain=ampGain.load();
 
         // trace -> sommets (px logiques). Tous les échantillons sont reliés à
@@ -737,16 +766,16 @@ void GpuOscilloscopeDisplay::renderOpenGL()
         auto frame=[&](const float* L, const float* R, const float* M, float alpha, bool current){
             const float halo=current ? 1.f : 0.f;
             if(style==0){
-                if(!mono) line(R, pr, Col::ink(juce::Colour(0xFF4AA3FF)), alpha, 1.4f, halo);
-                line(M, pr, Col::ink(juce::Colour(0xFF8FF6FF)), alpha, 1.6f, halo);
+                if(!mono) line(R, bottom, Col::ink(juce::Colour(0xFF4AA3FF)), alpha, 1.4f, halo);
+                line(M, top, Col::ink(juce::Colour(0xFF8FF6FF)), alpha, 1.6f, halo);
             } else if(style==1){
-                line(M, pr, Col::ink(juce::Colour(0xFF00E5FF)), alpha, 1.5f, 0.f);
-                if(!mono) line(R, pr, Col::ink(juce::Colour(0xFFFF4FD8)), alpha, 1.3f, 0.f);
+                line(M, top, Col::ink(juce::Colour(0xFF00E5FF)), alpha, 1.5f, 0.f);
+                if(!mono) line(R, bottom, Col::ink(juce::Colour(0xFFFF4FD8)), alpha, 1.3f, 0.f);
             } else if(style==2){
                 if(mono) line(M, pr, Col::ink(juce::Colour(0xFF7DFFD8)), alpha, 1.7f, 1.3f*halo);
                 else {
-                    line(L, upperHalf(pr), Col::ink(juce::Colour(0xFF7DFFD8)), alpha, 1.6f, 1.2f*halo);
-                    line(R, lowerHalf(pr), Col::ink(juce::Colour(0xFF5FD3FF)), alpha, 1.6f, 1.2f*halo);
+                    line(L, top,    Col::ink(juce::Colour(0xFF7DFFD8)), alpha, 1.6f, 1.2f*halo);
+                    line(R, bottom, Col::ink(juce::Colour(0xFF5FD3FF)), alpha, 1.6f, 1.2f*halo);
                 }
             } else {
                 auto lane=[&](const float* buf, juce::Rectangle<float> r, juce::Colour c){
@@ -754,7 +783,8 @@ void GpuOscilloscopeDisplay::renderOpenGL()
                     line(buf, r, c, alpha, 1.5f, 0.f);
                 };
                 if(mono) lane(M, pr, Col::ink(juce::Colour(0xFF22E0FF)));
-                else { lane(L, upperLane(pr), Col::ink(juce::Colour(0xFF22E0FF))); lane(R, lowerLane(pr), Col::ink(juce::Colour(0xFF3D8BFF))); }
+                else { lane(L, split ? upperLane(pr) : pr, Col::ink(juce::Colour(0xFF22E0FF)));
+                       lane(R, split ? lowerLane(pr) : pr, Col::ink(juce::Colour(0xFF3D8BFF))); }
             }
         };
 

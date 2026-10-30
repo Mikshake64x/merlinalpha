@@ -142,6 +142,7 @@ void GpuSurfaceDisplay::resized()
     const int hh=juce::jlimit(16, 22, juce::roundToInt(19.f*Ui::textScale));
     const int hw=juce::roundToInt(46.f*Ui::textScale);
     holdBtn->setBounds(getWidth()-6-16-6-hw, 2, hw, hh);
+    titleBottom=holdBtn->getBottom()+3;
 }
 
 //==============================================================================
@@ -245,6 +246,7 @@ void GpuSurfaceDisplay::paint(juce::Graphics& g)
     }
 
     drawDirectionButton(g);
+    Ui::drawTitleDecor(g, (float)getWidth(), (float)holdBtn->getBottom()+2.f);   // sous HOLD
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     Ui::drawTitleFit(g, TR("SPECTROGRAM GPU - SURFACE"), { 6.f, 5.f, (float)juce::jmax(20, holdBtn->getX()-12), 13.f }, g.getCurrentFont());   // plutôt que "GP…"
@@ -323,6 +325,8 @@ void GpuSurfaceDisplay::renderOpenGL()
         // ligne live : spectre courant à chaque image (elle se fige dans
         // l'historique à la capture suivante, au même endroit : pas de saut)
         if(logMap.read(processor, liveDb)){
+            // nouvelle fréquence d'échantillonnage : l'historique suivait l'ancien axe
+            if(logMap.axisVersion()!=seenAxisVersion){ seenAxisVersion=logMap.axisVersion(); rowCount=0; }
             for(int p=0;p<NPTS;++p) liveRow[p]=juce::jlimit(0.f,1.f,(liveDb[p]+100.f)/90.f);
             haveLive=true;
         }
@@ -334,6 +338,9 @@ void GpuSurfaceDisplay::renderOpenGL()
     const auto geo=geometry(W, H);
     const float scale=renderingScale();
     glViewport(0, 0, juce::roundToInt(scale*W), juce::roundToInt(scale*H));
+    // le relief s'arrête sous la ligne du titre
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(0, 0, juce::roundToInt(scale*W), juce::roundToInt(scale*(H-(float)titleBottom.load())));
 
     // ── sommets de l'image (pixels logiques) ──
     struct Draw { GLenum prim; int first, count, mode; juce::Colour c, c2; float lineAlpha; };
@@ -458,6 +465,7 @@ void GpuSurfaceDisplay::renderOpenGL()
     }
 
     // état rendu à JUCE (composition du calque 2D)
+    glDisable(GL_SCISSOR_TEST);
     glBindVertexArray((GLuint)prevVao);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);

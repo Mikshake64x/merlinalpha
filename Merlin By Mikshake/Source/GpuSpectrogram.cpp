@@ -221,9 +221,10 @@ namespace
     }
 
     constexpr int kGX = 319;   // sommets : 2 par colonne de données
+    constexpr float kReliefH = 2.2f;   // hauteur du relief à pleine échelle
 }
 
-GpuSpectrogramDisplay::Camera GpuSpectrogramDisplay::makeCamera(float yawRad, float pitchRad, float aspect)
+GpuSpectrogramDisplay::Camera GpuSpectrogramDisplay::makeCamera(float yawRad, float pitchRad, float aspect, float zoomAmount, float topLimit)
 {
     // orbite autour du centre du relief (comme la preview)
     const float r=9.5f;
@@ -275,6 +276,32 @@ GpuSpectrogramDisplay::Camera GpuSpectrogramDisplay::makeCamera(float yawRad, fl
     cam.shiftY=juce::jlimit(0.f, 0.6f, ys[1]+1.02f);   // le plus haut des deux coins du bas
     if(cam.shiftY>0.f)
         for(int c=0;c<4;++c) cam.mvp[c*4+1]-=cam.shiftY*cam.mvp[c*4+3];
+    // Le point 0 reste entier : le relief à pleine échelle est ramené sous la
+    // ligne du titre, le bas du cadre ne bouge pas. Un coin tout près de la
+    // caméra (vue basse et tournée) ne compte pas : il écraserait l'image.
+    float reliefTop=-1.f;
+    for(const float x : { -halfX, halfX })
+        for(const float z : { -halfZ, halfZ }){
+            const float* m=cam.mvp;
+            const float cy=m[1]*x + m[5]*kReliefH + m[9]*z + m[13];
+            const float cw=m[3]*x + m[7]*kReliefH + m[11]*z + m[15];
+            if(cw>2.f) reliefTop=juce::jmax(reliefTop, cy/cw);
+        }
+    if(reliefTop>topLimit){
+        cam.fitY=juce::jmax(0.6f, (topLimit+1.f)/(reliefTop+1.f));
+        for(int c=0;c<4;++c) cam.mvp[c*4+1]=cam.fitY*cam.mvp[c*4+1]+(cam.fitY-1.f)*cam.mvp[c*4+3];
+    }
+    // zoom molette : en avant, l'image grandit depuis la ligne du titre (le plus
+    // récent reste entier, le plus ancien passe sous le cadre) ; en arrière, elle
+    // se resserre vers le milieu de la zone libre : le vide se partage entre le
+    // titre et le bas du cadre, le point 0 ne descend pas (le bord avant dépasse
+    // un peu du cadre, d'où 60 % plutôt que 50 %)
+    cam.zoom=1.f+zoomAmount;
+    cam.zoomAnchorY=zoomAmount>0.f ? topLimit : -1.f+0.6f*(topLimit+1.f);
+    for(int c=0;c<4;++c){
+        cam.mvp[c*4]*=cam.zoom;
+        cam.mvp[c*4+1]=cam.zoom*cam.mvp[c*4+1]+(1.f-cam.zoom)*cam.zoomAnchorY*cam.mvp[c*4+3];
+    }
     cam.eye[0]=eyeP.x; cam.eye[1]=eyeP.y; cam.eye[2]=eyeP.z;
     cam.halfX=halfX; cam.halfZ=halfZ;
     cam.dir[0]=f.x; cam.dir[1]=f.y; cam.dir[2]=f.z;
@@ -331,6 +358,7 @@ void GpuSpectrogramDisplay::syncFromProcessor()
     yawRef()=snapYaw(yawRef(), kSnapAtLoad);
     yaw=yawRef();
     pitch=juce::jlimit(0.12f, 1.1f, pitchRef());
+    zoom=juce::jlimit(kMinZoom, kMaxZoom, zoomRef());
     repaint();
 }
 
@@ -364,6 +392,16 @@ float& GpuSpectrogramDisplay::pitchRef()
     return style==Style::Terrain ? processor.gpuTerrainPitch : style==Style::Neon ? processor.gpuNeonPitch : processor.gpuCrystalPitch;
 }
 
+float GpuSpectrogramDisplay::topLimit(int h) const
+{
+    return juce::jmax(-0.5f, 1.f-2.f*(float)(titleBottom.load()+2)/(float)juce::jmax(1, h));
+}
+
+float& GpuSpectrogramDisplay::zoomRef()
+{
+    return style==Style::Terrain ? processor.gpuTerrainZoom : style==Style::Neon ? processor.gpuNeonZoom : processor.gpuCrystalZoom;
+}
+
 float& GpuSpectrogramDisplay::timeRef()
 {
     switch(style){
@@ -395,6 +433,7 @@ void GpuSpectrogramDisplay::resized()
     const int hh=juce::jlimit(16, 22, juce::roundToInt(19.f*Ui::textScale));
     const int hw=juce::roundToInt(46.f*Ui::textScale);
     holdBtn->setBounds(getWidth()-hw-8, 2, hw, hh);
+    titleBottom=holdBtn->getBottom()+3;
 }
 
 //==============================================================================
@@ -419,9 +458,16 @@ void GpuSpectrogramDisplay::mouseDrag(const juce::MouseEvent& e)
 void GpuSpectrogramDisplay::mouseDoubleClick(const juce::MouseEvent& e)
 {
     if(e.mods.isRightButtonDown()) return;
-    yaw=0.f; pitch=kDefaultPitch;
-    yawRef()=0.f; pitchRef()=kDefaultPitch;
+    yaw=0.f; pitch=kDefaultPitch; zoom=0.f;
+    yawRef()=0.f; pitchRef()=kDefaultPitch; zoomRef()=0.f;
     repaint();
+}
+void GpuSpectrogramDisplay::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& w)
+{
+    float z=juce::jlimit(kMinZoom, kMaxZoom, zoom.load()+w.deltaY*0.053f);   // ~2,5 % par cran de molette
+    if(std::abs(z)<0.008f) z=0.f;   // aimant sur le cadrage d'origine
+    zoom=z; zoomRef()=z;
+    repaint();   // repères de fréquence
 }
 
 // Calque 2D : composé par JUCE au-dessus du rendu GL (ou peint seul quand le
@@ -437,7 +483,7 @@ void GpuSpectrogramDisplay::paint(juce::Graphics& g)
     // repères projetés sur le relief : fréquences le long du bord du fond,
     // temps le long du bord droit
     const float off=kReleaseFaderW, W3=juce::jmax(1.f, (float)W-off);   // zone 3D
-    const auto cam=makeCamera(yaw.load(), pitch.load(), W3/(float)H);
+    const auto cam=makeCamera(yaw.load(), pitch.load(), W3/(float)H, zoom.load(), topLimit(H));
     auto project=[&](float x, float y, float z, juce::Point<float>& out){
         const float* m=cam.mvp;
         const float cx=m[0]*x+m[4]*y+m[8]*z+m[12], cy=m[1]*x+m[5]*y+m[9]*z+m[13], cw=m[3]*x+m[7]*y+m[11]*z+m[15];
@@ -451,14 +497,14 @@ void GpuSpectrogramDisplay::paint(juce::Graphics& g)
     g.setFont(Ui::iceland(9.f));
     SpectroReadout::drawFreqMarks(g, fTop, [&](float hz, juce::Point<float>& at){
             return project((std::log(hz/20.f)/logSpan*2.f-1.f)*cam.halfX, 0.f, -cam.halfZ-0.25f, at); },   // le long de la ligne la plus récente
-        12.f*Ui::textScale, { off+4.f, 20.f, W3-8.f, (float)H-24.f });
+        12.f*Ui::textScale, { off+4.f, (float)titleBottom.load()+1.f, W3-8.f, (float)(H-titleBottom.load())-5.f });
     {
         const float T=juce::jmax(0.5f, timeSecA.load()), step=SpectroReadout::timeTickStep(T);
         g.setFont(Ui::iceland(8.5f));
         for(float t=0.f; t<=T+1e-3f; t+=step){
             juce::Point<float> p;
             if(!project(cam.halfX, 0.f, -cam.halfZ+t/T*2.f*cam.halfZ, p)) continue;   // 0 s au fond (la plus récente)
-            if(p.y<22.f || p.y>(float)H-6.f || p.x<off) continue;
+            if(p.y<(float)titleBottom.load()+6.f || p.y>(float)H-6.f || p.x<off) continue;
             const auto lbl=SpectroReadout::formatTimeTick(t, step);
             const float w=juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), lbl)+2.f;
             g.setColour(Col::textMid.withAlpha(0.6f));
@@ -468,9 +514,18 @@ void GpuSpectrogramDisplay::paint(juce::Graphics& g)
         }
     }
 
+    Ui::drawTitleDecor(g, (float)W, (float)holdBtn->getBottom()+2.f);   // sous HOLD
+    // valeur du zoom molette, en petit à gauche de HOLD
+    const juce::String zoomText="ZOOM "+juce::String(juce::roundToInt(zoom.load()*100.f))+" %";
+    const auto zoomFont=Ui::iceland(9.f);
+    const int zoomW=juce::roundToInt(juce::GlyphArrangement::getStringWidth(zoomFont, zoomText))+2;
+    g.setFont(zoomFont);
+    g.setColour(Col::textMid.withAlpha(0.8f));
+    g.drawText(zoomText, holdBtn->getX()-zoomW-8, 5, zoomW, 13, juce::Justification::centredRight, false);
+
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
-    Ui::drawTitleFit(g, TR(title()), { 6.f, 5.f, (float)juce::jmax(20, holdBtn->getX()-12), 13.f }, g.getCurrentFont());   // plutôt que "…"
+    Ui::drawTitleFit(g, TR(title()), { 6.f, 5.f, (float)juce::jmax(20, holdBtn->getX()-zoomW-20), 13.f }, g.getCurrentFont());   // plutôt que "…"
 
     // lecture au survol (le point est marqué en 3D par le shader)
     if(gl && shownValid)
@@ -575,7 +630,9 @@ void GpuSpectrogramDisplay::pick(const Camera& cam, float frac, int w, int h)
 {
     if(!hoverOn.load()){ hitValid=false; return; }
     const float nx=(hoverX.load()-kReleaseFaderW)/(float)w*2.f-1.f, ny=1.f-hoverY.load()/(float)h*2.f;
-    const float sx=nx*cam.tanHalfY*cam.aspect, sy=(ny+cam.shiftY)*cam.tanHalfY;   // + décalage de l'objectif
+    // (zoom puis tassement retirés d'abord : ils s'appliquent après le décalage de l'objectif)
+    const float ny0=(((ny-cam.zoomAnchorY)/cam.zoom+cam.zoomAnchorY)+1.f)/cam.fitY-1.f;
+    const float sx=nx/cam.zoom*cam.tanHalfY*cam.aspect, sy=(ny0+cam.shiftY)*cam.tanHalfY;
     float d[3];
     for(int k=0;k<3;++k) d[k]=cam.dir[k]+cam.right[k]*sx+cam.up[k]*sy;
     const float len=std::sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
@@ -642,14 +699,23 @@ void GpuSpectrogramDisplay::renderOpenGL()
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, heightTex);
+    // nouvelle fréquence d'échantillonnage : l'historique suivait l'ancien axe
+    if(logMap.axisVersion()!=seenAxisVersion){
+        seenAxisVersion=logMap.axisVersion();
+        std::memset(rows, 0, sizeof(rows));
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, NX, NZ, GL_RED, GL_FLOAT, rows);
+    }
     const int liveRow=(head+1)%NZ;
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, liveRow, NX, 1, GL_RED, GL_FLOAT, rows[liveRow]);
 
     const float scale=(float)context.getRenderingScale();
     const int w=viewW.load(), h=viewH.load();
     glViewport(juce::roundToInt(scale*kReleaseFaderW), 0, juce::roundToInt(scale*(float)w), juce::roundToInt(scale*(float)h));   // à droite du fader
+    // garde-fou : rien ne passe au-dessus de la ligne du titre
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(0, 0, juce::roundToInt(scale*(kReleaseFaderW+(float)w)), juce::roundToInt(scale*(float)(h-titleBottom.load())));
 
-    const auto cam=makeCamera(yaw.load(), pitch.load(), (float)w/(float)h);
+    const auto cam=makeCamera(yaw.load(), pitch.load(), (float)w/(float)h, zoom.load(), topLimit(h));
     const auto acc=Col::accent;
     pick(cam, frac, w, h);
     const bool showHover=hoverOn.load() && hitValid.load();
@@ -691,6 +757,7 @@ void GpuSpectrogramDisplay::renderOpenGL()
     // état rendu à JUCE (composition du calque 2D)
     glBindVertexArray((GLuint)prevVao);
     glDisable(GL_DEPTH_TEST);
+    glDisable(GL_SCISSOR_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glBindTexture(GL_TEXTURE_2D, 0);

@@ -61,7 +61,7 @@ Les dernières images s'estompent, comme un écran à phosphore		The last frames
 Tube		Tube	Röhre	Tubo	Tubo	Tubo	Трубка	ブラウン管	示波管	브라운관
 Numérique		Digital	Digital	Digitale	Digital	Digital	Цифровой	デジタル	数字	디지털
 Vintage		Vintage	Vintage	Vintage	Vintage	Vintage	Винтаж	ヴィンテージ	复古	빈티지
-Deux voies		Dual trace	Zweikanal	Doppia traccia	Doble trazo	Dois canais	Два канала	2チャンネル	双通道	2채널
+Rempli		Filled	Gefüllt	Riempito	Relleno	Preenchido	Заливка	塗りつぶし	填充	채움
 Template		Template	Vorlage	Modello	Plantilla	Modelo	Шаблон	テンプレート	模板	템플릿
 Décor autour des écrans		Decor around the screens	Dekor rund um die Bildschirme	Decoro attorno agli schermi	Decorado alrededor de las pantallas	Decoração ao redor das telas	Оформление вокруг экранов	画面まわりの装飾	屏幕周围的装饰	화면 주변 장식
 Galerie des templates		Template gallery	Vorlagengalerie	Galleria dei modelli	Galería de plantillas	Galeria de modelos	Галерея шаблонов	テンプレートギャラリー	模板库	템플릿 갤러리
@@ -295,3 +295,17 @@ Avec le thème clair		With the light theme	Mit dem hellen Thema	Con il tema chia
 Clairs		Light	Hell	Chiari	Claras	Claras	Светлые	明るい	浅色	밝게
 Noirs		Black	Schwarz	Neri	Negras	Pretas	Чёрные	黒	黑色	검정
 Couleurs des écrans sombres ; en thème clair, les écrans Papier en reprennent l'accent.		Dark screen colours; with the light theme, Paper screens take their accent from them.	Farben der dunklen Anzeigen; im hellen Thema übernehmen die Papier-Anzeigen ihren Akzent.	Colori degli schermi scuri; con il tema chiaro, gli schermi Carta ne riprendono l'accento.	Colores de las pantallas oscuras; con el tema claro, las pantallas Papel toman su acento.	Cores das telas escuras; com o tema claro, as telas Papel usam o seu destaque.	Цвета тёмных экранов; в светлой теме экраны «Бумага» берут из них акцент.	暗い画面の色。ライトテーマでは、ペーパー画面がアクセントを引き継ぎます。	深色屏幕的颜色；浅色主题下，纸张屏幕沿用其强调色。	어두운 화면 색상. 라이트 테마에서는 페이퍼 화면이 강조색을 이어받습니다.
+Titres des modules		Module titles	Modultitel	Titoli dei moduli	Títulos de los módulos	Títulos dos módulos	Заголовки модулей	モジュールのタイトル	模块标题	모듈 제목
+Ligne sous le titre		Line under the title	Linie unter dem Titel	Linea sotto il titolo	Línea bajo el título	Linha sob o título	Линия под заголовком	タイトルの下の線	标题下方的线条	제목 아래 선
+Sans		None	Keine	Nessuna	Sin línea	Sem linha	Нет	なし	无	없음
+Filet		Line	Linie	Linea	Línea	Linha	Линия	ライン	细线	라인
+Bandeau		Band	Band	Fascia	Banda	Faixa	Полоса	帯	横条	밴드
+Corrélation des vectorscopes		Vectorscope correlation	Vektorskop-Korrelation	Correlazione dei vettorscopi	Correlación de los vectorscopios	Correlação dos vectorscópios	Корреляция векторскопов	ベクトルスコープの相関	矢量示波器相关性	벡터스코프 상관
+Sur le cerclage du cercle		On the edge of the circle	Auf dem Kreisrand	Sul bordo del cerchio	En el borde del círculo	Na borda do círculo	На ободе круга	円の縁に表示	显示在圆环上	원 테두리에 표시
+Barre		Bar	Balken	Barra	Barra	Barra	Полоса	バー	条形	바
+Curseur		Cursor	Cursor	Cursore	Cursor	Cursor	Курсор	カーソル	光标	커서
+Gradué		Graduated	Skaliert	Graduato	Graduado	Graduado	Шкала	目盛り付き	带刻度	눈금
+Voies gauche et droite		Left and right channels	Linker und rechter Kanal	Canali sinistro e destro	Canales izquierdo y derecho	Canais esquerdo e direito	Левый и правый каналы	左右チャンネル	左右声道	좌우 채널
+En stéréo : sur le même écran ou l'une au-dessus de l'autre		In stereo: on one screen or one above the other	In Stereo: auf einem Schirm oder übereinander	In stereo: sullo stesso schermo o uno sopra l'altro	En estéreo: en la misma pantalla o uno encima del otro	Em estéreo: no mesmo ecrã ou um acima do outro	В стерео: на одном экране или один над другим	ステレオ時：同じ画面に重ねるか上下に分ける	立体声时：同屏显示或上下分开	스테레오: 한 화면에 겹치거나 위아래로 분리
+Superposées		Overlaid	Überlagert	Sovrapposti	Superpuestos	Sobrepostos	Наложение	重ねる	叠加	겹침
+Séparées		Separate	Getrennt	Separati	Separados	Separados	Раздельно	分ける	分开	분리

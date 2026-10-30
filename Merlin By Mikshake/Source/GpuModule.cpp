@@ -164,7 +164,14 @@ void GpuModuleBase::timerCallback()
     }
     const bool vs=vsyncWanted.load();
     if(!vs && context.isAttached()) context.triggerRepaint();
-    if(vs || ++uiTickDiv>=juce::jmax(1, frameHz/30)){ uiTickDiv=0; uiTick(); }
+    if(vs || ++uiTickDiv>=juce::jmax(1, frameHz/30)){
+        uiTickDiv=0;
+        // le calque 2D (graduations) n'est repeint que sur demande : il doit
+        // suivre un changement de fréquence d'échantillonnage
+        const double sr=processor.getCurrentSampleRate();
+        if(sr!=shownSampleRate){ shownSampleRate=sr; repaint(); }
+        uiTick();
+    }
 }
 
 // Fil de cadence (une fois par composition de l'écran) : une image par
@@ -268,6 +275,7 @@ void GpuModuleBase::paintGlFailure(juce::Graphics& g)
 void PsdLogMap::rebuild(double sr)
 {
     mappedSampleRate=sr;
+    ++axisVersionCount;
     const float binHz=(float)sr/(float)LeakAudioProcessor::PSD_FFT_SIZE;
     // 160 points log de 20 Hz au haut de l'axe (20 kHz, ou Nyquist si étendu)
     const float ratio=(extendedAxis ? topHz(sr) : 20000.f)/20.f;

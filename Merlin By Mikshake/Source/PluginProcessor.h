@@ -126,6 +126,8 @@ public:
     int  uiScale      { 0 };       // Options › Affichage › Taille de l'interface : 0 automatique (selon l'écran), sinon 100..200 %
     int  plateTint    { 1 };       // thème sombre : 0 gris d'origine, 1 ardoise (design de Sunny, v1.73)
     int  lightScreens { 1 };       // thème clair : 1 écrans des modules « Papier » (v1.75), 0 écrans noirs
+    int  titleStyle   { 1 };       // titres des modules (à l'essai) : 0 sans, 1 filet d'accent, 2 bandeau
+    int  corrStyle    { 1 };       // corrélation des vectorscopes (à l'essai) : 0 barre, 1 curseur sur le cerclage, 2 cerclage gradué
     bool masterConsole{ false };   // section master : false = A "Instrument", true = C "Console mastering"
 
     // Sens de défilement du spectrogramme 3D (indépendant par module) —
@@ -148,6 +150,7 @@ public:
     float gpuTerrainYaw { 0.f }, gpuTerrainPitch { 1.018f };
     float gpuNeonYaw    { 0.f }, gpuNeonPitch    { 1.018f };
     float gpuCrystalYaw { 0.f }, gpuCrystalPitch { 1.018f };
+    float gpuTerrainZoom { 0.f }, gpuNeonZoom { 0.f }, gpuCrystalZoom { 0.f };   // zoom molette, -0,25..0,25
 
     // ── Presets utilisateur (menu PRESET) ───────────────────────────────────
     static juce::File getPresetFolder();   // %APPDATA%\Side Key System\Merlin Alpha Presets
@@ -175,7 +178,8 @@ public:
     int   oscDefaultWindow() const { const double sr=getCurrentSampleRate(); return juce::roundToInt(0.025*(sr>0.0 ? sr : 48000.0)); }
     float oscAmpVal       { 1.0f };   // amplitude verticale de l'oscilloscope
     bool  oscMono         { false };  // oscilloscope : une trace (L+R)/2 au lieu de L et R
-    int   oscStyle        { 0 };      // oscilloscope : 0 tube cathodique, 1 numérique, 2 vintage, 3 deux voies
+    bool  oscSplit        { false };  // oscilloscope, en stéréo : L et R l'une au-dessus de l'autre (sinon superposées)
+    int   oscStyle        { 0 };      // oscilloscope : 0 tube cathodique, 1 numérique, 2 vintage, 3 rempli
     int   oscFps          { 30 };     // oscilloscope : images/s (24, 30 ou 60) — plus lisible que 60
     bool  oscPersist      { true };   // oscilloscope : rémanence des deux images précédentes
     int   oscLineWidth    { 20 };     // oscilloscope : épaisseur du trait, curseur 0..100 (0 = le plus fin)

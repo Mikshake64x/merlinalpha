@@ -61,6 +61,7 @@ private:
     std::atomic<float> timeSecA { 2.1f }, tiltA { 0.3f }, skewA { 0.f };
     std::atomic<bool>  reverseA { false };
     std::atomic<int>   viewW { 1 }, viewH { 1 };
+    std::atomic<int>   titleBottom { 26 };   // le relief s'arrête là : rien ne chevauche le titre
     float tiltAtDragStart { 0.3f }, skewAtDragStart { 0.f };
     bool  dragFromTitle { false };   // glisser parti du titre : pas de perspective (détachement du module)
     juce::Rectangle<float> dirBtnBounds;
@@ -80,6 +81,7 @@ private:
     double lastCaptureMs { 0.0 };
     float  glideFrac { 0.f };
     PsdLogMap logMap;
+    int seenAxisVersion { 0 };
     float  liveDb[NPTS] {};
     // courbe "live" au fond, mise à jour à chaque image : le bord du fond bouge
     // en continu même avec un TIME long (sinon une courbe toutes les TIME/95 s)

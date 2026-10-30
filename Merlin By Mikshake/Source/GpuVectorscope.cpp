@@ -235,6 +235,7 @@ void GpuVectorscopeDisplay::paint(juce::Graphics& g)
     g.drawText("R",(int)(cx+r*0.707f-2),(int)(cy-r*0.707f-13),14,11,juce::Justification::centred);
     g.drawText("L",(int)(cx-r*0.707f-12),(int)(cy-r*0.707f-13),14,11,juce::Justification::centred);
 
+    Ui::drawTitleDecor(g, (float)W, Ui::kTitleLineY, Ui::titleEndBeforeRing(cx, cy, r));
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     // gain automatique appliqué à l'affichage, à droite ; le titre prend le reste
@@ -246,9 +247,10 @@ void GpuVectorscopeDisplay::paint(juce::Graphics& g)
     g.setColour(Col::textMid.withAlpha(0.8f));
     g.drawText(gainTxt, W-gainW-6, 5, gainW, 13, juce::Justification::right, false);
 
-    // barre de corrélation (-1 .. +1), à la place et à la largeur de la jauge
-    // du Vectorscope d'origine (sous le cercle, 1.6 x le rayon)
-    {
+    // corrélation sur le cerclage ; ou barre (-1 .. +1), à la place et à la
+    // largeur de la jauge du Vectorscope d'origine (sous le cercle, 1.6 x le rayon)
+    if(Ui::corrStyle!=0) Ui::drawCorrRing(g, cx, cy, r, juce::jlimit(-1.f, 1.f, corrUi.load()), (float)H);
+    else {
         const float co=juce::jlimit(-1.f, 1.f, corrUi.load());
         const float mh=3.f, y=(float)H-mh*0.5f-8.f;
         const float x0=cx-r*0.80f, x1=cx+r*0.80f, mid=cx;

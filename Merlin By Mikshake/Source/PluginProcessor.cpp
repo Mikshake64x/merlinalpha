@@ -750,6 +750,8 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("uiScale", uiScale);
     xml.setAttribute("plateTint", plateTint);
     xml.setAttribute("lightScreens", lightScreens);
+    xml.setAttribute("titleStyle", titleStyle);
+    xml.setAttribute("corrStyle", corrStyle);
     xml.setAttribute("masterConsole", masterConsole);
     xml.setAttribute("peakHoldOn", peakHoldOn);
     xml.setAttribute("peakHoldIdx", peakHoldIdx);
@@ -763,6 +765,7 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("oscAmpVal", (double)oscAmpVal);
     xml.setAttribute("oscMono", oscMono);
     xml.setAttribute("oscStyle", oscStyle);
+    xml.setAttribute("oscSplit", oscSplit);
     xml.setAttribute("oscFps", oscFps);
     xml.setAttribute("oscPersist", oscPersist);
     xml.setAttribute("oscLineW", oscLineWidth);
@@ -794,6 +797,8 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("gpuTerrainYaw", (double)gpuTerrainYaw); xml.setAttribute("gpuTerrainPitch", (double)gpuTerrainPitch);
     xml.setAttribute("gpuNeonYaw",    (double)gpuNeonYaw);    xml.setAttribute("gpuNeonPitch",    (double)gpuNeonPitch);
     xml.setAttribute("gpuCrystalYaw", (double)gpuCrystalYaw); xml.setAttribute("gpuCrystalPitch", (double)gpuCrystalPitch);
+    xml.setAttribute("gpuTerrainZoom", (double)gpuTerrainZoom); xml.setAttribute("gpuNeonZoom", (double)gpuNeonZoom);
+    xml.setAttribute("gpuCrystalZoom", (double)gpuCrystalZoom);
     xml.setAttribute("presetName", currentPresetName);
     copyXmlToBinary(xml,destData);
 }
@@ -973,6 +978,8 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             if(uiScale!=0) uiScale=juce::jlimit(100, 200, uiScale);
             plateTint = juce::jlimit(0, 1, xml->getIntAttribute("plateTint", plateTint));   // absent : inchangé
             lightScreens = juce::jlimit(0, 1, xml->getIntAttribute("lightScreens", lightScreens));
+            titleStyle = juce::jlimit(0, 2, xml->getIntAttribute("titleStyle", titleStyle));
+            corrStyle  = juce::jlimit(0, 2, xml->getIntAttribute("corrStyle", corrStyle));
             masterConsole = xml->getBoolAttribute("masterConsole", false);
             peakHoldOn  = xml->getBoolAttribute("peakHoldOn", true);
             peakHoldIdx = xml->getIntAttribute("peakHoldIdx", 2);
@@ -986,6 +993,7 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             oscAmpVal   = (float)xml->getDoubleAttribute("oscAmpVal", 1.0);
             oscMono     = xml->getBoolAttribute("oscMono", false);
             oscStyle    = juce::jlimit(0, 3, xml->getIntAttribute("oscStyle", 0));
+            oscSplit    = xml->getBoolAttribute("oscSplit", oscStyle>=2);   // état plus ancien : ce que faisait ce style
             oscFps      = juce::jlimit(10, 144, xml->getIntAttribute("oscFps", 30));
             oscPersist  = xml->getBoolAttribute("oscPersist", true);
             // curseur 0..100 (v1.69), 20 d'origine ; les anciens niveaux 0..3
@@ -1022,6 +1030,9 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             gpuNeonPitch    = (float)xml->getDoubleAttribute("gpuNeonPitch",    1.018);
             gpuCrystalYaw   = (float)xml->getDoubleAttribute("gpuCrystalYaw",   0.0);
             gpuCrystalPitch = (float)xml->getDoubleAttribute("gpuCrystalPitch", 1.018);
+            gpuTerrainZoom  = (float)xml->getDoubleAttribute("gpuTerrainZoom",  0.0);
+            gpuNeonZoom     = (float)xml->getDoubleAttribute("gpuNeonZoom",     0.0);
+            gpuCrystalZoom  = (float)xml->getDoubleAttribute("gpuCrystalZoom",  0.0);
             currentPresetName = xml->getStringAttribute("presetName");
         }
     }

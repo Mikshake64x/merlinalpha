@@ -121,6 +121,62 @@ juce::String formatTimeTick(float sec, float step)
 
 }   // namespace SpectroReadout (rouvert juste après)
 
+void Ui::drawTitleDecor(juce::Graphics& g, float W, float y, float endX)
+{
+    if(titleStyle==0) return;
+    const float x0=8.f, x1=endX>0.f ? endX : W-8.f;
+    if(titleStyle==1){
+        juce::ColourGradient line(Col::accent, x0, 0.f, Col::accent.withAlpha(0.f), x1, 0.f, false);
+        line.addColour(0.45, Col::accent.withAlpha(0.33f));
+        g.setGradientFill(line);
+        g.fillRect(x0, y, x1-x0, 1.f);
+    } else {
+        g.setColour(Col::light(0.05f));
+        g.fillRect(0.f, 0.f, W, y);
+        g.setColour(Col::light(Col::paper ? 0.22f : 0.16f));
+        g.fillRect(0.f, y, endX>0.f ? endX : W, 1.f);
+    }
+}
+
+float Ui::titleEndBeforeRing(float cx, float cy, float r)
+{
+    const float dy=cy-kTitleLineY;
+    if(dy>=r+2.f) return 0.f;
+    return juce::jmax(40.f, cx-std::sqrt(juce::jmax(0.f, r*r-dy*dy))-6.f);
+}
+
+void Ui::drawCorrRing(juce::Graphics& g, float cx, float cy, float r, float corr, float height)
+{
+    const float pi=juce::MathConstants<float>::pi;
+    const auto angle=[pi](float c){ return pi-juce::jlimit(-1.f, 1.f, c)*pi*0.5f; };   // 0 en haut, sens horaire : -1 à gauche, 0 en bas, +1 à droite
+    auto stroke=[&](float from, float to, float width){
+        juce::Path arc; arc.addCentredArc(cx, cy, r, r, 0.f, from, to, true);
+        g.strokePath(arc, juce::PathStrokeType(width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    };
+    g.setColour(Col::light(Col::paper ? 0.18f : 0.14f));
+    stroke(pi*0.5f, pi*1.5f, 3.2f);
+
+    if(corrStyle==2){
+        g.setColour(Col::textMid);
+        for(int k=-4; k<=4; ++k){
+            const float a=angle((float)k*0.25f);
+            const bool big=k%4==0;
+            const float r0=r-(big ? 5.6f : 3.2f), r1=r+(big ? 5.6f : 3.2f);
+            g.drawLine(cx+std::sin(a)*r0, cy-std::cos(a)*r0, cx+std::sin(a)*r1, cy-std::cos(a)*r1, big ? 1.3f : 0.8f);
+        }
+        g.setFont(Ui::iceland(7.5f));
+        const juce::Rectangle<float> tag(0.f, 0.f, 22.f, 12.f);
+        if(cy+r+20.f<height) g.drawText("0", tag.withCentre({ cx, cy+r+13.6f }), juce::Justification::centred, false);
+        g.drawText("-1", tag.withPosition(cx-r+2.f, cy+7.f), juce::Justification::centredLeft, false);
+        g.drawText("+1", tag.withPosition(cx+r-24.f, cy+7.f), juce::Justification::centredRight, false);
+    }
+
+    const auto col=corr>=0.f ? Col::accent.interpolatedWith(Col::ink(juce::Colour(0xFFFFD200)), 1.f-corr) : Col::ink(juce::Colour(0xFFFF5530));
+    const float a=angle(corr);
+    g.setColour(col);
+    stroke(a-0.05f, a+0.05f, 6.4f);
+}
+
 void Ui::drawAxisLabels(juce::Graphics& g, const std::vector<AxisLabel>& labels, float y, float h, juce::Range<float> clipX, float gap)
 {
     const auto font=g.getCurrentFont();
@@ -794,7 +850,7 @@ void NeuAnimButton::paintButton(juce::Graphics& g, bool over, bool down)
         kick();
 
     // marge réservée dans les bounds pour le relief (pas de dessin hors limites)
-    const auto r=getLocalBounds().toFloat().reduced(arrowDir!=0 ? 1.5f : 2.5f);
+    const auto r=getLocalBounds().toFloat().reduced(reliefMargin>=0.f ? reliefMargin : arrowDir!=0 ? 1.5f : 2.5f);
     const float rad=juce::jmin(r.getHeight()*0.5f, 9.f);
     juce::Path shape; shape.addRoundedRectangle(r, rad);
     const float raised=juce::jlimit(0.f, 1.f, 1.f-press);
@@ -854,10 +910,91 @@ void NeuAnimButton::paintButton(juce::Graphics& g, bool over, bool down)
         return;
     }
     const int textLen=juce::jmax(1, getButtonText().length());
-    const float maxFsByW=((float)getWidth()-6.f)/((float)textLen*0.62f);
-    const float fs=juce::jlimit(7.f, 15.f*Ui::textScale, juce::jmin((float)getHeight()*0.5f*Ui::textScale, maxFsByW));
+    const float maxFsByW=(r.getWidth()-1.f)/((float)textLen*0.62f);
+    const float fs=juce::jlimit(7.f, 15.f*Ui::textScale, juce::jmin((r.getHeight()+5.f)*0.5f*Ui::textScale, maxFsByW));
     g.setFont(Ui::icelandAbs(fs));   // taille ajustée à la largeur, déjà à l'échelle
     g.drawText(getButtonText(), getLocalBounds().toFloat().translated(0.f, sunk-glow), juce::Justification::centred);
+}
+
+//==============================================================================
+namespace
+{
+    constexpr int kWindowBarH = 22;
+
+    struct WindowBarButton final : public juce::Button
+    {
+        explicit WindowBarButton(int t) : juce::Button("window"), type(t) {}
+
+        void paintButton(juce::Graphics& g, bool over, bool down) override
+        {
+            const auto r=getLocalBounds().toFloat();
+            const bool close=type==juce::DocumentWindow::closeButton;
+            if(over || down){
+                g.setColour(close ? juce::Colour(0xffd9443f).withAlpha(down ? 0.8f : 1.f)
+                                  : Neu::text.withAlpha(down ? 0.2f : 0.1f));
+                g.fillRoundedRectangle(r.reduced(1.f), 4.f);
+            }
+            g.setColour(close && (over || down) ? juce::Colours::white : Neu::text.withAlpha(0.8f));
+            const auto c=r.getCentre();
+            const float a=4.f, t=1.2f;
+            if(type==juce::DocumentWindow::minimiseButton)
+                g.drawLine(c.x-a, c.y, c.x+a, c.y, t);
+            else if(close){
+                g.drawLine(c.x-a, c.y-a, c.x+a, c.y+a, t);
+                g.drawLine(c.x-a, c.y+a, c.x+a, c.y-a, t);
+            } else if(getToggleState()){   // fenêtre agrandie : restaurer
+                g.drawRect(juce::Rectangle<float>(a*1.6f, a*1.6f).withCentre({ c.x-1.5f, c.y+1.5f }), t);
+                g.drawLine(c.x-a+2.5f, c.y-a, c.x+a, c.y-a, t);
+                g.drawLine(c.x+a, c.y-a, c.x+a, c.y+a-2.5f, t);
+            } else
+                g.drawRect(juce::Rectangle<float>(a*2.f, a*2.f).withCentre(c), t);
+        }
+
+        int type;
+    };
+}
+
+juce::ColourGradient Neu::plateFace(juce::Rectangle<float> r)
+{
+    return juce::ColourGradient(surface.brighter(light ? 0.02f : 0.04f), r.getX(), r.getY(),
+                                surface.darker  (light ? 0.03f : 0.06f), r.getRight(), r.getBottom(), false);
+}
+
+void WindowBarLook::install(juce::DocumentWindow& w)
+{
+   #if JUCE_WINDOWS
+    w.setLookAndFeel(this);
+    w.setTitleBarHeight(kWindowBarH);
+   #else
+    w.setUsingNativeTitleBar(true);
+   #endif
+}
+
+void WindowBarLook::drawDocumentWindowTitleBar(juce::DocumentWindow&, juce::Graphics& g, int, int h, int, int, const juce::Image*, bool)
+{
+    g.setColour(Neu::accentInk());
+    g.setFont(juce::Font(juce::FontOptions(16.f, juce::Font::bold)));
+    g.drawText(juce::String(juce::CharPointer_UTF8("\xce\xb1")), 8, 0, 20, h, juce::Justification::centredLeft, false);
+}
+
+juce::Button* WindowBarLook::createDocumentWindowButton(int buttonType)
+{
+    return new WindowBarButton(buttonType);
+}
+
+void WindowBarLook::positionDocumentWindowButtons(juce::DocumentWindow&, int x, int y, int w, int h,
+                                                  juce::Button* minimise, juce::Button* maximise, juce::Button* close, bool)
+{
+    const int bw=28;
+    int bx=x+w-bw-2;
+    for(auto* b : { close, maximise, minimise })
+        if(b!=nullptr){ b->setBounds(bx, y, bw, h); bx-=bw; }
+}
+
+void WindowBarLook::fillResizableWindowBackground(juce::Graphics& g, int w, int h, const juce::BorderSize<int>&, juce::ResizableWindow&)
+{
+    g.setGradientFill(Neu::plateFace({ (float)w, (float)h }));   // sans couture avec la plaque de l'éditeur
+    g.fillAll();
 }
 
 //==============================================================================
@@ -1180,11 +1317,12 @@ void VectorscopeDisplay::paintBackground(juce::Graphics& g, float cx, float cy, 
 }
 
 // Partie animée : traînée, jauge de corrélation, titre (même ordre qu'avant)
-void VectorscopeDisplay::paintForeground(juce::Graphics& g, float cx, float, float r)
+void VectorscopeDisplay::paintForeground(juce::Graphics& g, float cx, float cy, float r)
 {
     const int H=getHeight();
     if(trailValid) g.drawImageAt(trailImage,0,0);
-    {
+    if(Ui::corrStyle!=0) Ui::drawCorrRing(g, cx, cy, r, corr, (float)H);
+    else {
         // Jauge de corrélation : indicateur purement graphique, sans aucun texte.
         const float mh=2.5f, my=(float)H-mh-8.f, mx=cx-r*0.80f, mw=r*1.60f;
         g.setColour(Col::knobDim.darker(0.3f));
@@ -1196,6 +1334,7 @@ void VectorscopeDisplay::paintForeground(juce::Graphics& g, float cx, float, flo
         g.setColour(Col::gridCtr.withAlpha(0.45f));
         g.drawLine(mx+mw*0.5f,my,mx+mw*0.5f,my+mh,0.5f);
     }
+    Ui::drawTitleDecor(g, (float)getWidth(), Ui::kTitleLineY, Ui::titleEndBeforeRing(cx, cy, r));
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("VECTORSCOPE"),6,5,getWidth()-12,13,juce::Justification::left,1,0.7f);
@@ -1291,6 +1430,7 @@ void MultibandVectorscopeDisplay::paint(juce::Graphics& g)
         g.setColour(Col::textMid.withAlpha(0.85f));
         g.drawFittedText(TR(labels[b]),(int)(cx-r),(int)(cy+r+2),(int)(r*2),12,juce::Justification::centred,1,0.7f);
     }
+    Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("MULTIBAND VECTORSCOPE"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
@@ -1416,7 +1556,7 @@ void Spectrogram3DBase::timerCallback()
     glideFrac=(float)juce::jlimit(0.0, 1.0, (now-lastCaptureMs)/cap);
 
     const double sr=processor.getCurrentSampleRate();
-    if(sr>0.0 && sr!=mappedSampleRate) rebuildBinMap(sr);
+    if(sr>0.0 && sr!=mappedSampleRate){ rebuildBinMap(sr); rowCount=0; }   // l'historique suivait l'ancien axe
     if(mappedSampleRate<=0.0) return;
 
     processor.getPSDData(psd, LeakAudioProcessor::PSD_NUM_BINS);
@@ -1565,6 +1705,7 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
     }
 
     drawDirectionButton(g);
+    Ui::drawTitleDecor(g, (float)getWidth(), (float)holdBtn.getBottom()+2.f);   // sous HOLD
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     Ui::drawTitleFit(g, TR(title), { 6.f, 5.f, (float)juce::jmax(20, holdBtn.getX()-12), 13.f }, g.getCurrentFont());   // plutôt que "…"
@@ -1943,8 +2084,12 @@ void LoudnessPanel::paint(juce::Graphics& g)
     const float s=Ui::textScale;
     const int hdrH=juce::roundToInt(26.f*s), titleH=juce::roundToInt(13.f*s);
     g.setColour(Col::bg); g.fillRect(getLocalBounds());
-    g.setColour(Col::panel); g.fillRect(0,0,W,hdrH);
-    g.setColour(Col::border); g.drawLine(0.f,(float)hdrH+0.5f,(float)W,(float)hdrH+0.5f,0.6f);
+    if(Ui::titleStyle==0){
+        g.setColour(Col::panel); g.fillRect(0,0,W,hdrH);
+        g.setColour(Col::border); g.drawLine(0.f,(float)hdrH+0.5f,(float)W,(float)hdrH+0.5f,0.6f);
+    } else {
+        Ui::drawTitleDecor(g, (float)W, (float)hdrH);
+    }
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("LOUDNESS"),6,3,W-12,titleH,juce::Justification::left,1,0.7f);
@@ -2247,7 +2392,8 @@ void SpectrumDisplayLeak::rebuildCache()
             float fs=juce::jlimit(8.f,12.f,cachedGH*.065f);
             gi.setFont(Ui::iceland((fs)));
             gi.setColour(db==0?Col::textHi:Col::textMid);
-            gi.drawText(db==0?"+0":juce::String(db),0,(int)y-7,(int)cachedPadL-4,14,juce::Justification::centredRight);
+            // (« +0 » un peu plus bas : la ligne du titre passe juste au-dessus)
+            gi.drawText(db==0?"+0":juce::String(db),0,(int)y-7+(db==0 ? 4 : 0),(int)cachedPadL-4,14,juce::Justification::centredRight);
         }
         static const float vRef[]={20,50,100,200,500,1000,2000,5000,10000,20000};
         gi.setColour(Col::grid);
@@ -2580,6 +2726,7 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
         g.setColour(Col::accent);g.drawText(cachedTipStr,(int)(tx+7.f),(int)(gy0+6.f),(int)(cachedTipW-8.f),(int)th,juce::Justification::centredLeft);
     }
 
+    Ui::drawTitleDecor(g, (float)getWidth());
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("SPECTRUM"),8,4,juce::jmax(40,getWidth()/2),13,juce::Justification::left,1,0.7f);
@@ -2803,7 +2950,8 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("dBFS METER"),8,0,juce::jmax(40,modeBtn.getX()-22),headerH,juce::Justification::centredLeft,1,0.7f);
-    g.setColour(Col::border.withAlpha(0.5f)); g.drawLine(0.f,(float)headerH,(float)W,(float)headerH,0.6f);
+    if(Ui::titleStyle==0){ g.setColour(Col::border.withAlpha(0.5f)); g.drawLine(0.f,(float)headerH,(float)W,(float)headerH,0.6f); }
+    else Ui::drawTitleDecor(g, (float)W, (float)headerH);
     // référence 0VU entre les flèches, dans un petit écran creux
     if(!calibValueArea.isEmpty()){
         const auto va=calibValueArea.toFloat().reduced(1.f, 0.f);
@@ -3007,8 +3155,6 @@ TopBar::TopBar()
 {
     logoImage = juce::ImageCache::getFromMemory(BinaryData::sidekey_monogram_png,
                                                  BinaryData::sidekey_monogram_pngSize);
-    blackbirdImage = juce::ImageCache::getFromMemory(BinaryData::sidekey_blackbird_png,
-                                                      BinaryData::sidekey_blackbird_pngSize);
 
     setLookAndFeel(&laf);   // RESET + options : contrôles du châssis neumorphique
 
@@ -3245,9 +3391,13 @@ void TopBar::resized()
         x -= (gearW+4);
         fullScreenBtn.setBounds(x,gy,gearW,gearW);
     }
-    const int rw=juce::roundToInt(58.f*s*hk), rh=juce::jlimit(20, juce::roundToInt(26.f*s*hk), juce::jmax(20, H-12));
-    x -= rw+cap(12.f);
-    resetBtn.setBounds(x,(H-rh)/2,rw,rh);
+    // carré : le texte du bouton s'ajuste tout seul à la largeur ; les bounds
+    // débordent autour pour que son relief ne soit pas coupé
+    const int rh=juce::jlimit(20, juce::roundToInt(26.f*s*hk), juce::jmax(20, H-12));
+    constexpr int reliefBleed=7;
+    x -= rh+cap(12.f);
+    resetBtn.setReliefMargin(2.5f+(float)reliefBleed);
+    resetBtn.setBounds(juce::Rectangle<int>(x,(H-rh)/2,rh,rh).expanded(reliefBleed));
     if(! AppMode::isPlugin){
         // knob de Sevenpack Alpha (sa couronne déborde jusqu'à 1,3 R), valeur au centre
         const int vd=juce::jlimit(30, cap(50.f), H-2);
@@ -3255,18 +3405,12 @@ void TopBar::resized()
         volKnob.setBounds(x,(H-vd)/2,vd,vd);
     }
 
-    // ── à gauche : merle (même calcul que paint) puis interrupteurs en 2×2 ──
-    float bbW=0.f;
-    if(blackbirdImage.isValid()){
-        const float bbH=juce::jlimit(18.f,34.f*hk,(float)H*0.84f);
-        bbW=bbH*(float)blackbirdImage.getWidth()/(float)juce::jmax(1,blackbirdImage.getHeight());
-    }
-    const float birdRight=14.f+bbW;
+    // ── à gauche : interrupteurs en 2×2, alignés sur le bord des écrans ──
     // en plugin : thème et 3D seulement, sur une rangée (contrastToggle masqué : contraste permanent)
     const bool twoRows=! AppMode::isPlugin;
     const int th=twoRows ? juce::jlimit(14,cap(22.f),(H-10)/2) : juce::jlimit(20,cap(26.f),H*55/100);
     const int tw=juce::roundToInt((float)th*2.3f);
-    const int tx=juce::roundToInt(birdRight)+cap(14.f), tx2=tx+tw+cap(8.f);
+    const int tx=18, tx2=tx+tw+cap(8.f);
     if(twoRows){
         const int rg=cap(4.f), y0=(H-2*th-rg)/2, y1=y0+th+rg;
         themeToggle.setBounds(tx, y0,tw,th);  modules3DToggle.setBounds(tx2,y0,tw,th);
@@ -3436,20 +3580,6 @@ void TopBar::paint(juce::Graphics& g)
             g.setOpacity(1.0f);
         }
         logoBounds = juce::Rectangle<float>(lx,ly,logoW,logoH).expanded(4.f);
-    }
-
-    // Merle (blackbird) — coin haut-gauche, meme traitement (clic → About)
-    if(blackbirdImage.isValid()){
-        const float bbH=juce::jlimit(18.f,34.f*hk,(float)H*0.84f);
-        const float bbAspect=(float)blackbirdImage.getWidth()/(float)juce::jmax(1,blackbirdImage.getHeight());
-        const float bbW=bbH*bbAspect;
-        const float bx=14.f;
-        const float by=((float)H-bbH)*0.5f;
-        g.setOpacity(0.92f);
-        g.drawImage(blackbirdImage, (int)bx, (int)by, (int)bbW, (int)bbH,
-                    0, 0, blackbirdImage.getWidth(), blackbirdImage.getHeight());
-        g.setOpacity(1.0f);
-        blackbirdBounds = juce::Rectangle<float>(bx,by,bbW,bbH).expanded(4.f);
     }
 }
 
@@ -4369,7 +4499,8 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
             {1.f,"+1"},{0.5f,"+.5"},{0.f,"0"},{-0.5f,"-.5"},{-1.f,"-1"}})
     {
         g.setColour(Col::textMid.withAlpha(cv==0.f?0.7f:0.45f));
-        g.drawText(lbl, 0,(int)(cy-cv*ghalf)-4,(int)padL-2,9,juce::Justification::centredRight);
+        // (« +1 » un peu plus bas : la ligne du titre passe juste au-dessus)
+        g.drawText(lbl, 0,(int)(cy-cv*ghalf)-4+(cv==1.f ? 3 : 0),(int)padL-2,9,juce::Justification::centredRight);
     }
 
     // ── Grille verticale fréquence ───────────────────────────────────────
@@ -4471,6 +4602,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
         g.drawText(freqStr,(int)(tx+6.f),(int)ty,(int)(tipW-7.f),(int)th,juce::Justification::centredLeft);
     }
 
+    Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("MULTIBAND CORRELATOR"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
@@ -4714,7 +4846,7 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
     // Repères chiffrés de position (droite) — lecture rapide du %  panoramique
     g.setFont(Ui::iceland((7.5f)));
     g.setColour(Col::textMid.withAlpha(0.45f));
-    g.drawText("100",(int)(padL+gw)+2,(int)padT-5,30,9,juce::Justification::left);
+    g.drawText("100",(int)(padL+gw)+2,(int)padT-1,30,9,juce::Justification::left);   // sous la ligne du titre
     g.drawText("50", (int)(padL+gw)+2,(int)(cy-gh*0.25f)-5,30,9,juce::Justification::left);
     g.drawText("0",  (int)(padL+gw)+2,(int)cy-5,30,9,juce::Justification::left);
     g.drawText("50", (int)(padL+gw)+2,(int)(cy+gh*0.25f)-5,30,9,juce::Justification::left);
@@ -4745,7 +4877,7 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
     // ── Labels L / C / R (gauche) ─────────────────────────────────────────
     g.setFont(Ui::iceland((8.f)));
     g.setColour(Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.7f));
-    g.drawText("L", 0,(int)padT-6,(int)padL,10,juce::Justification::centredRight);
+    g.drawText("L", 0,(int)padT-2,(int)padL,10,juce::Justification::centredRight);   // sous la ligne du titre
     g.setColour(Col::textMid.withAlpha(0.6f));
     g.drawText("C", 0,(int)cy-5, (int)padL,10,juce::Justification::centredRight);
     g.setColour(Col::sideCol.withAlpha(0.7f));
@@ -4774,6 +4906,7 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
         g.drawText(freqStr,(int)(tx+6.f),(int)ty,(int)(tipW-7.f),(int)th,juce::Justification::centredLeft);
     }
 
+    Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("PANORAMA"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
@@ -4859,19 +4992,20 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
 
     g.setFont(Ui::iceland((7.5f)));
     g.setColour(Col::textMid.withAlpha(0.45f));
-    g.drawText("100",(int)(padL+gw)+2,(int)padT-5,30,9,juce::Justification::left);
+    g.drawText("100",(int)(padL+gw)+2,(int)padT-1,30,9,juce::Justification::left);   // sous la ligne du titre
     g.drawText("50", (int)(padL+gw)+2,(int)(cy-gh*0.25f)-5,30,9,juce::Justification::left);
     g.drawText("0",  (int)(padL+gw)+2,(int)cy-5,30,9,juce::Justification::left);
     g.drawText("50", (int)(padL+gw)+2,(int)(cy+gh*0.25f)-5,30,9,juce::Justification::left);
     g.drawText("100",(int)(padL+gw)+2,(int)(padT+gh)-5,30,9,juce::Justification::left);
     g.setFont(Ui::iceland((8.f)));
     g.setColour(Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.7f));
-    g.drawText("L", 0,(int)padT-6,(int)padL,10,juce::Justification::centredRight);
+    g.drawText("L", 0,(int)padT-2,(int)padL,10,juce::Justification::centredRight);   // sous la ligne du titre
     g.setColour(Col::textMid.withAlpha(0.6f));
     g.drawText("C", 0,(int)cy-5, (int)padL,10,juce::Justification::centredRight);
     g.setColour(Col::sideCol.withAlpha(0.7f));
     g.drawText("R", 0,(int)(padT+gh)-6,(int)padL,10,juce::Justification::centredRight);
 
+    Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("PANORAMA LED"),6,5,W-12,13,juce::Justification::left,1,0.7f);
@@ -5087,6 +5221,7 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
         g.drawText(tip,(int)(tx+6.f),(int)ty,(int)(tipW-7.f),(int)th,juce::Justification::centredLeft);
     }
 
+    Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
     g.drawFittedText(TR("SPECTRAL DENSITY (PSD)"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
@@ -5120,6 +5255,8 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     Lang::set(audioProcessor.language);
     Neu::apply(audioProcessor.lightTint, audioProcessor.highContrast, audioProcessor.plateTint==1, audioProcessor.lightScreens!=0);
     Ui::textScale = audioProcessor.largeText ? Ui::kLargeTextScale : 1.0f;
+    Ui::titleStyle = audioProcessor.titleStyle;
+    Ui::corrStyle  = audioProcessor.corrStyle;
     applyColours();
 
     addAndMakeVisible(topBar);
@@ -5298,11 +5435,14 @@ OptionsOverlay::State LeakEditor::optionsState() const
     s.oscStyle   = audioProcessor.oscStyle;
     s.oscFps     = audioProcessor.oscFps;
     s.oscPersist = audioProcessor.oscPersist;
+    s.oscSplit   = audioProcessor.oscSplit;
     s.oscLineWidth = audioProcessor.oscLineWidth;
     s.oscTraceMode = audioProcessor.oscTraceMode;
     s.uiScale = audioProcessor.uiScale;
     s.plateTint = audioProcessor.plateTint;
     s.lightScreens = audioProcessor.lightScreens;
+    s.titleStyle = audioProcessor.titleStyle;
+    s.corrStyle = audioProcessor.corrStyle;
     for(int i=0;i<Theme::NUM_PALETTES;++i){
         s.accentPalette.add(juce::Colour(Theme::palettes[i].accent));
         if(Theme::palettes[i].accent==audioProcessor.customAccentColor) s.accentIndex=i;
@@ -5398,12 +5538,16 @@ void LeakEditor::setupOptions()
     o.onModules3DChanged = [this](bool on){ audioProcessor.modules3D=on; spectrum.set3D(on); syncTopBarLook(); };
     o.onLargeTextChanged = [this](bool on){ audioProcessor.largeText=on; applyTextScale(); syncTopBarLook(); };
     o.onOscStyleSelected = [this](int i){ audioProcessor.oscStyle=juce::jlimit(0, 3, i); oscilloscope.syncFromProcessor(); };
+    o.onOscSplitSelected = [this](bool b){ audioProcessor.oscSplit=b; oscilloscope.syncFromProcessor(); };
+    oscilloscope.onSplitChanged=[this]{ if(optionsOverlay.isVisible()) optionsOverlay.setState(optionsState()); };
     o.onOscFpsSelected   = [this](int fps){ audioProcessor.oscFps=fps; oscilloscope.syncFromProcessor(); };
     o.onOscLineWidthChanged  = [this](int w){ audioProcessor.oscLineWidth=w; oscilloscope.syncFromProcessor(); };   // curseur, en direct
     o.onOscTraceModeSelected = [this](int m){ audioProcessor.oscTraceMode=m; oscilloscope.syncFromProcessor(); };
     o.onUiScaleSelected      = [this](int pct){ audioProcessor.uiScale=pct; appliedUiScale=0.f; applyUiScale(); };
     o.onPlateTintSelected    = [this](int i){ audioProcessor.plateTint=i; applyLook(); };
     o.onLightScreensSelected = [this](bool on){ audioProcessor.lightScreens=on ? 1 : 0; applyLook(); };
+    o.onTitleStyleSelected   = [this](int i){ audioProcessor.titleStyle=i; applyLook(); };
+    o.onCorrStyleSelected    = [this](int i){ audioProcessor.corrStyle=i; applyLook(); };
     o.onOscPersistChanged= [this](bool on){ audioProcessor.oscPersist=on; oscilloscope.syncFromProcessor(); };
     o.onMasterConsoleChanged = [this](bool on){
         audioProcessor.masterConsole=on; vuMeter.setConsoleStyle(on);
@@ -5458,6 +5602,8 @@ void LeakEditor::reloadFromProcessor()
 {
     reattachAll();   // preset rappelé : disposition d'origine, modules dans l'éditeur
     // apparence
+    Ui::titleStyle = audioProcessor.titleStyle;
+    Ui::corrStyle  = audioProcessor.corrStyle;
     applyColours();
     syncTopBarLook();
     masterStyleToggle.setToggleState(audioProcessor.masterConsole, juce::dontSendNotification);
@@ -5537,6 +5683,7 @@ void LeakEditor::timerCallback()
     vuMeter.update();
     loudnessPanel.update();
     topBar.setSampleRate(audioProcessor.getCurrentSampleRate());   // LCD sous le titre
+    updateDockMagnet();
     followDetachDrag();   // module qu'on est en train de détacher : la fenêtre suit la souris
     // plugin en taille Auto : l'écran (donc l'échelle) peut changer quand la DAW
     // déplace sa fenêtre — vérifié une fois par seconde
@@ -5651,7 +5798,7 @@ void LeakEditor::detachSlot(int s)
             juce::MessageManager::callAsync([sp, module]{ if(sp!=nullptr) sp->dockFloating(module); });
         }) });
     auto& w=*floating.back().window;
-    w.setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab);
+    w.setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab-w.contentOffset());
     comp->setVisible(true);
     w.addToDesktop();
     w.setAlwaysOnTop(alwaysOnTopState);   // même règle que la fenêtre principale
@@ -5678,8 +5825,68 @@ void LeakEditor::followDetachDrag()
         dragSlot=-1;
         return;
     }
-    if(w!=nullptr)
-        w->setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab);
+    if(w==nullptr) return;
+    if(magnetSlot==f->homeSlot){
+        // aimant : le module se cale sur son emplacement tant que la souris y reste
+        const auto* content=w->getContentComponent();
+        const auto offset=content!=nullptr ? content->getScreenPosition()-w->getScreenPosition() : juce::Point<int>();
+        w->setTopLeftPosition(localPointToGlobal(rcSlot[magnetSlot].getTopLeft())-offset);
+    } else {
+        w->setTopLeftPosition(juce::Desktop::getMousePosition()-dragGrab-w->contentOffset());
+    }
+}
+
+// Timer de l'éditeur : suit aussi le déplacement par la barre de titre de la
+// fenêtre (la souris y est prise par Windows, seul son état réel est lisible).
+void LeakEditor::updateDockMagnet()
+{
+    if(floating.empty() && magnetSlot<0) return;
+    constexpr int kReach=36;   // écart maximal entre la fenêtre et sa place exacte dans l'emplacement
+    const bool down=juce::ModifierKeys::getCurrentModifiersRealtime().isLeftButtonDown();
+    const auto mouse=juce::Desktop::getMousePosition();
+    int over=-1, dock=-1;
+    for(auto& f : floating){
+        const auto b=f.window->getScreenBounds();
+        const bool resized=b.getWidth()!=f.lastBounds.getWidth() || b.getHeight()!=f.lastBounds.getHeight();
+        if(down && !f.lastBounds.isEmpty()){
+            if(resized)                                            f.moving=false;   // bord tiré : ce n'est pas un déplacement
+            else if(b.getPosition()!=f.lastBounds.getPosition())   f.moving=true;
+        }
+        f.lastBounds=b;
+        if(!f.moving) continue;
+        bool inSlot=false;
+        if(isDetached(f.homeSlot)){
+            const auto* content=f.window->getContentComponent();
+            const auto inset=content!=nullptr ? content->getScreenPosition()-b.getPosition() : juce::Point<int>();
+            // pendant le détachement la fenêtre peut être calée : c'est la souris qui dit où elle va
+            const bool followed=dragFollowing && dragSlot==f.homeSlot;
+            const auto at=followed ? mouse-dragGrab-inset : b.getPosition();
+            inSlot=at.getDistanceFrom(localPointToGlobal(rcSlot[f.homeSlot].getTopLeft())-inset)<=kReach;
+        }
+        if(down){ if(inSlot) over=f.homeSlot; continue; }
+        f.moving=false;
+        if(inSlot) dock=f.module;
+    }
+    if(over!=magnetSlot){
+        if(magnetSlot>=0) repaint(rcSlot[magnetSlot]);
+        if(over>=0)       repaint(rcSlot[over]);
+        magnetSlot=over;
+    }
+    if(dock>=0) dockFloating(dock);   // hors de la boucle : retire le module de floating
+}
+
+void LeakEditor::drawDockMagnet(juce::Graphics& g, int s)
+{
+    const auto r=rcSlot[s].toFloat().reduced(3.f);
+    const auto ink=Neu::accentInk();
+    g.setColour(Neu::well);                 // couvre les deux moitiés du creux
+    g.fillRoundedRectangle(r, kScreenRadius);
+    g.setColour(ink.withAlpha(0.14f));
+    g.fillRoundedRectangle(r, kScreenRadius);
+    g.setColour(ink);
+    g.drawRoundedRectangle(r, kScreenRadius, 2.5f);
+    g.setFont(Ui::iceland(13.f).withExtraKerningFactor(0.08f));
+    g.drawText(TR("ramener").toUpperCase(), r, juce::Justification::centred, false);
 }
 
 LeakEditor::FloatingModule* LeakEditor::floatingFor(int module)
@@ -6599,6 +6806,8 @@ void LeakEditor::applyLook()
 {
     Neu::apply(audioProcessor.lightTint, audioProcessor.highContrast, audioProcessor.plateTint==1, audioProcessor.lightScreens!=0);
     // écrans Papier ou noirs : la palette des modules suit le thème
+    Ui::titleStyle = audioProcessor.titleStyle;
+    Ui::corrStyle  = audioProcessor.corrStyle;
     applyColours();
     layoutDirty=true;
     updateLayout();
@@ -6606,6 +6815,10 @@ void LeakEditor::applyLook()
     // modules OpenGL : leur calque 2D (coins de la lunette) n'est refait que
     // s'ils sont eux-mêmes invalidés
     for(auto* gm : gpuModules()) gm->repaint();
+    // barres de fenêtre : couleur de la plaque
+    if(auto* top=getTopLevelComponent()) top->repaint();
+    for(auto& f : floating) f.window->repaint();
+    if(optionsWindow!=nullptr) optionsWindow->repaint();
     if(licenseOverlay.isVisible()){ OptionsUi::lightTheme()=audioProcessor.lightTint; licenseOverlay.refresh(); }
 }
 
@@ -6644,9 +6857,7 @@ void LeakEditor::rebuildChassisCaches(float pxScale)
         juce::Graphics g(chassisCache);
         g.addTransform(juce::AffineTransform::scale(pxScale));
         // plaque : surface neumorphique, lumière venant du haut-gauche
-        juce::ColourGradient face(Neu::surface.brighter(Neu::light ? 0.02f : 0.04f), plateR.getX(), plateR.getY(),
-                                  Neu::surface.darker  (Neu::light ? 0.03f : 0.06f), plateR.getRight(), plateR.getBottom(), false);
-        g.setGradientFill(face); g.fillPath(plateP);
+        g.setGradientFill(Neu::plateFace(plateR)); g.fillPath(plateP);
 
         // filet gravé sous la barre de titre
         {
@@ -6696,6 +6907,7 @@ void LeakEditor::paint(juce::Graphics& g)
     g.drawImage(chassisCache,getLocalBounds().toFloat());
     // moitié survolée d'un creux partagé, par-dessus le châssis en cache
     if(isDetached(hoverDetachedSlot)) drawDetachedHalf(g, hoverDetachedSlot, hoverDetachedAdd, true);
+    if(isDetached(magnetSlot))        drawDockMagnet(g, magnetSlot);
 }
 
 // Calque au-dessus des modules (OverlayLayer) : seules les zones utiles sont

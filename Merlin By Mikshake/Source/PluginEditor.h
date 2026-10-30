@@ -95,6 +95,7 @@ namespace Neu {
     // paperScreens : écrans des modules en clair quand le thème est clair (Col::paper)
     void apply(bool lightTint, bool contrast, bool slate=false, bool paperScreens=false);
     juce::Colour accentInk();   // accent lisible sur le châssis (assombri en clair)
+    juce::ColourGradient plateFace(juce::Rectangle<float>);   // face de la plaque, en diagonale
 
     // Relief : carte en saillie (deux ombres) ou creux (ombres internes).
     void drawRaised(juce::Graphics&, juce::Rectangle<float>, float radius, float depth);
@@ -132,6 +133,20 @@ namespace Ui {
     // Bande de titre des modules : un glisser qui y commence détache le module
     // (appli) et ne fait jamais tourner / basculer les vues 3D
     inline float titleStripHeight() { return 22.f*textScale; }
+    // Titre d'un module (deux styles à l'essai, Options › Affichage) : 1 filet
+    // d'accent qui s'efface vers la droite, 2 bandeau fermé par une ligne. La
+    // ligne tient dans la place du titre, les mesures ne bougent pas : à 19 px,
+    // sous le texte et au-dessus du contenu (22 px) ; plus bas si un bouton descend.
+    inline int titleStyle { 1 };
+    inline constexpr float kTitleLineY = 19.f;
+    // endX : fin de la ligne si elle doit s'arrêter avant un obstacle (0 = bord)
+    void drawTitleDecor(juce::Graphics&, float width, float lineY=kTitleLineY, float endX=0.f);
+    // fin de la ligne avant l'anneau d'un vectorscope, s'il monte jusque-là
+    float titleEndBeforeRing(float cx, float cy, float r);
+    // Corrélation des vectorscopes (à l'essai, Options › Affichage) : 0 barre
+    // sous le cercle, 1 curseur sur le demi-cercle bas du cerclage, 2 idem gradué
+    inline int corrStyle { 1 };
+    void drawCorrRing(juce::Graphics&, float cx, float cy, float r, float corr, float height);
 
     // Gros texte (Aa) : une ligne dont la police rétrécit juste assez pour tenir
     // dans sa largeur — jamais de « … », les mesures restent entières
@@ -217,8 +232,13 @@ public:
     // flèche (1 = haut, -1 = bas) dessinée à la place du texte ; marge de relief
     // réduite pour les petits boutons empilés
     void setArrow(int dir) { arrowDir=dir; repaint(); }
+    // marge plus large pour un bouton isolé : tout le relief tient dans les bounds
+    // (sinon l'ombre est coupée en carré), seul le bouton lui-même reste cliquable
+    void setReliefMargin(float m) { reliefMargin=m; repaint(); }
+    bool hitTest(int x, int y) override { return reliefMargin<0.f || getLocalBounds().toFloat().reduced(reliefMargin).contains((float)x, (float)y); }
 private:
     int   arrowDir { 0 };
+    float reliefMargin { -1.f };   // < 0 : marge standard
     void timerCallback() override;
     void kick() { if(!isTimerRunning()) startTimerHz(60); }
     float press { 0.f }, pressVel { 0.f };   // 0 = en relief, 1 = enfoncé (ressort)
@@ -374,6 +394,21 @@ public:
     void drawComboBoxTextWhenNothingSelected(juce::Graphics&,juce::ComboBox&,juce::Label&) override;
     void drawLabel           (juce::Graphics&,juce::Label&) override;
     void drawRotarySlider    (juce::Graphics&,int,int,int,int,float,float,float,juce::Slider&) override;
+};
+
+// Barre de fenêtre Merlin (Windows, à la place de la barre du système) : fine,
+// couleur de la plaque, α et boutons discrets. Déplacement, aimantation aux bords
+// et redimensionnement restent ceux de Windows (JUCE répond à WM_NCHITTEST par
+// findControlAtPoint). Ailleurs, barre du système.
+class WindowBarLook : public juce::LookAndFeel_V4
+{
+public:
+    void install(juce::DocumentWindow&);   // à la construction ; setLookAndFeel(nullptr) dans le destructeur
+    void drawDocumentWindowTitleBar(juce::DocumentWindow&,juce::Graphics&,int,int,int,int,const juce::Image*,bool) override;
+    juce::Button* createDocumentWindowButton(int) override;
+    void positionDocumentWindowButtons(juce::DocumentWindow&,int,int,int,int,juce::Button*,juce::Button*,juce::Button*,bool) override;
+    void fillResizableWindowBackground(juce::Graphics&,int,int,const juce::BorderSize<int>&,juce::ResizableWindow&) override;
+    void drawResizableWindowBorder(juce::Graphics&,int,int,const juce::BorderSize<int>&,juce::ResizableWindow&) override {}
 };
 
 // Menu clic droit des slots (design A "liste sectionnée", preview validée) :
@@ -1116,7 +1151,7 @@ public:
     {
         if(demoBounds.contains(e.position) && onDemoClicked)
             onDemoClicked();
-        else if((logoBounds.contains(e.position) || blackbirdBounds.contains(e.position)) && onAboutClicked)
+        else if(logoBounds.contains(e.position) && onAboutClicked)
             onAboutClicked();
         else if(titleBounds.contains(e.position) && onTitleClicked)
             onTitleClicked();
@@ -1167,8 +1202,7 @@ private:
     bool          glitching { false };
     juce::Random  rng;
     juce::Image   logoImage;
-    juce::Image   blackbirdImage;
-    juce::Rectangle<float> logoBounds, blackbirdBounds, titleBounds, demoBounds;
+    juce::Rectangle<float> logoBounds, titleBounds, demoBounds;
     juce::String     demoText;
     double           sampleRate { 0.0 };
     NeuLookAndFeel   laf;
@@ -1455,23 +1489,28 @@ private:
     // dans le menu ; le choisir le ramène). Pas mémorisé d'un lancement à l'autre.
     struct DetachedWindow : public juce::DocumentWindow
     {
-        // fenêtre native créée une seule fois, une fois taillée (sinon la barre de
-        // titre Windows recréait la fenêtre et sa partie droite n'était pas dessinée)
+        // fenêtre native créée une seule fois, une fois taillée (sinon sa partie
+        // droite pouvait ne pas être dessinée)
         DetachedWindow(const juce::String& name, juce::Component& content, std::function<void()> close)
             : juce::DocumentWindow(name, Col::bg, juce::DocumentWindow::minimiseButton | juce::DocumentWindow::closeButton, false),
               onClose(std::move(close))
         {
-            setUsingNativeTitleBar(true);
+            barLook->install(*this);
             setContentNonOwned(&content, true);
             setResizable(true, false);
             setResizeLimits(220, 140, 6000, 4000);
         }
-        ~DetachedWindow() override { clearContentComponent(); }   // le module appartient à l'éditeur
+        ~DetachedWindow() override { clearContentComponent(); setLookAndFeel(nullptr); }   // le module appartient à l'éditeur
         void closeButtonPressed() override { if(onClose) onClose(); }
+        // écart entre le coin de la fenêtre et son contenu (barre Merlin, bord)
+        juce::Point<int> contentOffset() const { const auto b=getContentComponentBorder(); return { b.getLeft(), b.getTop() }; }
         std::function<void()> onClose;
+        juce::SharedResourcePointer<WindowBarLook> barLook;
     };
     // fenêtre d'un module détaché, et l'emplacement qu'il a quitté
-    struct FloatingModule { int module=0, homeSlot=-1; std::unique_ptr<DetachedWindow> window; };
+    // (lastBounds, moving : la fenêtre est-elle en train d'être déplacée ?)
+    struct FloatingModule { int module=0, homeSlot=-1; std::unique_ptr<DetachedWindow> window;
+                            juce::Rectangle<int> lastBounds; bool moving=false; };
     std::vector<FloatingModule> floating;
     // Options (appli) : fenêtre à part, déplaçable ; Merlin reste visible et actif
     std::unique_ptr<DetachedWindow> optionsWindow;
@@ -1484,6 +1523,11 @@ private:
     void dockFloating(int module);  // ferme la fenêtre : le module revient à l'éditeur (affiché seulement s'il a un emplacement)
     void reattachAll();
     void followDetachDrag();
+    // fenêtre ramenée sur son emplacement d'origine : il s'allume, et le module
+    // y revient au relâchement
+    void updateDockMagnet();
+    void drawDockMagnet(juce::Graphics&, int s);
+    int  magnetSlot { -1 };
     void drawDetachedSlot(juce::Graphics&, int s);
     void drawDetachedHalf(juce::Graphics&, int s, bool addHalf, bool hover);
     // moitiés du creux partagé : ramener le module (gauche / haut), en ajouter un autre (droite / bas)

@@ -361,7 +361,7 @@ public:
         startTimer (1000);   // chien de garde du flux audio + détection de la carte
 
         // 3) fenêtre
-        setUsingNativeTitleBar (true);
+        barLook->install (*this);
         editor.reset (processor.createEditorAndMakeActive());
         // l'éditeur vit dans windowHolder, à l'échelle (Options › Taille de
         // l'interface) ; la fenêtre se redimensionne par ses bords
@@ -425,6 +425,10 @@ public:
                 w += frame->getLeftAndRight();
                 h += frame->getTopAndBottom();
             }
+        // barre Merlin et bord : ils font partie de la fenêtre, donc de la limite
+        const auto border = getContentComponentBorder();
+        w += border.getLeftAndRight();
+        h += border.getTopAndBottom();
         // fenêtre masquée (plein écran) : limites enregistrées sans repositionner
         // la fenêtre — setResizeLimits la recalait, et une fenêtre mémorisée
         // agrandie était alors restaurée et RÉAFFICHÉE, vide et noire, derrière
@@ -516,6 +520,7 @@ public:
         clearContentComponent();
         windowHolder.setEditor (nullptr);
         editor = nullptr;
+        setLookAndFeel (nullptr);
     }
 
     void closeButtonPressed() override
@@ -834,19 +839,47 @@ private:
         auto* dev = deviceManager.getCurrentAudioDevice();
         if (dev == nullptr)
         {
-            stalledSeconds = 0;
+            // ouverture ratée (carte en plein changement de fréquence) : on réessaie
+            if (++stalledSeconds >= 3)
+            {
+                stalledSeconds = 0;
+                if (deviceManager.getAudioDeviceSetup().inputDeviceName.isNotEmpty())
+                    deviceManager.restartLastAudioDevice();
+            }
             return;
         }
 
         const auto count = analyser.callbackCount.load (std::memory_order_relaxed);
-        stalledSeconds = (count == lastCallbackCount) ? stalledSeconds + 1 : 0;
+        const bool flowing = count != lastCallbackCount;
+        stalledSeconds = flowing ? 0 : stalledSeconds + 1;
         lastCallbackCount = count;
 
-        if (stalledSeconds >= 3)
+        // La carte a changé de fréquence sans que JUCE le voie : Windows
+        // convertit alors en silence et Merlin garderait l'ancienne.
+        const auto cardRate = cardRateProbe.poll (deviceManager.getAudioDeviceSetup().inputDeviceName);
+        const bool wrongRate = cardRate > 0.0 && std::abs (cardRate - dev->getCurrentSampleRate()) > 1.0;
+        wrongRateSeconds = wrongRate ? wrongRateSeconds + 1 : 0;
+        if (flowing && ! wrongRate)
+            reopenDelay = minReopenDelay;
+
+        if (stalledSeconds >= reopenDelay || wrongRateSeconds >= reopenDelay)
         {
-            stalledSeconds = 0;
-            deviceManager.restartLastAudioDevice();
+            stalledSeconds = wrongRateSeconds = 0;
+            reopenDelay = juce::jmin (maxReopenDelay, reopenDelay * 2);   // la carte ne revient pas : essais espacés
+            reopenCardDevice (cardRate);
         }
+    }
+
+    // restartLastAudioDevice() ne fait rien tant que le périphérique existe,
+    // même arrêté : il faut le fermer d'abord. La fréquence demandée est celle
+    // de la carte, jamais celle mémorisée.
+    void reopenCardDevice (double cardRate)
+    {
+        juce::AudioDeviceManager::AudioDeviceSetup setup;
+        deviceManager.getAudioDeviceSetup (setup);
+        deviceManager.closeAudioDevice();
+        setup.sampleRate = cardRate;
+        deviceManager.setAudioDeviceSetup (setup, true);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -878,8 +911,10 @@ private:
 
     //==============================================================================
     juce::PropertiesFile& settings;
+    juce::SharedResourcePointer<WindowBarLook> barLook;
     SharedAudioDeviceManager deviceManager;
     SystemLoopbackCapture    systemCapture;   // sortie de Windows (sans carte son)
+    CardRateProbe            cardRateProbe;   // fréquence réelle de la carte
     enum AudioSource { sourceAuto = 0, sourceCard = 1, sourceSystem = 2 };
     int  audioSource = sourceAuto;
     bool usingSystem = false;
@@ -1034,6 +1069,9 @@ private:
     juce::Point<int> windowedEditorSize;
     uint32_t lastCallbackCount = 0;
     int stalledSeconds = 0;
+    int wrongRateSeconds = 0;
+    static constexpr int minReopenDelay = 3, maxReopenDelay = 30;
+    int reopenDelay = minReopenDelay;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
 };

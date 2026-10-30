@@ -166,6 +166,59 @@ bool SystemLoopbackCapture::captureSession()
 }
 
 //==============================================================================
+double CardRateProbe::poll(const juce::String& inputName)
+{
+    {
+        const juce::ScopedLock sl(nameLock);
+        if(wanted!=inputName){ wanted=inputName; rate=0.0; }
+    }
+    if(inputName.isNotEmpty() && !isThreadRunning()) startThread(juce::Thread::Priority::low);
+    return rate.load();
+}
+
+void CardRateProbe::run()
+{
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    while(!threadShouldExit()){
+        juce::String name;
+        {
+            const juce::ScopedLock sl(nameLock);
+            name=wanted;
+        }
+        double found=0.0;
+        ComRef<IMMDeviceEnumerator> en;
+        ComRef<IMMDeviceCollection> all;
+        UINT count=0;
+        if(name.isNotEmpty()
+           && SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                         __uuidof(IMMDeviceEnumerator), (void**)en.put()))
+           && SUCCEEDED(en->EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE, all.put()))
+           && SUCCEEDED(all->GetCount(&count))){
+            for(UINT i=0; i<count && found<=0.0; ++i){
+                ComRef<IMMDevice> dev;
+                ComRef<IPropertyStore> ps;
+                if(FAILED(all->Item(i, dev.put())) || FAILED(dev->OpenPropertyStore(STGM_READ, ps.put()))) continue;
+                PROPVARIANT v; PropVariantInit(&v);
+                const bool same=SUCCEEDED(ps->GetValue(PKEY_Device_FriendlyName, &v)) && v.vt==VT_LPWSTR
+                                && juce::String(v.pwszVal)==name;
+                PropVariantClear(&v);
+                if(!same) continue;
+                ComRef<IAudioClient> client;
+                WAVEFORMATEX* wfx=nullptr;
+                if(SUCCEEDED(dev->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)client.put()))
+                   && SUCCEEDED(client->GetMixFormat(&wfx)) && wfx!=nullptr){
+                    found=(double)wfx->nSamplesPerSec;
+                    CoTaskMemFree(wfx);
+                }
+            }
+        }
+        rate=found;
+        wait(1000);
+    }
+    CoUninitialize();
+}
+
+//==============================================================================
 namespace
 {
     // contrôle de volume de la sortie par défaut (COM initialisé au besoin)
@@ -312,6 +365,8 @@ bool WindowsVolume::set (float v)
 #if ! JUCE_WINDOWS
 void SystemLoopbackCapture::run() {}
 bool SystemLoopbackCapture::captureSession() { return false; }
+double CardRateProbe::poll(const juce::String&) { return 0.0; }
+void CardRateProbe::run() {}
 #if ! JUCE_MAC
 float WindowsVolume::get() { return -1.f; }
 bool  WindowsVolume::set(float) { return false; }

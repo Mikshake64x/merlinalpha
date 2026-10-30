@@ -1167,7 +1167,10 @@ public:
         int uiScale = 0;                    // taille de l'interface : 0 automatique, sinon pourcentage
         int plateTint = 1;                  // thème sombre : 0 gris, 1 ardoise
         int lightScreens = 1;               // thème clair : 1 écrans Papier, 0 écrans noirs
-        int oscStyle = 0;                   // 0 tube, 1 numérique, 2 vintage, 3 deux voies
+        int titleStyle = 1;                 // titres des modules : 0 sans, 1 filet, 2 bandeau
+        int corrStyle = 1;                  // corrélation des vectorscopes : 0 barre, 1 curseur, 2 gradué
+        int oscStyle = 0;                   // 0 tube, 1 numérique, 2 vintage, 3 rempli
+        bool oscSplit = false;              // L et R l'une au-dessus de l'autre
         int oscFps = 30;                    // 24, 30 ou 60
         int oscLineWidth = 20;              // curseur 0..100 (0 = le plus fin)
         int oscTraceMode = 0;               // 0 précis, 1 classique
@@ -1261,10 +1264,13 @@ public:
         largeTextSwitch.setOn (s.largeText);
         plateSeg.setSelected (juce::jlimit (0, 1, s.plateTint));
         screensSeg.setSelected (s.lightScreens != 0 ? 0 : 1);
+        titleSeg.setSelected (juce::jlimit (0, 2, s.titleStyle));
+        corrSeg.setSelected (juce::jlimit (0, 2, s.corrStyle));
         for (int i = 0; i < kNumUiScales; ++i)
             if (uiScaleValues[i] == s.uiScale) uiScaleSeg.setSelected (i);
         masterSeg.setSelected (s.masterConsole ? 1 : 0);
         oscStyleSeg.setSelected (juce::jlimit (0, 3, s.oscStyle));
+        oscSplitSeg.setSelected (s.oscSplit ? 1 : 0);
         oscFpsSeg.setSelected (s.oscFps <= 24 ? 0 : s.oscFps <= 30 ? 1 : 2);
         if (! oscWidthSlider.isMouseButtonDown (true))
             oscWidthSlider.setValue (juce::jlimit (0, 100, s.oscLineWidth));
@@ -1298,12 +1304,14 @@ public:
         repaint (titleArea);
     }
 
+
     // Appli : les Options vivent dans leur propre fenêtre (déplaçable, Merlin
     // reste visible et actif derrière) ; la feuille occupe alors toute la
     // fenêtre, sans voile ni ombre. Plugin : panneau posé sur l'éditeur.
     void setWindowed (bool shouldBeWindowed)
     {
         windowed = shouldBeWindowed;
+        closeButton.setVisible (! windowed);   // fenêtre : le bouton de sa barre suffit
         resized();
         repaint();
     }
@@ -1413,13 +1421,16 @@ public:
     // Affichage
     std::function<void (bool)>  onFullScreenChanged, onAlwaysOnTopChanged, onDarkChanged, onContrastChanged,
                                 onModules3DChanged, onLargeTextChanged, onMasterConsoleChanged;
-    std::function<void (int)>   onOscStyleSelected;      // 0 tube, 1 numérique, 2 vintage, 3 deux voies
+    std::function<void (int)>   onOscStyleSelected;      // 0 tube, 1 numérique, 2 vintage, 3 rempli
+    std::function<void (bool)>  onOscSplitSelected;      // L et R l'une au-dessus de l'autre
     std::function<void (int)>   onOscFpsSelected;        // 24, 30, 60
     std::function<void (int)>   onOscLineWidthChanged;   // curseur 0..100
     std::function<void (int)>   onOscTraceModeSelected;  // 0 précis, 1 classique
     std::function<void (int)>   onUiScaleSelected;       // taille de l'interface : 0 automatique, sinon pourcentage
     std::function<void (int)>   onPlateTintSelected;     // thème sombre : 0 gris, 1 ardoise
     std::function<void (bool)>  onLightScreensSelected;  // thème clair : écrans Papier ou noirs
+    std::function<void (int)>   onTitleStyleSelected;    // titres des modules : 0 sans, 1 filet, 2 bandeau
+    std::function<void (int)>   onCorrStyleSelected;     // corrélation des vectorscopes : 0 barre, 1 curseur, 2 gradué
     std::function<void (bool)>  onOscPersistChanged;
     // Apparence
     std::function<void (int)>   onAccentSelected;        // indice de palette
@@ -1529,7 +1540,8 @@ private:
         using OptionsUi::Icon;
         auto& p = pages[kDisplayPage];
         masterSeg.setLabels ({ TR ("Instrument"), TR ("Console") });
-        oscStyleSeg.setLabels ({ TR ("Tube"), TR ("Numérique"), TR ("Vintage"), TR ("Deux voies") });
+        oscStyleSeg.setLabels ({ TR ("Tube"), TR ("Numérique"), TR ("Vintage"), TR ("Rempli") });
+        oscSplitSeg.setLabels ({ TR ("Superposées"), TR ("Séparées") });
         if (! AppMode::isPlugin)   // en plugin, la fenêtre appartient à la DAW
         {
             p.addGroup (TR ("Fenêtre"));
@@ -1545,6 +1557,12 @@ private:
         screensSeg.setLabels ({ TR ("Clairs"), TR ("Noirs") });
         p.addRow (Icon::theme, juce::Colour (0xff8e8e93), TR ("Écrans des modules"), TR ("Avec le thème clair"), &screensSeg, screensSeg.getIdealWidth());
         screensSeg.onChange = [this] (int i) { if (onLightScreensSelected) onLightScreensSelected (i == 0); };
+        titleSeg.setLabels ({ TR ("Sans"), TR ("Filet"), TR ("Bandeau") });
+        p.addRow (Icon::theme, juce::Colour (0xff8e8e93), TR ("Titres des modules"), TR ("Ligne sous le titre"), &titleSeg, titleSeg.getIdealWidth());
+        titleSeg.onChange = [this] (int i) { if (onTitleStyleSelected) onTitleStyleSelected (i); };
+        corrSeg.setLabels ({ TR ("Barre"), TR ("Curseur"), TR ("Gradué") });
+        p.addRow (Icon::theme, juce::Colour (0xff8e8e93), TR ("Corrélation des vectorscopes"), TR ("Sur le cerclage du cercle"), &corrSeg, corrSeg.getIdealWidth());
+        corrSeg.onChange = [this] (int i) { if (onCorrStyleSelected) onCorrStyleSelected (i); };
         p.addRow (Icon::grid, juce::Colour (0xff30b0c7), TR ("Modules 3D"), TR ("Spectrum en blocs 3D"), &modules3DSwitch, 44, 26);
         p.addRow (Icon::text, juce::Colour (0xff0a84ff), TR ("Gros texte"), TR ("Lecture à distance"), &largeTextSwitch, 44, 26);
         // tout agrandi d'un bloc (écrans 4K) : Auto suit la résolution de l'écran
@@ -1556,6 +1574,8 @@ private:
                   &masterSeg, masterSeg.getIdealWidth());
         p.addGroup (TR ("Modules"));
         p.addRow (Icon::phase, juce::Colour (0xff30b0c7), TR ("Oscilloscope"), TR ("Style de l'écran"), &oscStyleSeg, oscStyleSeg.getIdealWidth());
+        p.addRow (Icon::phase, juce::Colour (0xff30b0c7), TR ("Voies gauche et droite"), TR ("En stéréo : sur le même écran ou l'une au-dessus de l'autre"),
+                  &oscSplitSeg, oscSplitSeg.getIdealWidth());
         p.addRow (Icon::timer, juce::Colour (0xff30b0c7), TR ("Cadence de l'oscilloscope"), TR ("Images par seconde : moins vite = plus lisible"),
                   &oscFpsSeg, oscFpsSeg.getIdealWidth());
         p.addRow (Icon::glass, juce::Colour (0xff30b0c7), TR ("Rémanence"), TR ("Les dernières images s'estompent, comme un écran à phosphore"),
@@ -1569,6 +1589,7 @@ private:
         oscWidthSlider.onValueChange = [this] { if (onOscLineWidthChanged) onOscLineWidthChanged (juce::roundToInt (oscWidthSlider.getValue())); };
         oscTraceSeg.onChange = [this] (int i) { if (onOscTraceModeSelected) onOscTraceModeSelected (i); };
         oscStyleSeg.onChange = [this] (int i) { if (onOscStyleSelected) onOscStyleSelected (i); };
+        oscSplitSeg.onChange = [this] (int i) { if (onOscSplitSelected) onOscSplitSelected (i == 1); };
         static const int oscFpsValues[] = { 24, 30, 60 };
         oscFpsSeg.onChange = [this] (int i) { if (onOscFpsSelected) onOscFpsSelected (oscFpsValues[i]); };
         oscPersistSwitch.onChange = [this] (bool on) { if (onOscPersistChanged) onOscPersistChanged (on); };
@@ -1670,8 +1691,11 @@ private:
     OptionsUi::Switch fullScreenSwitch, alwaysOnTopSwitch, darkSwitch, contrastSwitch, modules3DSwitch, largeTextSwitch;
     OptionsUi::Segmented plateSeg { { "Gris", "Ardoise" } };
     OptionsUi::Segmented screensSeg { { "Clairs", "Noirs" } };
+    OptionsUi::Segmented titleSeg { { "Sans", "Filet", "Bandeau" } };
+    OptionsUi::Segmented corrSeg { { "Barre", "Curseur", "Gradué" } };
     OptionsUi::Segmented masterSeg { { "Instrument", "Console" } };
-    OptionsUi::Segmented oscStyleSeg { juce::StringArray { juce::String ("Tube"), TR ("Numérique"), juce::String ("Vintage"), juce::String ("Deux voies") } };
+    OptionsUi::Segmented oscStyleSeg { juce::StringArray { juce::String ("Tube"), TR ("Numérique"), juce::String ("Vintage"), juce::String ("Rempli") } };
+    OptionsUi::Segmented oscSplitSeg { juce::StringArray { TR ("Superposées"), TR ("Séparées") } };
     OptionsUi::Segmented oscFpsSeg { { "24", "30", "60" } };
     OptionsUi::ValueSlider oscWidthSlider;   // épaisseur du trait de l'oscilloscope, 0..100
     OptionsUi::Segmented oscTraceSeg { { juce::String (juce::CharPointer_UTF8 ("Pr\xc3\xa9" "cis")), "Classique" } };

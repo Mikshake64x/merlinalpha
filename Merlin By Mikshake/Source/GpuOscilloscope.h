@@ -15,7 +15,7 @@ class ReleaseFader;   // PluginEditor.h
 // dépendait du timer du thread de messages, irrégulier).
 //
 // Quatre styles (Options > Affichage) : 0 tube cathodique, 1 numérique (DSO),
-// 2 vintage à lunette, 3 deux voies. Le fond (dégradé, graticule, légendes
+// 2 vintage à lunette, 3 rempli. Le fond (dégradé, graticule, légendes
 // fixes) est dessiné en 2D puis envoyé en texture ; les traces sont des
 // rubans anti-aliasés (geometry shader). Rémanence : les deux images
 // précédentes, plus pâles. Déclenchement sur la fondamentale + calage sur le
@@ -40,6 +40,7 @@ public:
     // Faders du module (AMP vertical à gauche, TIME horizontal en bas), seuls
     // réglages de l'oscilloscope : refreshFaders() relit les valeurs du processor
     void refreshFaders();
+    std::function<void()> onSplitChanged;   // bouton du module : les Options suivent
     static constexpr float kFaderL = 26.f, kFaderB = 20.f;   // place réservée (gauche, bas)
 
 private:
@@ -57,10 +58,11 @@ private:
     void uiTick() override;
     static juce::Rectangle<float> plotAreaFor(int style, float W, float H);
     static juce::Rectangle<float> tubeAreaFor(float W, float H);
-    void paintBackground(juce::Graphics&, int style, bool mono) const;
+    void paintBackground(juce::Graphics&, int style, bool mono, bool split) const;
     void rebuildBackgroundIfNeeded();
 
     juce::TextButton monoBtn { "ST" };   // (bouton TRIG retiré : déclenchement toujours actif)
+    juce::TextButton splitBtn { "OVER" };   // en stéréo : voies superposées (OVER) ou séparées (SPLIT)
     std::unique_ptr<ReleaseFader> ampFader, timeFader;
 
     // réglages lus par le thread GL
@@ -69,6 +71,7 @@ private:
     std::atomic<bool>  triggerMode { true };
     std::atomic<int>   styleA { 0 };
     std::atomic<bool>  monoA { false }, persistA { true };
+    std::atomic<bool>  splitA { false };   // en stéréo : L et R l'une au-dessus de l'autre
     std::atomic<float> widthMulA { 1.f };      // Options : épaisseur du trait
     std::atomic<bool>  classicTraceA { false }; // Options : tracé classique (enveloppe dès 2 échantillons / pixel)
     std::atomic<int>   viewW { 1 }, viewH { 1 };
