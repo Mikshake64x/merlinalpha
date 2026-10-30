@@ -2780,6 +2780,8 @@ static int needleStatH(int H)
     return juce::jlimit(juce::roundToInt(42.f*s), juce::roundToInt(58.f*s), juce::roundToInt((float)H*0.15f*s));
 }
 
+static const char* const kNeedleTitle="dBFS";
+
 void NeedleVuMeter::resized()
 {
     const int W=getWidth(), H=getHeight();
@@ -2788,20 +2790,20 @@ void NeedleVuMeter::resized()
     // (un peu plus haut qu'avant : les flèches ▲ / ▼ y sont empilées)
     headerH=juce::roundToInt(30.f*Ui::textScale);
     int cbH=headerH-8;
-    // commandes, en hauteurs de bouton : LR, valeur, ▲/▼, pas. Le titre
-    // "dBFS METER" doit rester entier : dans un module étroit, elles rétrécissent
-    constexpr float kMode=1.7f, kValue=2.7f, kArrows=1.1f, kStep=2.1f;
+    // commandes, en hauteurs de bouton : LR, valeur, ▲/▼, pas. Titre court : la
+    // place va aux commandes ; dans un module étroit, elles rétrécissent
+    constexpr float kMode=1.2f, kValue=2.5f, kArrows=1.0f, kStep=1.9f;
     constexpr float kSum=kMode+kValue+kArrows+kStep;
     {
-        const float titleW=juce::GlyphArrangement::getStringWidth(Ui::iceland(10.5f).withExtraKerningFactor(0.08f), TR("dBFS METER"));
-        // 8 bord, titre, 22 d'écart (le relief des boutons déborde), 8 bord, 6 + 2 + 6 entre groupes
-        const float room=(float)W-8.f-titleW-22.f-8.f-14.f;
+        const float titleW=juce::GlyphArrangement::getStringWidth(Ui::iceland(10.5f).withExtraKerningFactor(0.08f), kNeedleTitle);
+        // 8 bord, titre, 10 d'écart, 8 bord, 4 + 2 + 4 entre groupes
+        const float room=(float)W-8.f-titleW-10.f-8.f-10.f;
         if((float)cbH*kSum>room) cbH=juce::jmax(12, (int)(room/kSum));
     }
     const int y=(headerH-cbH)/2;
     int x=W-8;
     auto place=[&](juce::Component& c, float k){ const int w=juce::roundToInt((float)cbH*k); x-=w; c.setBounds(x, y, w, cbH); };
-    place(stepBtn, kStep);  x-=6;
+    place(stepBtn, kStep);  x-=4;
     {   // ▲ au-dessus de ▼, sur toute la hauteur de l'en-tête
         const int w=juce::roundToInt((float)cbH*kArrows), colH=headerH-4, bh=colH/2;
         x-=w;
@@ -2810,7 +2812,7 @@ void NeedleVuMeter::resized()
         x-=2;
     }
     { const int w=juce::roundToInt((float)cbH*kValue); x-=w; calibValueArea={ x, y, w, cbH }; }
-    x-=6;
+    x-=4;
     place(modeBtn, kMode);
 
     const int statH=needleStatH(H);
@@ -2949,7 +2951,7 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
     // ── En-tête ──────────────────────────────────────────────────────────
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
-    g.drawFittedText(TR("dBFS METER"),8,0,juce::jmax(40,modeBtn.getX()-22),headerH,juce::Justification::centredLeft,1,0.7f);
+    g.drawFittedText(kNeedleTitle,8,0,juce::jmax(30,modeBtn.getX()-10),headerH,juce::Justification::centredLeft,1,0.7f);
     if(Ui::titleStyle==0){ g.setColour(Col::border.withAlpha(0.5f)); g.drawLine(0.f,(float)headerH,(float)W,(float)headerH,0.6f); }
     else Ui::drawTitleDecor(g, (float)W, (float)headerH);
     // référence 0VU entre les flèches, dans un petit écran creux

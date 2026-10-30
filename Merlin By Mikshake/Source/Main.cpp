@@ -239,7 +239,11 @@ namespace
             }
         }
 
-        void paint (juce::Graphics& g) override { g.fillAll (juce::Colours::black); }
+        void paint (juce::Graphics& g) override
+        {
+            g.setGradientFill (Neu::plateFace (getLocalBounds().toFloat()));   // la plaque continue sous les marges
+            g.fillAll();
+        }
 
         void resized() override
         {
@@ -249,10 +253,13 @@ namespace
             const float scale = fixedScale > 0.f ? fixedScale
                                                  : juce::jmax (1.f, (float) getHeight() / referenceHeight,
                                                                     (float) getWidth()  / maxDesignWidth);
+            // marges de sécurité : sans barre de fenêtre, l'en-tête toucherait le
+            // haut de l'écran (le bas a déjà la marge de la bande de contrôles)
+            const int top = juce::roundToInt ((float) getHeight() * 0.011f), bottom = juce::roundToInt ((float) getHeight() * 0.005f);
             editor->setTransform ({});
             editor->setBounds (0, 0, juce::roundToInt ((float) getWidth()  / scale),
-                                     juce::roundToInt ((float) getHeight() / scale));
-            editor->setTransform (juce::AffineTransform::scale (scale));
+                                     juce::roundToInt ((float) (getHeight() - top - bottom) / scale));
+            editor->setTransform (juce::AffineTransform::scale (scale).translated (0.f, (float) top));
         }
 
     private:

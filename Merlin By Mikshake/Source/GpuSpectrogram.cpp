@@ -287,20 +287,27 @@ GpuSpectrogramDisplay::Camera GpuSpectrogramDisplay::makeCamera(float yawRad, fl
             const float cw=m[3]*x + m[7]*kReliefH + m[11]*z + m[15];
             if(cw>2.f) reliefTop=juce::jmax(reliefTop, cy/cw);
         }
-    if(reliefTop>topLimit){
-        cam.fitY=juce::jmax(0.6f, (topLimit+1.f)/(reliefTop+1.f));
-        for(int c=0;c<4;++c) cam.mvp[c*4+1]=cam.fitY*cam.mvp[c*4+1]+(cam.fitY-1.f)*cam.mvp[c*4+3];
+    // Vue tournée : le bord du bas, ce sont les graves et non le plus ancien : il
+    // reste dans le cadre, alors que de face il passe juste dessous.
+    const float floorBottom=ys[1]>-1.99f ? ys[1]-cam.shiftY : -1.f;
+    const float from=-1.f+sa*juce::jmin(0.f, floorBottom+1.f), to=-1.f+0.05f*sa;
+    if(reliefTop>topLimit || from<to){
+        cam.fitA=juce::jlimit(0.6f, 1.f, (topLimit-to)/juce::jmax(0.01f, reliefTop-from));
+        cam.fitB=to-cam.fitA*from;
+        for(int c=0;c<4;++c) cam.mvp[c*4+1]=cam.fitA*cam.mvp[c*4+1]+cam.fitB*cam.mvp[c*4+3];
     }
     // zoom molette : en avant, l'image grandit depuis la ligne du titre (le plus
     // récent reste entier, le plus ancien passe sous le cadre) ; en arrière, elle
     // se resserre vers le milieu de la zone libre : le vide se partage entre le
-    // titre et le bas du cadre, le point 0 ne descend pas (le bord avant dépasse
-    // un peu du cadre, d'où 60 % plutôt que 50 %)
+    // titre et le bas du cadre, le point 0 ne descend pas (de face, le bord avant
+    // dépasse un peu du cadre, d'où 60 % plutôt que 50 %). Vue tournée : en avant,
+    // seule la largeur grandit, sinon les graves sortiraient du cadre.
     cam.zoom=1.f+zoomAmount;
-    cam.zoomAnchorY=zoomAmount>0.f ? topLimit : -1.f+0.6f*(topLimit+1.f);
+    cam.zoomY=1.f+zoomAmount*(zoomAmount>0.f ? 1.f-sa : 1.f);
+    cam.zoomAnchorY=zoomAmount>0.f ? topLimit : -1.f+(0.6f-0.1f*sa)*(topLimit+1.f);
     for(int c=0;c<4;++c){
         cam.mvp[c*4]*=cam.zoom;
-        cam.mvp[c*4+1]=cam.zoom*cam.mvp[c*4+1]+(1.f-cam.zoom)*cam.zoomAnchorY*cam.mvp[c*4+3];
+        cam.mvp[c*4+1]=cam.zoomY*cam.mvp[c*4+1]+(1.f-cam.zoomY)*cam.zoomAnchorY*cam.mvp[c*4+3];
     }
     cam.eye[0]=eyeP.x; cam.eye[1]=eyeP.y; cam.eye[2]=eyeP.z;
     cam.halfX=halfX; cam.halfZ=halfZ;
@@ -631,7 +638,7 @@ void GpuSpectrogramDisplay::pick(const Camera& cam, float frac, int w, int h)
     if(!hoverOn.load()){ hitValid=false; return; }
     const float nx=(hoverX.load()-kReleaseFaderW)/(float)w*2.f-1.f, ny=1.f-hoverY.load()/(float)h*2.f;
     // (zoom puis tassement retirés d'abord : ils s'appliquent après le décalage de l'objectif)
-    const float ny0=(((ny-cam.zoomAnchorY)/cam.zoom+cam.zoomAnchorY)+1.f)/cam.fitY-1.f;
+    const float ny0=((ny-cam.zoomAnchorY)/cam.zoomY+cam.zoomAnchorY-cam.fitB)/cam.fitA;
     const float sx=nx/cam.zoom*cam.tanHalfY*cam.aspect, sy=(ny0+cam.shiftY)*cam.tanHalfY;
     float d[3];
     for(int k=0;k<3;++k) d[k]=cam.dir[k]+cam.right[k]*sx+cam.up[k]*sy;

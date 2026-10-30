@@ -56,8 +56,8 @@ private:
         float eye[3], dir[3], right[3], up[3];   // repère de la caméra (tracé de rayon du survol)
         float tanHalfY, aspect;
         float shiftY { 0.f };                    // décalage vertical de l'objectif (NDC) : bord avant au bas du cadre
-        float fitY { 1.f };                      // tassement vertical : le relief entier tient sous le titre
-        float zoom { 1.f };                      // agrandissement de l'image (molette)
+        float fitA { 1.f }, fitB { 0.f };        // y de l'image -> fitA*y+fitB : le relief entier tient dans le cadre
+        float zoom { 1.f }, zoomY { 1.f };       // agrandissement de l'image (molette), en largeur et en hauteur
         float zoomAnchorY { 0.f };               // ligne de l'image (NDC) que le zoom ne bouge pas
         float halfX;                             // demi-largeur du relief (fréquences)
         float halfZ { 3.f };                     // demi-profondeur du relief (temps)
