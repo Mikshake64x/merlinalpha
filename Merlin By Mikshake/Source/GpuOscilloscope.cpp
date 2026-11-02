@@ -83,7 +83,7 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
 {
     for(auto* v : { &rawL, &rawR, &trigSig, &lockSig }) v->assign((size_t)MAXN, 0.f);
     for(auto* v : { &bufL, &bufR, &bufM, &tmpM, &lockRef }) v->assign((size_t)kMaxWindow, 0.f);
-    for(auto* v : { &capL, &capR }) v->assign((size_t)kCapLen, 0.f);
+    for(auto* v : { &capL, &capR, &refL, &refR }) v->assign((size_t)kCapLen, 0.f);
     for(int i=0;i<kHist;++i){ histL[i].assign((size_t)kMaxWindow, 0.f); histR[i].assign((size_t)kMaxWindow, 0.f); }
     verts.reserve((size_t)kMaxWindow*4);
 
@@ -101,9 +101,37 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
     precisionBtn.setClickingTogglesState(true);
     precisionBtn.onClick=[this]{ precisionA=precisionBtn.getToggleState(); };
     addAndMakeVisible(precisionBtn);
-    // arme la capture du prochain coup ; autre appui : retour au direct
-    captureBtn.onClick=[this]{ captureA=captureA.load()==kCapLive ? kCapArmed : kCapLive; };
+    // arme la capture du prochain coup ; autre appui : retour au direct, sauf
+    // avec SUPERPOSE, où il relance un coup sur la même référence
+    captureBtn.onClick=[this]{
+        const int cap=captureA.load();
+        const bool sup=superposeA.load();
+        if(cap==kCapLive || (cap==kCapHeld && sup))        captureA=kCapArmed;
+        else if(cap==kCapArmed && sup && capValidA.load()) captureA=kCapHeld;   // attente annulée
+        else { captureA=kCapLive; superposeA=false; capValidA=false; viewLenA=0; }
+    };
     addAndMakeVisible(captureBtn);
+    // grisé hors capture ; la mesure gardée devient la référence, le coup suivant s'y superpose
+    superposeBtn.setEnabled(false);
+    superposeBtn.onClick=[this]{
+        const bool on=!superposeA.load();
+        superposeA=on;
+        if(on && captureA.load()==kCapHeld) captureA=kCapArmed;
+    };
+    addAndMakeVisible(superposeBtn);
+    // un clic affiche ou masque une capture ; jamais les deux masquées : sur la
+    // seule affichée, le clic passe à l'autre
+    auto pick=[](std::atomic<bool>& self, std::atomic<bool>& other){
+        const bool on=!self.load();
+        self=on;
+        if(!on && !other.load()) other=true;
+    };
+    chip1.onClick=[this, pick]{ pick(showFirstA, showLastA); };
+    chip2.onClick=[this, pick]{ pick(showLastA, showFirstA); };
+    addChildComponent(chip1);
+    addChildComponent(chip2);
+    resetChip.onClick=[this]{ captureA=kCapLive; superposeA=false; capValidA=false; viewLenA=0; };
+    addChildComponent(resetChip);
 
     // AMP (vertical, à gauche) et TIME (horizontal, en bas) : mêmes plages que
     // les boutons de la barre du bas
@@ -125,6 +153,7 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
     timeFader->onValueChange=[this](float v){
         const int n=juce::roundToInt(v);
         processor.oscTimeDiv=n; setTimeDiv(n);
+        viewLenA=0;
     };
     addAndMakeVisible(*timeFader);
     syncFromProcessor();
@@ -152,6 +181,7 @@ void GpuOscilloscopeDisplay::syncFromProcessor()
     splitBtn.setButtonText(processor.oscSplit ? "SPLIT" : "OVER");
     splitBtn.setEnabled(!processor.oscMono);   // une seule trace en mono
     styleA=juce::jlimit(0, 3, processor.oscStyle);
+    layoutChips();
     monoA=processor.oscMono;
     splitA=processor.oscSplit;
     persistA=processor.oscPersist;
@@ -164,6 +194,64 @@ void GpuOscilloscopeDisplay::syncFromProcessor()
     repaint();
 }
 
+void GpuOscilloscopeDisplay::TraceChip::paintButton(juce::Graphics& g, bool over, bool)
+{
+    const auto r=getLocalBounds().toFloat().reduced(0.5f);
+    const auto c=Col::ink(colour);
+    const bool on=getToggleState();
+    g.setColour(c.withAlpha(on ? 0.22f : over ? 0.1f : 0.f));
+    g.fillRoundedRectangle(r, 3.f);
+    g.setColour(c.withAlpha(on ? 1.f : 0.4f));
+    g.drawRoundedRectangle(r, 3.f, 1.f);
+    g.setColour(c.withAlpha(on ? 1.f : 0.5f));
+    g.setFont(Ui::iceland(10.f));
+    g.drawText(TR(getName()), getLocalBounds(), juce::Justification::centred, false);
+}
+
+void GpuOscilloscopeDisplay::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
+{
+    if(! capValidA.load()){ juce::Component::mouseWheelMove(e, w); return; }   // en direct, le tracé bouge
+    const auto pr=plotAreaFor(styleA.load(), (float)getWidth(), (float)getHeight());
+    const float at=juce::jlimit(0.f, 1.f, (e.position.x-pr.getX())/pr.getWidth());
+    const int n=nPts.load(), oldLen=viewLenA.load()>0 ? viewLenA.load() : n, oldStart=viewLenA.load()>0 ? viewStartA.load() : 0;
+    const int len=juce::jlimit(juce::jmin(kMinView, n), n, juce::roundToInt((float)oldLen*std::pow(1.6f, -w.deltaY)));   // ~25 % par cran
+    const float sample=(float)oldStart+at*(float)oldLen;   // reste sous le pointeur
+    viewStartA=juce::jlimit(0, n-len, juce::roundToInt(sample-at*(float)len));
+    viewLenA=len<n ? len : 0;
+    repaint();   // ms/div
+}
+
+void GpuOscilloscopeDisplay::mouseDown(const juce::MouseEvent&)
+{
+    dragStartView=viewStartA.load();
+}
+
+void GpuOscilloscopeDisplay::mouseDrag(const juce::MouseEvent& e)
+{
+    const int len=viewLenA.load();
+    if(len<=0 || !e.mods.isLeftButtonDown()) return;
+    const auto pr=plotAreaFor(styleA.load(), (float)getWidth(), (float)getHeight());
+    const int moved=juce::roundToInt((float)e.getDistanceFromDragStartX()/pr.getWidth()*(float)len);
+    viewStartA=juce::jlimit(0, nPts.load()-len, dragStartView-moved);   // le tracé suit la souris
+}
+
+void GpuOscilloscopeDisplay::mouseDoubleClick(const juce::MouseEvent&)
+{
+    viewLenA=0;
+    repaint();
+}
+
+void GpuOscilloscopeDisplay::layoutChips()
+{
+    const auto pr=plotAreaFor(styleA.load(), (float)getWidth(), (float)getHeight());
+    const int w=juce::roundToInt(18.f*Ui::textScale), h=juce::roundToInt(13.f*Ui::textScale);
+    const int x=(int)pr.getRight()-w-4, y=(int)pr.getY()+4;
+    chip2.setBounds(x, y, w, h);
+    chip1.setBounds(x-w-3, y, w, h);
+    const int rw=juce::roundToInt(32.f*Ui::textScale);
+    resetChip.setBounds((chip1.isVisible() ? chip1.getX()-3 : x+w)-rw, y, rw, h);
+}
+
 void GpuOscilloscopeDisplay::resized()
 {
     viewW=juce::jmax(1, getWidth());
@@ -172,14 +260,18 @@ void GpuOscilloscopeDisplay::resized()
         const int bw=juce::roundToInt(34.f*Ui::textScale), bh=juce::roundToInt(12.f*Ui::textScale);
         monoBtn.setBounds(getWidth()-bw-4, 2, bw, bh);
         splitBtn.setBounds(monoBtn.getX()-bw-3, 2, bw, bh);
-        const int pw=juce::roundToInt(44.f*Ui::textScale);
+        const int pw=juce::roundToInt(40.f*Ui::textScale);
         precisionBtn.setBounds(splitBtn.getX()-pw-3, 2, pw, bh);
-        const int cw=juce::roundToInt(38.f*Ui::textScale);
-        captureBtn.setBounds(precisionBtn.getX()-cw-3, 2, cw, bh);
-        const int minX=juce::roundToInt(60.f*Ui::textScale);   // module étroit : le titre d'abord
+        const int cw=juce::roundToInt(34.f*Ui::textScale), sw=juce::roundToInt(40.f*Ui::textScale);
+        const int minX=juce::roundToInt(52.f*Ui::textScale);   // module étroit : le titre, comprimé au besoin, d'abord
+        const bool superposeFits=precisionBtn.getX()-sw-cw-6>=minX;
+        superposeBtn.setBounds(precisionBtn.getX()-sw-3, 2, sw, bh);
+        superposeBtn.setVisible(superposeFits);
+        captureBtn.setBounds((superposeFits ? superposeBtn.getX() : precisionBtn.getX())-cw-3, 2, cw, bh);
         precisionBtn.setVisible(precisionBtn.getX()>=minX);
         captureBtn.setVisible(captureBtn.getX()>=minX);
     }
+    layoutChips();
     // faders : AMP le long du bord gauche, TIME le long du bas
     if(ampFader)  ampFader ->setBounds(2, 22, (int)kFaderL-4, juce::jmax(10, getHeight()-22-(int)kFaderB-4));
     if(timeFader) timeFader->setBounds((int)kFaderL, getHeight()-(int)kFaderB, juce::jmax(60, getWidth()-(int)kFaderL-6), (int)kFaderB-2);
@@ -371,6 +463,25 @@ void GpuOscilloscopeDisplay::uiTick()
     const int cap=captureA.load();
     const bool lit=cap==kCapHeld || (cap==kCapArmed && (juce::Time::getMillisecondCounter()/250)%2==0);
     if(lit!=captureBtn.getToggleState()) captureBtn.setToggleState(lit, juce::dontSendNotification);
+    const bool canSuperpose=cap!=kCapLive, superpose=superposeA.load();
+    if(canSuperpose!=superposeBtn.isEnabled()) superposeBtn.setEnabled(canSuperpose);
+    if(superpose!=superposeBtn.getToggleState()) superposeBtn.setToggleState(superpose, juce::dontSendNotification);
+    const bool chips=refReadyA.load();
+    if(chips!=chip1.isVisible()){
+        chip1.setVisible(chips);
+        chip2.setVisible(chips);
+        if(!chips) showFirstA=showLastA=true;
+        layoutChips();
+    }
+    const bool canReset=capValidA.load();
+    if(canReset!=resetChip.isVisible()) resetChip.setVisible(canReset);
+    const bool zoomed=viewLenA.load()>0;
+    if(zoomed!=handCursor){
+        handCursor=zoomed;
+        setMouseCursor(zoomed ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);
+    }
+    chip1.setToggleState(showFirstA.load(), juce::dontSendNotification);
+    chip2.setToggleState(showLastA.load(), juce::dontSendNotification);
     if(styleA.load()==1){
         const float vpp=measVpp.load(), hz=measHz.load();
         const juce::String m="Vpp "+juce::String(vpp, 2)+"   f "+(hz>0.f ? juce::String(juce::roundToInt(hz))+" Hz" : juce::String("--"));
@@ -405,7 +516,8 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
     }
 
     const double sr=juce::jmax(1.0, processor.getCurrentSampleRate());
-    const juce::String perDiv=juce::String((double)nPts.load()/sr*100.0, 2)+" ms/div";   // 10 divisions
+    const int shownN=viewLenA.load()>0 ? viewLenA.load() : nPts.load();
+    const juce::String perDiv=juce::String((double)shownN/sr*100.0, 2)+" ms/div";   // 10 divisions
     g.setFont(Ui::iceland(9.f));
     if(style==0){
         g.setColour(Col::ink(juce::Colour(0xFF8FF6FF)).withAlpha(0.7f));
@@ -508,7 +620,7 @@ void GpuOscilloscopeDisplay::pushHistory()
 // continu, au plus près du direct.
 bool GpuOscilloscopeDisplay::capture()
 {
-    const int  n=nPts.load();
+    int n=nPts.load();
     const bool mono=monoA.load();
     if(n!=histN){ histN=n; histCount=0; }
     const double sr=juce::jmax(1.0, processor.getCurrentSampleRate());
@@ -529,18 +641,33 @@ bool GpuOscilloscopeDisplay::capture()
 
     // CAPTURE : le coup reste à l'écran ; TIME et AMP y restent actifs
     auto showHeld=[&]{
-        if(capFresh || n!=curN){
+        const int view=viewLenA.load();
+        const int shown=view>0 ? juce::jmin(view, n) : n;
+        const int start=view>0 ? juce::jlimit(0, n-shown, viewStartA.load()) : 0;
+        if(capFresh || shown!=curN || start!=heldStart){
             capFresh=false;
             histCount=0;   // rien de pâle du direct d'avant
-            std::memcpy(bufL.data(), capL.data(), (size_t)n*sizeof(float));
-            std::memcpy(bufR.data(), capR.data(), (size_t)n*sizeof(float));
+            heldStart=start;
+            n=shown;
+            std::memcpy(bufL.data(), capL.data()+start, (size_t)n*sizeof(float));
+            std::memcpy(bufR.data(), capR.data()+start, (size_t)n*sizeof(float));
             finish();
         }
     };
+    // SUPERPOSE : au réarmement, la mesure gardée devient la référence
+    if(!superposeA.load()) refValid=refPending=false;
+    else if(!refValid && captureA.load()==kCapArmed && capValidA.load()){
+        refL=capL; refR=capR;
+        refStart=capStart; refPending=capPending; refValid=true;
+    }
+    refReadyA=refValid;
+    if(refPending && processor.getScopeData(rawL.data(), rawR.data(), 0)>=refStart+(juce::uint64)kCapLen)
+        readHit(refStart, refL, refR, refPending);
+
     if(captureA.load()==kCapHeld){
         // la fin du coup arrive pendant qu'il est à l'écran : TIME peut s'élargir dessus
         if(capPending && processor.getScopeData(rawL.data(), rawR.data(), 0)>=capStart+(juce::uint64)kCapLen){
-            readCapture();
+            readHit(capStart, capL, capR, capPending);
             capFresh=true;
         }
         showHeld();
@@ -563,9 +690,10 @@ bool GpuOscilloscopeDisplay::capture()
         if(watchForHit(fetch, endAbs, n, sr)){
             capWatching=false;
             int armed=kCapArmed;
-            if(captureA.compare_exchange_strong(armed, kCapHeld)){ capFresh=true; showHeld(); }
+            if(captureA.compare_exchange_strong(armed, kCapHeld)){ capFresh=true; capValidA=true; showLastA=true; viewLenA=0; showHeld(); }
             return false;   // rawL vient d'être relu : pas d'image directe à ce tour
         }
+        if(refValid){ showHeld(); return false; }   // l'image reste en place jusqu'au coup
     } else capWatching=false;
 
     // Silence (sous -80 dBFS sur la fenêtre la plus récente) : ligne plate
@@ -708,22 +836,22 @@ bool GpuOscilloscopeDisplay::watchForHit(int fetch, juce::uint64 endAbs, int n, 
     }
     capStart=capHit-juce::jmin(capHit, (juce::uint64)(sr*0.005));
     if(endAbs<capStart+(juce::uint64)n) return false;
-    readCapture();
+    readHit(capStart, capL, capR, capPending);
     return true;
 }
 
 // copie le coup depuis l'anneau ; ce qui n'est pas encore arrivé reste à zéro
-void GpuOscilloscopeDisplay::readCapture()
+void GpuOscilloscopeDisplay::readHit(juce::uint64 start, std::vector<float>& l, std::vector<float>& r, bool& pending)
 {
     const int readN=LeakAudioProcessor::SCOPE_MAX_READ;
     const juce::uint64 base=processor.getScopeData(rawL.data(), rawR.data(), readN)-(juce::uint64)readN;
-    const int offset=(int)juce::jlimit<juce::int64>(0, readN, (juce::int64)capStart-(juce::int64)base);
+    const int offset=(int)juce::jlimit<juce::int64>(0, readN, (juce::int64)start-(juce::int64)base);
     const int got=juce::jmin(kCapLen, readN-offset);
-    std::memcpy(capL.data(), rawL.data()+offset, (size_t)got*sizeof(float));
-    std::memcpy(capR.data(), rawR.data()+offset, (size_t)got*sizeof(float));
-    std::fill(capL.begin()+got, capL.end(), 0.f);
-    std::fill(capR.begin()+got, capR.end(), 0.f);
-    capPending=got<kCapLen;
+    std::memcpy(l.data(), rawL.data()+offset, (size_t)got*sizeof(float));
+    std::memcpy(r.data(), rawR.data()+offset, (size_t)got*sizeof(float));
+    std::fill(l.begin()+got, l.end(), 0.f);
+    std::fill(r.begin()+got, r.end(), 0.f);
+    pending=got<kCapLen;
 }
 
 // Fenêtre la plus récente qui se superpose à la référence (corrélation
@@ -938,12 +1066,15 @@ void GpuOscilloscopeDisplay::renderOpenGL()
             }
             return (int)(verts.size()/2);
         };
+        bool refPass=false;   // SUPERPOSE : la référence, d'une seule couleur, sous le dernier coup
+        const auto refInk=Col::ink(juce::Colour(kRefColour));
         auto colourUniform=[](juce::OpenGLShaderProgram& prog, juce::Colour c, float alpha){
             const float a=c.getFloatAlpha()*alpha;
             prog.setUniform("col", c.getFloatRed()*a, c.getFloatGreen()*a, c.getFloatBlue()*a, a);
         };
         auto line=[&](const float* buf, juce::Rectangle<float> r, juce::Colour c, float alpha, float width, float halo){
             width*=widthMul;   // Options : épaisseur du trait
+            if(refPass) c=refInk;
             const int nv=build(buf, r, false);
             if(nv<2) return;
             lineShader->use();
@@ -1010,7 +1141,16 @@ void GpuOscilloscopeDisplay::renderOpenGL()
                 frame(histL[idx].data(), histR[idx].data(), mono ? tmpM.data() : histL[idx].data(), age==1 ? 0.32f : 0.14f, false);
             }
         }
-        frame(bufL.data(), bufR.data(), mono ? bufM.data() : bufL.data(), 1.f, true);
+        if(refValid && showFirstA.load()){
+            refPass=true;
+            const float* rl=refL.data()+heldStart;
+            const float* rr=refR.data()+heldStart;
+            if(mono) for(int i=0;i<n;++i) tmpM[(size_t)i]=0.5f*(rl[i]+rr[i]);
+            frame(rl, rr, mono ? tmpM.data() : rl, 0.85f, false);
+            refPass=false;
+        }
+        if(!refValid || showLastA.load())
+            frame(bufL.data(), bufR.data(), mono ? bufM.data() : bufL.data(), 1.f, true);
     }
 
     // état rendu à JUCE (composition du calque 2D)
