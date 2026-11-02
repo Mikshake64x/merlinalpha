@@ -52,6 +52,9 @@ namespace Theme {
         Col::spectroLow  = juce::Colour(c.spectroLow);
         Col::spectroMid  = juce::Colour(c.spectroMid);
         Col::spectroHigh = juce::Colour(c.spectroHigh);
+        Col::darkAccent  = Col::accent;
+        Col::darkTextHi  = Col::textHi;
+        Col::darkTextMid = Col::textMid;
         if(Col::paper){
             // écrans Papier (aperçu validé, variante A) : blanc cassé, grille
             // gris-bleu fine, encre ardoise ; accent et Side tirés des couleurs choisies
@@ -121,19 +124,22 @@ juce::String formatTimeTick(float sec, float step)
 
 }   // namespace SpectroReadout (rouvert juste après)
 
-void Ui::drawTitleDecor(juce::Graphics& g, float W, float y, float endX)
+void Ui::drawTitleDecor(juce::Graphics& g, float W, float y, float endX, bool darkScreen)
 {
     if(titleStyle==0) return;
     const float x0=8.f, x1=endX>0.f ? endX : W-8.f;
     if(titleStyle==1){
-        juce::ColourGradient line(Col::accent, x0, 0.f, Col::accent.withAlpha(0.f), x1, 0.f, false);
-        line.addColour(0.45, Col::accent.withAlpha(0.33f));
+        const auto acc=darkScreen ? Col::darkAccent : Col::accent;
+        juce::ColourGradient line(acc, x0, 0.f, acc.withAlpha(0.f), x1, 0.f, false);
+        line.addColour(0.45, acc.withAlpha(0.33f));
         g.setGradientFill(line);
         g.fillRect(x0, y, x1-x0, 1.f);
     } else {
-        g.setColour(Col::light(0.05f));
+        const bool paper=Col::paper && !darkScreen;
+        const auto tint=paper ? Col::textHi : juce::Colours::white;
+        g.setColour(tint.withAlpha(0.05f));
         g.fillRect(0.f, 0.f, W, y);
-        g.setColour(Col::light(Col::paper ? 0.22f : 0.16f));
+        g.setColour(tint.withAlpha(paper ? 0.22f : 0.16f));
         g.fillRect(0.f, y, endX>0.f ? endX : W, 1.f);
     }
 }
@@ -399,7 +405,7 @@ void drawBezel(juce::Graphics& g, juce::Rectangle<float> s)
     g.drawRoundedRectangle(o.expanded(0.5f), R+0.5f, 1.f);
 }
 
-void drawScreenGlass(juce::Graphics& g, juce::Rectangle<float> s)
+void drawScreenGlass(juce::Graphics& g, juce::Rectangle<float> s, bool darkScreen)
 {
     // coins : les modules peignent des rectangles, la lunette les arrondit
     juce::Path caps; caps.addRectangle(s); caps.addRoundedRectangle(s, screenRadius);
@@ -409,6 +415,11 @@ void drawScreenGlass(juce::Graphics& g, juce::Rectangle<float> s)
         // écran Papier creusé : ombre interne en haut à gauche, lumière en bas
         // à droite, filet net ; pas de reflet
         g.setColour(paperBezel()); g.fillPath(caps);
+        if(darkScreen){   // le même creux, sans halo blanc sur un écran sombre
+            g.setColour(juce::Colours::black.withAlpha(0.55f));
+            g.drawRoundedRectangle(s.reduced(0.5f), screenRadius, 1.f);
+            return;
+        }
         juce::Path ring; ring.addRectangle(s.expanded(24.f)); ring.addRoundedRectangle(s, screenRadius);
         ring.setUsingNonZeroWinding(false);
         g.saveState();
@@ -2173,14 +2184,16 @@ void ReleaseFader::paint(juce::Graphics& g)
     // d'accent lumineux depuis le bas, petit curseur clair (plus grand au
     // survol, lueur renforcée pendant le glisser).
     const int W=getWidth(), H=getHeight();
-    const auto acc=Col::accent;
+    const auto acc=darkScreen ? Col::darkAccent : Col::accent;
+    const auto mid=darkScreen ? Col::darkTextMid : Col::textMid;
+    const bool paper=Col::paper && !darkScreen;
     if(horizontal){
         // même rail, couché : étiquette à gauche, valeur à droite
         if(W<60||H<8) return;
         const float lw=30.f*Ui::textScale, vw=46.f*Ui::textScale, cy=(float)H*0.5f;   // gros texte : "TIME" ne mord plus sur le rail
         const float x0=lw, x1=(float)W-vw;
         g.setFont(Ui::iceland(9.f));
-        g.setColour(Col::textMid.withAlpha(0.8f));
+        g.setColour(mid.withAlpha(0.8f));
         g.drawFittedText(TR(label),0,0,(int)lw-2,H,juce::Justification::centredRight,1,0.6f);
         juce::Path rail; rail.startNewSubPath(x0, cy); rail.lineTo(x1, cy);
         const juce::PathStrokeType railStroke(4.f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
@@ -2192,8 +2205,8 @@ void ReleaseFader::paint(juce::Graphics& g)
         g.setColour(acc); g.strokePath(fill, railStroke);
         const float tw=hovered||dragging ? 7.f : 6.f, th=hovered||dragging ? 16.f : 14.f;
         const auto thumb=juce::Rectangle<float>(tw, juce::jmin(th,(float)H)).withCentre({xv, cy});
-        g.setColour(juce::Colours::black.withAlpha(Col::paper ? 0.22f : 0.5f)); g.fillRoundedRectangle(thumb.translated(1.f, 0.f), tw*0.5f);
-        g.setColour(Col::pick(juce::Colour(0xFFE8FFF6), juce::Colours::white)); g.fillRoundedRectangle(thumb, tw*0.5f);
+        g.setColour(juce::Colours::black.withAlpha(paper ? 0.22f : 0.5f)); g.fillRoundedRectangle(thumb.translated(1.f, 0.f), tw*0.5f);
+        g.setColour((paper ? juce::Colours::white : juce::Colour(0xFFE8FFF6))); g.fillRoundedRectangle(thumb, tw*0.5f);
         g.setFont(Ui::iceland(9.5f));
         g.setColour(acc);
         g.drawFittedText(valueText(),(int)x1+6,0,(int)vw-6,H,juce::Justification::centredLeft,1,0.6f);
@@ -2205,7 +2218,7 @@ void ReleaseFader::paint(juce::Graphics& g)
     const float cx=(float)W*0.5f;
 
     g.setFont(Ui::iceland(9.f));
-    g.setColour(Col::textMid.withAlpha(0.8f));
+    g.setColour(mid.withAlpha(0.8f));
     g.drawFittedText(TR(label),0,1,W,juce::roundToInt(11.f*s),juce::Justification::centred,1,0.45f);   // "TIME" tient dans le rail
 
     // rail
@@ -2226,8 +2239,8 @@ void ReleaseFader::paint(juce::Graphics& g)
     // curseur
     const float tw=hovered||dragging ? 16.f : 14.f, th=hovered||dragging ? 7.f : 6.f;
     const auto thumb=juce::Rectangle<float>(tw, th).withCentre({cx, yv});
-    g.setColour(juce::Colours::black.withAlpha(Col::paper ? 0.22f : 0.5f)); g.fillRoundedRectangle(thumb.translated(0.f, 1.f), th*0.5f);
-    g.setColour(Col::pick(juce::Colour(0xFFE8FFF6), juce::Colours::white)); g.fillRoundedRectangle(thumb, th*0.5f);
+    g.setColour(juce::Colours::black.withAlpha(paper ? 0.22f : 0.5f)); g.fillRoundedRectangle(thumb.translated(0.f, 1.f), th*0.5f);
+    g.setColour((paper ? juce::Colours::white : juce::Colour(0xFFE8FFF6))); g.fillRoundedRectangle(thumb, th*0.5f);
 
     g.setFont(Ui::iceland(9.5f));
     g.setColour(acc);
@@ -3975,6 +3988,7 @@ AboutOverlay::AboutOverlay()
 juce::Rectangle<float> AboutOverlay::panelBounds() const
 {
     const auto b=getLocalBounds().toFloat();
+    if(windowed) return b;
     return b.reduced(juce::jmax(20.f, b.getWidth()*0.015f), juce::jmax(12.f, b.getHeight()*0.04f));
 }
 
@@ -4025,13 +4039,20 @@ void AboutOverlay::resized()
 
 void AboutOverlay::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colours::black.withAlpha(0.60f*animOpacity));
+    if(!windowed) g.fillAll(juce::Colours::black.withAlpha(0.60f*animOpacity));
     if(!chromeCache.isValid()) rebuildChromeCache();
     if(!chromeCache.isValid()) return;
     juce::Graphics::ScopedSaveState state(g);
     g.setOpacity(animOpacity);
     g.addTransform(panelTransform());
     g.drawImageTransformed(chromeCache, juce::AffineTransform::scale(1.f/chromeScale));
+}
+
+juce::String AboutOverlay::chromeState() const
+{
+    double scale=juce::Component::getApproximateScaleFactorForComponent(this);
+    if(auto* d=juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds())) scale*=d->scale;
+    return juce::String(scale)+"|"+juce::String((int)Neu::light)+"|"+Neu::accentInk().toString()+"|"+licenceText();
 }
 
 // Décor statique (feuille, en-tête, duo, filets, pied de page) rendu une fois
@@ -4044,6 +4065,7 @@ void AboutOverlay::rebuildChromeCache()
     double scale=juce::Component::getApproximateScaleFactorForComponent(this);
     if(auto* d=juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds())) scale*=d->scale;
     chromeScale=(float)juce::jlimit(1.0, 4.0, scale);
+    chromeKey=chromeState();
     chromeCache=juce::Image(juce::Image::ARGB, juce::roundToInt((float)w*chromeScale), juce::roundToInt((float)h*chromeScale), true);
     juce::Graphics g(chromeCache);
     g.addTransform(juce::AffineTransform::scale(chromeScale));
@@ -4052,8 +4074,10 @@ void AboutOverlay::rebuildChromeCache()
     // feuille en relief, comme la plaque
     juce::Path sheet;
     sheet.addRoundedRectangle(panelBounds(), 14.f);
-    juce::DropShadow(Neu::shadowDark,  30, {  10,  10 }).drawForPath(g, sheet);
-    juce::DropShadow(Neu::shadowLight, 20, {  -6,  -6 }).drawForPath(g, sheet);
+    if(!windowed){   // en fenêtre, la feuille la remplit : les ombres sortiraient de l'image
+        juce::DropShadow(Neu::shadowDark,  30, {  10,  10 }).drawForPath(g, sheet);
+        juce::DropShadow(Neu::shadowLight, 20, {  -6,  -6 }).drawForPath(g, sheet);
+    }
     g.setColour(Neu::surface);
     g.fillPath(sheet);
     g.setColour(aboutLine());
@@ -4305,11 +4329,19 @@ void AboutOverlay::visibilityChanged()
 // 16 px avec un léger rebond (280 ms) ; disparition inverse (170 ms)
 void AboutOverlay::showAnimated()
 {
-    chromeCache={};   // thème, accent et licence relus
+    if(chromeState()!=chromeKey) chromeCache={};   // thème, accent, licence ou écran changés
     for(int i=0;i<3;++i){
         viewport[i].getVerticalScrollBar().setColour(juce::ScrollBar::thumbColourId, Neu::text.withAlpha(0.28f));
         viewport[i].setViewPosition(0, 0);
         column[i].repaint();
+    }
+    if(windowed){   // pas d'animation : elle repeindrait toute la fenêtre à 60 i/s, au détriment des mesures
+        stopTimer();
+        animating=false;
+        animOpacity=animScale=1.f;
+        for(auto& v : viewport){ v.setTransform({}); v.setAlpha(1.f); }
+        setVisible(true);
+        return;
     }
     animOpacity=0.f; animScale=0.f;
     for(auto& v : viewport){ v.setTransform(panelTransform()); v.setAlpha(0.f); }
@@ -4319,6 +4351,7 @@ void AboutOverlay::showAnimated()
 
 void AboutOverlay::hideAnimated()
 {
+    if(windowed){ setVisible(false); return; }
     if(isVisible() && !(animating && !animatingIn))
         startAnimation(false);
 }
@@ -5315,17 +5348,20 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     license->addChangeListener(this);
     updateLicenseUi();
 
+    if(!AppMode::isPlugin)
+        juce::Timer::callAfterDelay(1500, [sp=juce::Component::SafePointer<LeakEditor>(this)]{ if(sp!=nullptr) sp->prepareAbout(); });
     topBar.onAboutClicked    = [this]{
         closeOptions();
-        if(aboutOverlay.isVisible()) aboutOverlay.hideAnimated(); else aboutOverlay.showAnimated();
+        if(aboutOverlay.isVisible()) aboutOverlay.hideAnimated(); else openAbout();
     };
     // RESET de l'en-tête (v1.73) — un clic sur le titre fait la même chose
     topBar.onResetClicked    = [this]{
         audioProcessor.resetLoudness();
         spectrum.resetAll();
         vuMeter.resetAll();
+        oscilloscope.resetCaptures();
     };
-    topBar.onTitleClicked    = [this]{ if(topBar.onResetClicked) topBar.onResetClicked(); };
+    topBar.onTitleClicked   = [this]{ if(topBar.onResetClicked) topBar.onResetClicked(); };
     topBar.onFullScreenClicked = [this]{ if(onToggleFullScreen) onToggleFullScreen(); };
     topBar.onKeyboardToggled   = [this](bool on){ if(host.setKeyboardInMerlin) host.setKeyboardInMerlin(on); };
     topBar.onSettingsClicked = [this]{ openOptions(); };   // menu Options (trois points)
@@ -5404,6 +5440,8 @@ LeakEditor::~LeakEditor()
         if(auto* comp=getComponentForModule(f.module)) comp->setLookAndFeel(nullptr);
     floating.clear();                    // fenêtres détachées fermées (les modules restent à l'éditeur)
     optionsWindow.reset();               // idem pour la fenêtre des Options
+    aboutWindow.reset();                 // et celle de l'À propos
+    aboutOverlay.setLookAndFeel(nullptr);
     license->removeChangeListener(this);
     aboutOverlay.removeComponentListener(this);
     optionsOverlay.removeComponentListener(this);
@@ -5504,6 +5542,49 @@ void LeakEditor::openOptions()
     optionsOverlay.toFront(true);
 }
 
+// À propos : dans l'appli, fenêtre à part comme les Options, les modules GPU
+// restent actifs derrière ; dans le plugin, voile sur l'éditeur
+void LeakEditor::prepareAbout()
+{
+    if(AppMode::isPlugin || aboutWindow!=nullptr) return;
+    aboutOverlay.setLookAndFeel(&laf);   // la fenêtre a le style de la barre
+    removeChildComponent(&aboutOverlay);
+    aboutOverlay.setWindowed(true);
+    aboutOverlay.setSize(juce::jlimit(980, 1280, getWidth()), juce::jlimit(600, 760, getHeight()));
+    aboutWindow=std::make_unique<DetachedWindow>(juce::String(juce::CharPointer_UTF8("Merlin \xce\xb1 \xc2\xb7 "))+TR("À propos"), aboutOverlay,
+        [sp=juce::Component::SafePointer<LeakEditor>(this)]{
+            juce::MessageManager::callAsync([sp]{ if(sp!=nullptr) sp->closeAbout(); });
+        });
+    auto& w=*aboutWindow;
+    w.setResizeLimits(900, 560, 2400, 1600);
+    aboutOverlay.setVisible(false);   // son contenu, visible dès la construction de la fenêtre
+    w.addToDesktop();
+    aboutOverlay.prepareChrome();
+}
+
+void LeakEditor::openAbout()
+{
+    if(AppMode::isPlugin){ aboutOverlay.showAnimated(); return; }
+    prepareAbout();
+    auto& w=*aboutWindow;
+    if(aboutOverlay.isVisible()){ w.toFront(true); return; }
+    w.centreAroundComponent(this, w.getWidth(), w.getHeight());
+    w.setAlwaysOnTop(alwaysOnTopState);
+    if(auto* peer=w.getPeer())
+        WindowsDisplay::setNoActivate(peer->getNativeHandle(), !keyboardState);
+    aboutOverlay.showAnimated();
+    w.setVisible(true);
+    w.toFront(true);
+    updateGpuSuspension();
+}
+
+void LeakEditor::closeAbout()
+{
+    aboutOverlay.setVisible(false);
+    if(aboutWindow!=nullptr) aboutWindow->setVisible(false);   // gardée pour la prochaine ouverture
+    updateGpuSuspension();
+}
+
 // Ferme les Options (fenêtre de l'appli ou panneau du plugin) ; le panneau
 // revient, masqué, dans l'éditeur pour la prochaine ouverture
 void LeakEditor::closeOptions()
@@ -5565,7 +5646,7 @@ void LeakEditor::setupOptions()
     o.onSavePreset       = [this]{ askSavePreset(); };
     o.onOpenPresetFolder = []{ auto f=LeakAudioProcessor::getPresetFolder(); f.createDirectory(); f.startAsProcess(); };
     o.onResetLayout      = [this]{ resetLayout(); closeOptions(); };
-    o.onOpenAbout        = [this]{ closeOptions(); aboutOverlay.showAnimated(); };
+    o.onOpenAbout        = [this]{ closeOptions(); openAbout(); };
     o.onOpenLicence      = [this]{ openLicence(); };
     // ligne Version : pastille α de Merlin au format des pictogrammes (carré arrondi 28 px)
     o.drawAppBadge = [](juce::Graphics& g, juce::Rectangle<float> r){
@@ -5826,6 +5907,7 @@ void LeakEditor::raiseDetachedWindows()
     };
     for(auto& f : floating) raise(f.window.get());
     raise(optionsWindow.get());
+    raise(aboutWindow.get());
 }
 
 // la fenêtre détachée suit la souris tant que le bouton reste enfoncé (timer de l'éditeur)
@@ -5957,9 +6039,10 @@ void LeakEditor::setKeyboardState(bool b)
         if(f.window!=nullptr)
             if(auto* peer=f.window->getPeer())
                 WindowsDisplay::setNoActivate(peer->getNativeHandle(), !b);
-    if(optionsWindow!=nullptr)
-        if(auto* peer=optionsWindow->getPeer())
-            WindowsDisplay::setNoActivate(peer->getNativeHandle(), !b);
+    for(auto* w : { optionsWindow.get(), aboutWindow.get() })
+        if(w!=nullptr)
+            if(auto* peer=w->getPeer())
+                WindowsDisplay::setNoActivate(peer->getNativeHandle(), !b);
 }
 
 void LeakEditor::reattachAll()
@@ -6612,7 +6695,7 @@ void LeakEditor::updateLayout()
     topBar      .setBounds(rcTitle);
     controls       .setBounds(rcCtrl);   // bande du bas (fixe)
     overlayLayer   .setBounds(getLocalBounds());
-    aboutOverlay   .setBounds(getLocalBounds());
+    if(AppMode::isPlugin) aboutOverlay.setBounds(getLocalBounds());   // appli : taille de sa fenêtre
     if(optionsWindow==nullptr)   // sinon le panneau suit sa propre fenêtre
         optionsOverlay.setBounds(getLocalBounds());
     licenseOverlay .setBounds(getLocalBounds());
@@ -6700,8 +6783,11 @@ void LeakEditor::openLicence()
 void LeakEditor::updateGpuSuspension()
 {
     // Options dans leur propre fenêtre (appli) : rien ne recouvre les modules
-    const bool optionsOver=optionsOverlay.isVisible() && optionsWindow==nullptr;
-    const bool covered=aboutOverlay.isVisible() || optionsOver
+    // d'après le parent : une fenêtre rend son contenu visible dès sa construction,
+    // avant d'être rangée dans optionsWindow / aboutWindow (les modules s'arrêtaient)
+    const bool optionsOver=optionsOverlay.isVisible() && optionsOverlay.getParentComponent()==this;
+    const bool aboutOver=aboutOverlay.isVisible() && aboutOverlay.getParentComponent()==this;
+    const bool covered=aboutOver || optionsOver
                        || licenseOverlay.isVisible() || windowSwaps>0;
     for(auto* g : gpuModules())
         g->setSuspended(covered || movingModules.contains(g));
@@ -6841,6 +6927,7 @@ void LeakEditor::applyLook()
     if(auto* top=getTopLevelComponent()) top->repaint();
     for(auto& f : floating) f.window->repaint();
     if(optionsWindow!=nullptr) optionsWindow->repaint();
+    if(aboutWindow!=nullptr)   aboutWindow->repaint();
     if(licenseOverlay.isVisible()){ OptionsUi::lightTheme()=audioProcessor.lightTint; licenseOverlay.refresh(); }
 }
 
@@ -6854,9 +6941,9 @@ static void drawScreenCard(juce::Graphics& g, juce::Rectangle<float> r)
 }
 
 // coins arrondis + bord de la vitre d'un écran (au-dessus du module)
-static void drawScreenCaps(juce::Graphics& g, juce::Rectangle<float> r)
+static void drawScreenCaps(juce::Graphics& g, juce::Rectangle<float> r, bool darkScreen)
 {
-    Neu::drawScreenGlass(g, r);
+    Neu::drawScreenGlass(g, r, darkScreen);
 }
 
 void LeakEditor::rebuildChassisCaches(float pxScale)
@@ -6906,8 +6993,9 @@ void LeakEditor::rebuildChassisCaches(float pxScale)
     {
         juce::Graphics og(overlayCache);
         og.addTransform(juce::AffineTransform::scale(pxScale));
-        for(const auto& r : screens)
-            drawScreenCaps(og, r);   // coins arrondis (les modules peignent des rectangles)
+        for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
+            if(!rcSlot[s].isEmpty() && !isDetached(s))   // coins arrondis (les modules peignent des rectangles)
+                drawScreenCaps(og, rcSlot[s].toFloat(), getComponentForModule(audioProcessor.slotModule[s])==&oscilloscope);
     }
 
     // zones utiles du calque : pourtour des écrans

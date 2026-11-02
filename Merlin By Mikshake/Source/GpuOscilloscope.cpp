@@ -1,5 +1,5 @@
 #include "GpuOscilloscope.h"
-#include "PluginEditor.h"   // Col::, Ui::
+#include "PluginEditor.h"   // Col::, Neu::, Ui::
 
 using namespace juce::gl;
 
@@ -45,7 +45,9 @@ void main()
     float len = length(d);
     vec2 dir = len > 1e-4 ? d/len : vec2(1.0, 0.0);
     vec2 n = vec2(-dir.y, dir.x)*halfW;
-    vec2 e = dir*halfW*0.5;
+    // prolongement aux raccords : les petits segments se recouvrent uniformément ;
+    // sur un long segment, il ferait un point brillant à chaque raccord
+    vec2 e = dir*halfW*0.5*(1.0-smoothstep(1.5*halfW, 3.0*halfW, len));
     vec2  q[4] = vec2[4](ap-e+n, ap-e-n, bp+e+n, bp+e-n);
     float s[4] = float[4](1.0, -1.0, 1.0, -1.0);
     for(int k = 0; k < 4; ++k){
@@ -87,16 +89,16 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
     for(int i=0;i<kHist;++i){ histL[i].assign((size_t)kMaxWindow, 0.f); histR[i].assign((size_t)kMaxWindow, 0.f); }
     verts.reserve((size_t)kMaxWindow*4);
 
-    // ST : traces L et R ; MONO : une trace (L+R)/2
-    monoBtn.onClick=[this]{ processor.oscMono=!processor.oscMono; syncFromProcessor(); };
-    addAndMakeVisible(monoBtn);
-    // L et R superposées ou l'une au-dessus de l'autre (aussi dans les Options)
-    splitBtn.onClick=[this]{
-        processor.oscSplit=!processor.oscSplit;
+    // ST : L et R superposées ; SPLIT : l'une au-dessus de l'autre (aussi dans les
+    // Options) ; MONO : une trace (L+R)/2
+    voicesBtn.onClick=[this]{
+        if(processor.oscMono)       processor.oscMono=processor.oscSplit=false;
+        else if(processor.oscSplit) processor.oscMono=true;
+        else                        processor.oscSplit=true;
         syncFromProcessor();
         if(onSplitChanged) onSplitChanged();
     };
-    addAndMakeVisible(splitBtn);
+    addAndMakeVisible(voicesBtn);
     // calage d'avant la v1.81.7 (phase de la fondamentale) ; éteint à chaque ouverture
     precisionBtn.setClickingTogglesState(true);
     precisionBtn.onClick=[this]{ precisionA=precisionBtn.getToggleState(); };
@@ -130,12 +132,13 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
     chip2.onClick=[this, pick]{ pick(showLastA, showFirstA); };
     addChildComponent(chip1);
     addChildComponent(chip2);
-    resetChip.onClick=[this]{ captureA=kCapLive; superposeA=false; capValidA=false; viewLenA=0; };
+    resetChip.onClick=[this]{ resetCaptures(); };
     addChildComponent(resetChip);
 
     // AMP (vertical, à gauche) et TIME (horizontal, en bas) : mêmes plages que
     // les boutons de la barre du bas
     ampFader=std::make_unique<ReleaseFader>();
+    ampFader->setDarkScreen(true);
     ampFader->configure("AMP", 0.5f, 4.f, 1.f, 1.f);
     ampFader->formatValue=[](float v){ return juce::String(v, 1)+"x"; };
     ampFader->onValueChange=[this](float v){
@@ -143,6 +146,7 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
     };
     addAndMakeVisible(*ampFader);
     timeFader=std::make_unique<ReleaseFader>();
+    timeFader->setDarkScreen(true);
     timeFader->setHorizontal(true);
     timeFader->configure("TIME", 128.f, (float)kMaxWindow, 2048.f, 1200.f);
     timeFader->getDefault=[this]{ return (float)processor.oscDefaultWindow(); };   // double-clic : 25 ms
@@ -157,6 +161,14 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
     };
     addAndMakeVisible(*timeFader);
     syncFromProcessor();
+}
+
+void GpuOscilloscopeDisplay::resetCaptures()
+{
+    captureA=kCapLive;
+    superposeA=false;
+    capValidA=false;
+    viewLenA=0;
 }
 
 void GpuOscilloscopeDisplay::refreshFaders()
@@ -177,11 +189,8 @@ int GpuOscilloscopeDisplay::maxFrameRate() const
 
 void GpuOscilloscopeDisplay::syncFromProcessor()
 {
-    monoBtn.setButtonText(processor.oscMono ? "MONO" : "ST");
-    splitBtn.setButtonText(processor.oscSplit ? "SPLIT" : "OVER");
-    splitBtn.setEnabled(!processor.oscMono);   // une seule trace en mono
     styleA=juce::jlimit(0, 3, processor.oscStyle);
-    layoutChips();
+    layoutBottomRow();   // la place des légendes dépend du style
     monoA=processor.oscMono;
     splitA=processor.oscSplit;
     persistA=processor.oscPersist;
@@ -194,18 +203,21 @@ void GpuOscilloscopeDisplay::syncFromProcessor()
     repaint();
 }
 
-void GpuOscilloscopeDisplay::TraceChip::paintButton(juce::Graphics& g, bool over, bool)
+void GpuOscilloscopeDisplay::ScopeButton::paintButton(juce::Graphics& g, bool over, bool down)
 {
     const auto r=getLocalBounds().toFloat().reduced(0.5f);
-    const auto c=Col::ink(colour);
-    const bool on=getToggleState();
-    g.setColour(c.withAlpha(on ? 0.22f : over ? 0.1f : 0.f));
-    g.fillRoundedRectangle(r, 3.f);
-    g.setColour(c.withAlpha(on ? 1.f : 0.4f));
-    g.drawRoundedRectangle(r, 3.f, 1.f);
-    g.setColour(c.withAlpha(on ? 1.f : 0.5f));
-    g.setFont(Ui::iceland(10.f));
-    g.drawText(TR(getName()), getLocalBounds(), juce::Justification::centred, false);
+    const float rad=juce::jmin(4.f, r.getHeight()*0.35f);
+    const bool enabled=isEnabled(), on=enabled && getToggleState();
+    const auto c=enabled ? colour : Col::darkTextMid;
+    if(on || over || down){
+        g.setColour(on ? c : c.withAlpha(0.16f));
+        g.fillRoundedRectangle(r, rad);
+    }
+    g.setColour(on ? c : c.withAlpha(enabled ? 0.65f : 0.25f));
+    g.drawRoundedRectangle(r, rad, 1.f);
+    g.setColour(on ? juce::Colour(0xFF0B1A1F) : c.withAlpha(enabled ? 0.95f : 0.4f));
+    g.setFont(Ui::icelandAbs(juce::jlimit(6.f, 11.f*Ui::textScale, (float)getHeight()*0.72f)));
+    g.drawFittedText(getButtonText(), getLocalBounds().reduced(2, 0), juce::Justification::centred, 1, 0.6f);
 }
 
 void GpuOscilloscopeDisplay::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
@@ -241,57 +253,92 @@ void GpuOscilloscopeDisplay::mouseDoubleClick(const juce::MouseEvent&)
     repaint();
 }
 
-void GpuOscilloscopeDisplay::layoutChips()
+namespace
 {
-    const auto pr=plotAreaFor(styleA.load(), (float)getWidth(), (float)getHeight());
-    const int w=juce::roundToInt(18.f*Ui::textScale), h=juce::roundToInt(13.f*Ui::textScale);
-    const int x=(int)pr.getRight()-w-4, y=(int)pr.getY()+4;
-    chip2.setBounds(x, y, w, h);
-    chip1.setBounds(x-w-3, y, w, h);
-    const int rw=juce::roundToInt(32.f*Ui::textScale);
-    resetChip.setBounds((chip1.isVisible() ? chip1.getX()-3 : x+w)-rw, y, rw, h);
+    constexpr float kCaptureW[5]={ 44.f, 52.f, 18.f, 18.f, 32.f };   // CAPTURE, SUPERPOSE, 1, 2, RESET
+    constexpr float kCaptureGap=3.f;
+
+    float captureRowWidth()
+    {
+        float total=4.f*kCaptureGap;
+        for(float w : kCaptureW) total+=w*Ui::textScale;
+        return total;
+    }
+
+    float textWidth(const juce::Font& f, const juce::String& t) { return juce::GlyphArrangement::getStringWidth(f, t); }
+    float perDivWidth(const juce::Font& f) { return textWidth(f, "000.00 ms/div")+8.f; }
+}
+
+// « CH1 L » / « CH2 R » tiennent à côté de la capture et de la base de temps
+bool GpuOscilloscopeDisplay::roomyLegends(const juce::Font& f, float plotW) const
+{
+    const float gap=6.f*Ui::textScale;
+    return plotW >= textWidth(f, "CH1 L")+gap+textWidth(f, "CH2 R")+gap+captureRowWidth()+perDivWidth(f);
+}
+
+// TIME a toute la barre du bas. La capture passe sur la ligne des légendes,
+// entre elles : chaque bouton a sa place, même caché (1, 2 et RESET
+// n'apparaissent que lorsqu'un coup est gardé)
+void GpuOscilloscopeDisplay::layoutBottomRow()
+{
+    const int W=getWidth(), H=getHeight();
+    if(timeFader) timeFader->setBounds((int)kFaderL, H-(int)kFaderB+2, juce::jmax(60, W-(int)kFaderL-6), (int)kFaderB-2);
+
+    const int style=styleA.load();
+    const auto pr=plotAreaFor(style, (float)W, (float)H);
+    const auto font=Ui::iceland(9.f);
+    const float gap=6.f*Ui::textScale;
+    float left=0.f, right=0.f;
+    if(style==0){
+        left=roomyLegends(font, pr.getWidth()) ? textWidth(font, "CH1 L")+gap+textWidth(font, "CH2 R")+gap
+                                               : textWidth(font, "L+R")+gap;
+        right=perDivWidth(font);
+    }
+    else if(style==1) left=86.f;   // pastilles CH1 L, CH2 R
+    const float room=juce::jmax(1.f, pr.getWidth()-left-right), total=captureRowWidth();
+    const float k=juce::jlimit(0.55f, 1.f, room/total);
+    float x=pr.getX()+left+juce::jmax(0.f, (room-total*k)*0.5f);
+    const int bh=juce::roundToInt(12.f*Ui::textScale), y=H-(int)kFaderB-16;
+    ScopeButton* row[5]={ &captureBtn, &superposeBtn, &chip1, &chip2, &resetChip };
+    for(int i=0;i<5;++i){
+        const float w=kCaptureW[i]*Ui::textScale*k;
+        row[i]->setBounds(juce::roundToInt(x), y, juce::roundToInt(w), bh);
+        x+=w+kCaptureGap;
+    }
 }
 
 void GpuOscilloscopeDisplay::resized()
 {
     viewW=juce::jmax(1, getWidth());
     viewH=juce::jmax(1, getHeight());
-    {   // bouton ST/MONO à l'échelle du texte (illisible en gros texte)
-        const int bw=juce::roundToInt(34.f*Ui::textScale), bh=juce::roundToInt(12.f*Ui::textScale);
-        monoBtn.setBounds(getWidth()-bw-4, 2, bw, bh);
-        splitBtn.setBounds(monoBtn.getX()-bw-3, 2, bw, bh);
-        const int pw=juce::roundToInt(40.f*Ui::textScale);
-        precisionBtn.setBounds(splitBtn.getX()-pw-3, 2, pw, bh);
-        const int cw=juce::roundToInt(34.f*Ui::textScale), sw=juce::roundToInt(40.f*Ui::textScale);
-        const int minX=juce::roundToInt(52.f*Ui::textScale);   // module étroit : le titre, comprimé au besoin, d'abord
-        const bool superposeFits=precisionBtn.getX()-sw-cw-6>=minX;
-        superposeBtn.setBounds(precisionBtn.getX()-sw-3, 2, sw, bh);
-        superposeBtn.setVisible(superposeFits);
-        captureBtn.setBounds((superposeFits ? superposeBtn.getX() : precisionBtn.getX())-cw-3, 2, cw, bh);
-        precisionBtn.setVisible(precisionBtn.getX()>=minX);
-        captureBtn.setVisible(captureBtn.getX()>=minX);
+    const float ts=Ui::textScale;
+    auto px=[ts](float v){ return juce::roundToInt(v*ts); };
+    {   // en-tête : réglages de la vue, à droite du titre
+        const int vw=px(56.f), pw=px(44.f), bh=px(12.f);
+        voicesBtn.setBounds(getWidth()-vw-4, 2, vw, bh);
+        precisionBtn.setBounds(voicesBtn.getX()-pw-9, 2, pw, bh);
+        topDividerX=voicesBtn.getX()-5;
     }
-    layoutChips();
-    // faders : AMP le long du bord gauche, TIME le long du bas
-    if(ampFader)  ampFader ->setBounds(2, 22, (int)kFaderL-4, juce::jmax(10, getHeight()-22-(int)kFaderB-4));
-    if(timeFader) timeFader->setBounds((int)kFaderL, getHeight()-(int)kFaderB, juce::jmax(60, getWidth()-(int)kFaderL-6), (int)kFaderB-2);
+    // AMP le long du bord gauche
+    if(ampFader) ampFader->setBounds(2, 22, (int)kFaderL-4, juce::jmax(10, getHeight()-22-(int)kFaderB-4));
+    layoutBottomRow();
     rebuildBackgroundIfNeeded();
 }
 
 //==============================================================================
 // Géométrie et fond (thread de messages)
 //==============================================================================
-// Les écrans laissent la place des faders : kFaderL à gauche, kFaderB en bas
+// Les écrans laissent la place des faders : kFaderL à gauche, kFaderB en bas,
+// et 17 px au-dessus de TIME pour la capture
 juce::Rectangle<float> GpuOscilloscopeDisplay::tubeAreaFor(float W, float H)
 {
-    return { kFaderL, 22.f, W-kFaderL-6.f, H-27.f-kFaderB };
+    return { kFaderL, 22.f, W-kFaderL-6.f, H-41.f-kFaderB };
 }
 
 juce::Rectangle<float> GpuOscilloscopeDisplay::plotAreaFor(int style, float W, float H)
 {
     switch(style){
         case 2:  return tubeAreaFor(W, H).reduced(14.f, 10.f);   // dans le tube
-        case 3:  return { kFaderL+2.f, 24.f, W-kFaderL-10.f, H-30.f-kFaderB };
         default: return { kFaderL+2.f, 24.f, W-kFaderL-10.f, H-24.f-17.f-kFaderB };     // légendes en bas
     }
 }
@@ -321,9 +368,9 @@ namespace
     // zone d'une voie du style rempli : grille légère et ligne du zéro
     void scopeLane(juce::Graphics& g, juce::Rectangle<float> r)
     {
-        g.setColour(Col::pick(juce::Colour::fromRGBA(120,180,220,31), Col::textHi.withAlpha(0.10f)));
+        g.setColour(juce::Colour::fromRGBA(120,180,220,31));
         for(int i=0;i<=8;++i) g.fillRect(std::round(r.getX()+r.getWidth()*(float)i/8.f), r.getY(), 1.f, r.getHeight());
-        g.setColour(Col::pick(juce::Colour::fromRGBA(120,200,240,77), Col::textHi.withAlpha(0.30f)));
+        g.setColour(juce::Colour::fromRGBA(120,200,240,77));
         g.fillRect(r.getX(), std::round(r.getCentreY()), r.getWidth(), 1.f);
     }
 
@@ -333,7 +380,7 @@ namespace
     juce::Rectangle<float> lowerLane(juce::Rectangle<float> r) { return r.withTrimmedTop(r.getHeight()*0.5f+3.f); }
 }
 
-// fond, graticule et légendes fixes
+// fond, graticule et légendes fixes : l'écran reste sombre, même en thème clair
 void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool mono, bool split) const
 {
     const float W=(float)getWidth(), H=(float)getHeight();
@@ -351,75 +398,75 @@ void GpuOscilloscopeDisplay::paintBackground(juce::Graphics& g, int style, bool 
     };
 
     if(style==0){            // tube cathodique
-        g.fillAll(Col::pick(juce::Colour(0xFF02121A), Col::bg));
-        g.setGradientFill(juce::ColourGradient(Col::pick(juce::Colour::fromRGBA(20,90,110,89), Col::accent.withAlpha(0.05f)), W*0.5f, H*0.55f,
+        g.fillAll(juce::Colour(0xFF02121A));
+        g.setGradientFill(juce::ColourGradient(juce::Colour::fromRGBA(20,90,110,89), W*0.5f, H*0.55f,
                                                juce::Colours::transparentBlack, W*1.2f, H*0.55f, true));
         g.fillAll();
-        scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(90,220,255,41), Col::textHi.withAlpha(0.13f)), false, true);
-        splitMarks(Col::pick(juce::Colour::fromRGBA(90,220,255,90), Col::textHi.withAlpha(0.30f)),
-                   Col::ink(juce::Colour(0xFF8FF6FF)), Col::ink(juce::Colour(0xFF4AA3FF)));
+        scopeGraticule(g, pr, juce::Colour::fromRGBA(90,220,255,41), false, true);
+        splitMarks(juce::Colour::fromRGBA(90,220,255,90),
+                   juce::Colour(0xFF8FF6FF), juce::Colour(0xFF4AA3FF));
         // légendes placées selon leur largeur réelle ; la base de temps (« 2.50
         // ms/div », calque 2D, à droite) garde sa place : sinon « L » / « R »
         auto tw=[&](const juce::String& t){ return juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), t); };
-        const float gap=6.f*Ui::textScale, perDivW=tw("00.00 ms/div")+8.f;
-        const bool roomy=pr.getWidth() >= tw("CH1 L")+gap+tw("CH2 R")+perDivW;
+        const float gap=6.f*Ui::textScale;
+        const bool roomy=roomyLegends(g.getCurrentFont(), pr.getWidth());
         const juce::String l1=mono ? "L+R" : (roomy ? "CH1 L" : "L"), l2=roomy ? "CH2 R" : "R";
-        label(l1, pr.getX(), pr.getBottom()+3.f, Col::ink(juce::Colour(0xFF8FF6FF)));
-        if(!mono) label(l2, pr.getX()+tw(l1)+gap, pr.getBottom()+3.f, Col::ink(juce::Colour(0xFF4AA3FF)));
+        label(l1, pr.getX(), pr.getBottom()+3.f, juce::Colour(0xFF8FF6FF));
+        if(!mono) label(l2, pr.getX()+tw(l1)+gap, pr.getBottom()+3.f, juce::Colour(0xFF4AA3FF));
     }
     else if(style==1){       // numérique (DSO)
-        g.fillAll(Col::pick(juce::Colour(0xFF050607), Col::bg));
-        scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(200,200,200,72), Col::textHi.withAlpha(0.28f)), true, false);
-        g.setColour(Col::pick(juce::Colour::fromRGBA(200,200,200,90), Col::textHi.withAlpha(0.35f)));
+        g.fillAll(juce::Colour(0xFF050607));
+        scopeGraticule(g, pr, juce::Colour::fromRGBA(200,200,200,72), true, false);
+        g.setColour(juce::Colour::fromRGBA(200,200,200,90));
         g.fillRect(pr.getX(), std::round(pr.getCentreY()), pr.getWidth(), 1.f);
-        splitMarks(juce::Colours::transparentBlack, Col::ink(juce::Colour(0xFF00E5FF)), Col::ink(juce::Colour(0xFFFF4FD8)));
+        splitMarks(juce::Colours::transparentBlack, juce::Colour(0xFF00E5FF), juce::Colour(0xFFFF4FD8));
         auto chip=[&](const juce::String& t, float x, juce::Colour bg, juce::Colour fg){
             const juce::Rectangle<float> r(x, pr.getBottom()+4.f, 38.f, 11.f);
             g.setColour(bg); g.fillRoundedRectangle(r, 2.f);
             g.setColour(fg); g.drawText(t, r, juce::Justification::centred, false); };
-        if(mono) chip("L+R", pr.getX(), Col::ink(juce::Colour(0xFF00E5FF)), Col::pick(juce::Colour(0xFF03181C), juce::Colours::white));
-        else   { chip("CH1 L", pr.getX(), Col::ink(juce::Colour(0xFF00E5FF)), Col::pick(juce::Colour(0xFF03181C), juce::Colours::white));
-                 chip("CH2 R", pr.getX()+42.f, Col::ink(juce::Colour(0xFFFF4FD8)), Col::pick(juce::Colour(0xFF2A0622), juce::Colours::white)); }
+        if(mono) chip("L+R", pr.getX(), juce::Colour(0xFF00E5FF), juce::Colour(0xFF03181C));
+        else   { chip("CH1 L", pr.getX(), juce::Colour(0xFF00E5FF), juce::Colour(0xFF03181C));
+                 chip("CH2 R", pr.getX()+42.f, juce::Colour(0xFFFF4FD8), juce::Colour(0xFF2A0622)); }
     }
     else if(style==2){       // vintage à lunette
-        g.fillAll(Col::pick(juce::Colour(0xFF16181B), Col::panel));
+        g.fillAll(juce::Colour(0xFF16181B));
         const auto tube=tubeAreaFor(W, H);
         juce::Path p; p.addRoundedRectangle(tube, 16.f);
-        g.setColour(Col::pick(juce::Colour(0xFF030B09), Col::bg)); g.fillPath(p);
+        g.setColour(juce::Colour(0xFF030B09)); g.fillPath(p);
         {
             juce::Graphics::ScopedSaveState ss(g);
             g.reduceClipRegion(p);
-            g.setGradientFill(juce::ColourGradient(Col::pick(juce::Colour::fromRGBA(40,140,110,72), Col::accent.withAlpha(0.04f)), tube.getCentreX(), tube.getCentreY(),
-                                                   Col::pick(juce::Colour::fromRGBA(0,0,0,128), juce::Colour(0x1A283C5A)), tube.getRight()+tube.getWidth()*0.1f, tube.getCentreY(), true));
+            g.setGradientFill(juce::ColourGradient(juce::Colour::fromRGBA(40,140,110,72), tube.getCentreX(), tube.getCentreY(),
+                                                   juce::Colour::fromRGBA(0,0,0,128), tube.getRight()+tube.getWidth()*0.1f, tube.getCentreY(), true));
             g.fillPath(p);
-            scopeGraticule(g, pr, Col::pick(juce::Colour::fromRGBA(120,255,210,33), Col::textHi.withAlpha(0.12f)), false, false);
-            splitMarks(Col::pick(juce::Colour::fromRGBA(120,255,210,70), Col::textHi.withAlpha(0.30f)),
-                       Col::ink(juce::Colour(0xFF7DFFD8)), Col::ink(juce::Colour(0xFF5FD3FF)));
+            scopeGraticule(g, pr, juce::Colour::fromRGBA(120,255,210,33), false, false);
+            splitMarks(juce::Colour::fromRGBA(120,255,210,70),
+                       juce::Colour(0xFF7DFFD8), juce::Colour(0xFF5FD3FF));
             if(!mono && !split){
-                label("L", pr.getX()+3.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF7DFFD8)));
-                label("R", pr.getX()+13.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF5FD3FF)));
+                label("L", pr.getX()+3.f, pr.getY()+2.f, juce::Colour(0xFF7DFFD8));
+                label("R", pr.getX()+13.f, pr.getY()+2.f, juce::Colour(0xFF5FD3FF));
             }
             // reflet du verre bombé
-            g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(Col::paper ? 0.f : 0.07f), 0.f, tube.getY(),
+            g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(0.07f), 0.f, tube.getY(),
                                                    juce::Colours::transparentWhite, 0.f, tube.getCentreY(), false));
             g.fillRect(tube.withHeight(tube.getHeight()*0.5f));
         }
-        g.setColour(Col::pick(juce::Colour(0xFF2C3036), Col::border)); g.strokePath(p, juce::PathStrokeType(3.f));
+        g.setColour(juce::Colour(0xFF2C3036)); g.strokePath(p, juce::PathStrokeType(3.f));
     }
     else {                   // rempli
-        g.fillAll(Col::pick(juce::Colour(0xFF04090D), Col::bg));
-        if(mono){ scopeLane(g, pr); label("L+R", pr.getX()+4.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF22E0FF))); }
+        g.fillAll(juce::Colour(0xFF04090D));
+        if(mono){ scopeLane(g, pr); label("L+R", pr.getX()+4.f, pr.getY()+2.f, juce::Colour(0xFF22E0FF)); }
         else if(!split){
             scopeLane(g, pr);
-            label("L", pr.getX()+4.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF22E0FF)));
-            label("R", pr.getX()+14.f, pr.getY()+2.f, Col::ink(juce::Colour(0xFF3D8BFF)));
+            label("L", pr.getX()+4.f, pr.getY()+2.f, juce::Colour(0xFF22E0FF));
+            label("R", pr.getX()+14.f, pr.getY()+2.f, juce::Colour(0xFF3D8BFF));
         }
         else {
             scopeLane(g, upperLane(pr)); scopeLane(g, lowerLane(pr));
-            g.setColour(Col::light(0.08f));
+            g.setColour(juce::Colours::white.withAlpha(0.08f));
             g.fillRect(pr.getX(), std::round(pr.getCentreY()), pr.getWidth(), 1.f);
-            label("L", pr.getX()+4.f, upperLane(pr).getY()+2.f, Col::ink(juce::Colour(0xFF22E0FF)));
-            label("R", pr.getX()+4.f, lowerLane(pr).getY()+2.f, Col::ink(juce::Colour(0xFF3D8BFF)));
+            label("L", pr.getX()+4.f, upperLane(pr).getY()+2.f, juce::Colour(0xFF22E0FF));
+            label("R", pr.getX()+4.f, lowerLane(pr).getY()+2.f, juce::Colour(0xFF3D8BFF));
         }
     }
 }
@@ -463,6 +510,11 @@ void GpuOscilloscopeDisplay::uiTick()
     const int cap=captureA.load();
     const bool lit=cap==kCapHeld || (cap==kCapArmed && (juce::Time::getMillisecondCounter()/250)%2==0);
     if(lit!=captureBtn.getToggleState()) captureBtn.setToggleState(lit, juce::dontSendNotification);
+    // PRÉCISION ne joue que sur les fenêtres courtes : l'analyse longue défile
+    const bool shortView=!isRollView(nPts.load(), juce::jmax(1.0, processor.getCurrentSampleRate()));
+    if(shortView!=precisionBtn.isEnabled()) precisionBtn.setEnabled(shortView);
+    const auto voices=TR("VOIES")+" : "+juce::String(processor.oscMono ? "MONO" : processor.oscSplit ? "SPLIT" : "ST");
+    if(voices!=voicesBtn.getButtonText()) voicesBtn.setButtonText(voices);
     const bool canSuperpose=cap!=kCapLive, superpose=superposeA.load();
     if(canSuperpose!=superposeBtn.isEnabled()) superposeBtn.setEnabled(canSuperpose);
     if(superpose!=superposeBtn.getToggleState()) superposeBtn.setToggleState(superpose, juce::dontSendNotification);
@@ -471,7 +523,6 @@ void GpuOscilloscopeDisplay::uiTick()
         chip1.setVisible(chips);
         chip2.setVisible(chips);
         if(!chips) showFirstA=showLastA=true;
-        layoutChips();
     }
     const bool canReset=capValidA.load();
     if(canReset!=resetChip.isVisible()) resetChip.setVisible(canReset);
@@ -498,7 +549,7 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
         juce::Image img;
         { const juce::SpinLock::ScopedLockType sl(bgLock); img=bgImage; }
         if(img.isValid()) g.drawImage(img, getLocalBounds().toFloat());
-        else              g.fillAll(Col::bg);
+        else              g.fillAll(juce::Colours::black);
     }
 
     const int  style=styleA.load();
@@ -506,9 +557,9 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
     const auto pr=plotAreaFor(style, (float)W, (float)H);
 
     if(triggerMode.load() && style!=3){
-        const juce::Colour c = style==1 ? Col::ink(juce::Colour(0xFFFF9F0A))
-                             : style==2 ? Col::ink(juce::Colour(0xFF7DFFD8)).withAlpha(0.8f)
-                                        : Col::ink(juce::Colour(0xFF8FF6FF)).withAlpha(0.8f);
+        const juce::Colour c = style==1 ? juce::Colour(0xFFFF9F0A)
+                             : style==2 ? juce::Colour(0xFF7DFFD8).withAlpha(0.8f)
+                                        : juce::Colour(0xFF8FF6FF).withAlpha(0.8f);
         // voies séparées : sur le zéro de la voie L
         const float cy=(splitA.load() && !mono) ? upperHalf(pr).getCentreY() : pr.getCentreY();
         juce::Path tri; tri.addTriangle(pr.getX(), cy-4.f, pr.getX()+6.f, cy, pr.getX(), cy+4.f);
@@ -520,23 +571,26 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
     const juce::String perDiv=juce::String((double)shownN/sr*100.0, 2)+" ms/div";   // 10 divisions
     g.setFont(Ui::iceland(9.f));
     if(style==0){
-        g.setColour(Col::ink(juce::Colour(0xFF8FF6FF)).withAlpha(0.7f));
-        g.drawText(perDiv, juce::Rectangle<float>(pr.getRight()-90.f, pr.getBottom()+3.f, 90.f, 11.f), juce::Justification::right, false);
+        g.setColour(juce::Colour(0xFF8FF6FF).withAlpha(0.7f));
+        if(pr.getRight()-textWidth(g.getCurrentFont(), perDiv) >= (float)resetChip.getRight()+2.f)   // module très étroit : la capture d'abord
+            g.drawText(perDiv, juce::Rectangle<float>(pr.getRight()-90.f, pr.getBottom()+3.f, 90.f, 11.f), juce::Justification::right, false);
     } else if(style==1){
-        g.setColour(Col::pick(juce::Colour(0xD9DCDCDC), Col::textMid));
-        const float left=mono ? 44.f : 86.f;
-        g.drawText(shownMeas+"   "+perDiv, juce::Rectangle<float>(pr.getX()+left, pr.getBottom()+3.f, pr.getWidth()-left, 12.f),
+        g.setColour(juce::Colour(0xD9DCDCDC));
+        g.drawText(shownMeas+"   "+perDiv, juce::Rectangle<float>(pr.getX(), pr.getBottom()-13.f, pr.getWidth()-3.f, 12.f),   // dans l'écran : la capture a pris la ligne
                    juce::Justification::right, false);
     }
 
-    Ui::drawTitleDecor(g, (float)W);
+    Ui::drawTitleDecor(g, (float)W, Ui::kTitleLineY, 0.f, true);
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
-    const int titleEnd=captureBtn.isVisible() ? captureBtn.getX() : precisionBtn.isVisible() ? precisionBtn.getX() : splitBtn.getX();
-    g.drawFittedText(TR("OSCILLOSCOPE"), 6, 5, juce::jmax(20, titleEnd-10), 13, juce::Justification::left, 1, 0.6f);
+    g.setColour(Col::darkTextHi.withAlpha(0.85f));
+    g.drawFittedText(TR("OSCILLOSCOPE"), 6, 5, juce::jmax(20, precisionBtn.getX()-10), 13, juce::Justification::left, 1, 0.6f);
+
+    // filet entre les boutons de l'en-tête
+    g.setColour(Col::darkTextMid.withAlpha(0.35f));
+    g.fillRect(topDividerX, 3, 1, voicesBtn.getHeight()-2);
 
     paintGlFailure(g);
-    paintScreenFrame(g);
+    Neu::drawScreenGlass(g, getLocalBounds().toFloat(), true);
 }
 
 //==============================================================================
@@ -710,6 +764,28 @@ bool GpuOscilloscopeDisplay::capture()
             finish();
             return true;
         }
+    }
+
+    // Analyse longue (dès 250 ms) : la fenêtre dépasse la note, il n'y a plus rien
+    // à caler. Balayage continu, à vitesse constante : une horloge lisse l'arrivée
+    // de l'audio par blocs, et le tracé avance d'une colonne entière pour que
+    // l'enveloppe ne scintille pas. PRÉCISION ne joue que sur les fenêtres courtes.
+    if(isRollView(n, sr)){
+        const double nowMs=juce::Time::getMillisecondCounterHiRes();
+        const double target=(double)endAbs-sr*0.03;   // 30 ms de marge : l'audio est toujours arrivé
+        rollEnd+=juce::jlimit(0.0, 0.1, (nowMs-rollMs)*0.001)*sr;
+        rollMs=nowMs;
+        const double late=target-rollEnd;
+        rollEnd=std::abs(late)>sr*0.1 ? target : rollEnd+late*0.02;
+        const double column=juce::jmax(1.0, (double)n/(double)plotCols);
+        const double start=std::floor((rollEnd-(double)n)/column)*column;
+        const int at=juce::jlimit(0, search, (int)std::llround(start-(double)baseAbs));
+        histCount=0;   // pas de rémanence sur un tracé qui défile
+        lockN=lockMiss=0;
+        std::memcpy(bufL.data(), rawL.data()+at, (size_t)n*sizeof(float));
+        std::memcpy(bufR.data(), rawR.data()+at, (size_t)n*sizeof(float));
+        finish();
+        return true;
     }
 
     auto trigSrc=[&](int i){ return lockSig[(size_t)i]; };
@@ -1021,8 +1097,7 @@ void GpuOscilloscopeDisplay::renderOpenGL()
         // pixel, découpait la courbe en marches (aliasing visible à 25 ms).
         // Au-delà (longues fenêtres, fenêtre étroite) : premier, extrêmes et
         // dernier de chaque colonne PHYSIQUE, à leur abscisse exacte : même
-        // courbe que tous les échantillons, sans marches. Les pentes raides sont
-        // redécoupées tous les ~3 px : un long segment laisse voir ses raccords.
+        // courbe que tous les échantillons, sans marches, pour 4 points par colonne.
         // Tracé « classique » (Options) : l'enveloppe d'avant la v1.66.3, dès
         // 2 échantillons par pixel logique — trait plus net, moins de détail.
         const bool classic=classicTraceA.load();
@@ -1032,21 +1107,16 @@ void GpuOscilloscopeDisplay::renderOpenGL()
             const float cy=r.getCentreY(), amp=r.getHeight()*0.46f;
             auto add=[&](float x, float y){ verts.push_back(x); verts.push_back(y); if(area){ verts.push_back(x); verts.push_back(cy); } };
             const int cols=juce::jmax(1, classic ? (int)r.getWidth() : (int)(r.getWidth()*scale));
+            plotCols=cols;
             auto addSample=[&](int i){ add(r.getX()+(float)i/(float)(n-1)*r.getWidth(), cy-juce::jlimit(-1.f, 1.f, buf[i]*gain)*amp); };
             if(!classic && n>cols*12){
-                constexpr int kMaxSteps=16;   // reste borné sur du bruit plein cadre
-                auto addRun=[&](int from, int to){
-                    const float dy=std::abs(juce::jlimit(-1.f, 1.f, buf[to]*gain)-juce::jlimit(-1.f, 1.f, buf[from]*gain))*amp;
-                    const int steps=juce::jlimit(1, juce::jmin(to-from, kMaxSteps), (int)(dy/3.f));
-                    for(int s=1;s<=steps;++s) addSample(from+(to-from)*s/steps);
-                };
                 int last=-1;
                 for(int c=0;c<cols;++c){
                     const int i0=c*n/cols, i1=juce::jmin(n, juce::jmax(i0+1, (c+1)*n/cols));
                     int iMin=i0, iMax=i0;
                     for(int i=i0+1;i<i1;++i){ if(buf[i]<buf[iMin]) iMin=i; if(buf[i]>buf[iMax]) iMax=i; }
                     for(int i : { i0, juce::jmin(iMin, iMax), juce::jmax(iMin, iMax), i1-1 })
-                        if(i!=last){ if(last<0) addSample(i); else addRun(last, i); last=i; }
+                        if(i!=last){ addSample(i); last=i; }
                 }
             } else if(n>cols*2 && classic){
                 float prevY=cy;
@@ -1067,7 +1137,7 @@ void GpuOscilloscopeDisplay::renderOpenGL()
             return (int)(verts.size()/2);
         };
         bool refPass=false;   // SUPERPOSE : la référence, d'une seule couleur, sous le dernier coup
-        const auto refInk=Col::ink(juce::Colour(kRefColour));
+        const auto refInk=juce::Colour(kRefColour);
         auto colourUniform=[](juce::OpenGLShaderProgram& prog, juce::Colour c, float alpha){
             const float a=c.getFloatAlpha()*alpha;
             prog.setUniform("col", c.getFloatRed()*a, c.getFloatGreen()*a, c.getFloatBlue()*a, a);
@@ -1085,7 +1155,7 @@ void GpuOscilloscopeDisplay::renderOpenGL()
             if(halo>0.f){   // halo serré (tube, vintage), proportionné à l'épaisseur choisie
                 lineShader->setUniform("halfW", width*0.5f+2.4f*juce::jmin(1.f, widthMul));
                 lineShader->setUniform("sharp", 1.3f);
-                colourUniform(*lineShader, c, (Col::paper ? 0.12f : 0.22f)*halo*alpha);
+                colourUniform(*lineShader, c, 0.22f*halo*alpha);
                 glDrawArrays(GL_LINE_STRIP, 0, nv);
             }
             // marge de lissage des bords : 0,6 px, réduite pour les traits fins
@@ -1110,25 +1180,25 @@ void GpuOscilloscopeDisplay::renderOpenGL()
         auto frame=[&](const float* L, const float* R, const float* M, float alpha, bool current){
             const float halo=current ? 1.f : 0.f;
             if(style==0){
-                if(!mono) line(R, bottom, Col::ink(juce::Colour(0xFF4AA3FF)), alpha, 1.4f, halo);
-                line(M, top, Col::ink(juce::Colour(0xFF8FF6FF)), alpha, 1.6f, halo);
+                if(!mono) line(R, bottom, juce::Colour(0xFF4AA3FF), alpha, 1.4f, halo);
+                line(M, top, juce::Colour(0xFF8FF6FF), alpha, 1.6f, halo);
             } else if(style==1){
-                line(M, top, Col::ink(juce::Colour(0xFF00E5FF)), alpha, 1.5f, 0.f);
-                if(!mono) line(R, bottom, Col::ink(juce::Colour(0xFFFF4FD8)), alpha, 1.3f, 0.f);
+                line(M, top, juce::Colour(0xFF00E5FF), alpha, 1.5f, 0.f);
+                if(!mono) line(R, bottom, juce::Colour(0xFFFF4FD8), alpha, 1.3f, 0.f);
             } else if(style==2){
-                if(mono) line(M, pr, Col::ink(juce::Colour(0xFF7DFFD8)), alpha, 1.7f, 1.3f*halo);
+                if(mono) line(M, pr, juce::Colour(0xFF7DFFD8), alpha, 1.7f, 1.3f*halo);
                 else {
-                    line(L, top,    Col::ink(juce::Colour(0xFF7DFFD8)), alpha, 1.6f, 1.2f*halo);
-                    line(R, bottom, Col::ink(juce::Colour(0xFF5FD3FF)), alpha, 1.6f, 1.2f*halo);
+                    line(L, top,    juce::Colour(0xFF7DFFD8), alpha, 1.6f, 1.2f*halo);
+                    line(R, bottom, juce::Colour(0xFF5FD3FF), alpha, 1.6f, 1.2f*halo);
                 }
             } else {
                 auto lane=[&](const float* buf, juce::Rectangle<float> r, juce::Colour c){
                     if(current) fill(buf, r, c, 0.13f*alpha);
                     line(buf, r, c, alpha, 1.5f, 0.f);
                 };
-                if(mono) lane(M, pr, Col::ink(juce::Colour(0xFF22E0FF)));
-                else { lane(L, split ? upperLane(pr) : pr, Col::ink(juce::Colour(0xFF22E0FF)));
-                       lane(R, split ? lowerLane(pr) : pr, Col::ink(juce::Colour(0xFF3D8BFF))); }
+                if(mono) lane(M, pr, juce::Colour(0xFF22E0FF));
+                else { lane(L, split ? upperLane(pr) : pr, juce::Colour(0xFF22E0FF));
+                       lane(R, split ? lowerLane(pr) : pr, juce::Colour(0xFF3D8BFF)); }
             }
         };
 

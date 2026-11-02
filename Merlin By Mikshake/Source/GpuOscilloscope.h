@@ -40,6 +40,7 @@ public:
     static constexpr int kMaxWindow = 65536;  // fenêtre affichée max, 1,37 s à 48 kHz (le reste de l'anneau sert au déclenchement)
     void setTimeDiv(int samples) { nPts=juce::jlimit(64, kMaxWindow, samples); repaint(); }   // repaint : ms/div
     void setAmplitude(float g)   { ampGain=juce::jlimit(0.25f, 6.f, g); }
+    void resetCaptures();        // retour au direct : captures, superposition et zoom effacés
     // style, MONO/ST, rémanence, cadence relus (Options, preset rappelé)
     void syncFromProcessor();
     int  maxFrameRate() const override;   // Options > cadence de l'oscilloscope
@@ -67,25 +68,28 @@ private:
     void paintBackground(juce::Graphics&, int style, bool mono, bool split) const;
     void rebuildBackgroundIfNeeded();
 
-    juce::TextButton monoBtn { "ST" };   // (bouton TRIG retiré : déclenchement toujours actif)
-    juce::TextButton splitBtn { "OVER" };   // en stéréo : voies superposées (OVER) ou séparées (SPLIT)
-    juce::TextButton precisionBtn { "PRECISION" };   // allumé : calage sur la fondamentale plutôt que sur la forme
-    juce::TextButton captureBtn { "CAPTURE" };       // garde le prochain coup à l'écran
-    juce::TextButton superposeBtn { "SUPERPOSE" };   // la mesure gardée reste en référence sous les coups suivants
-    std::unique_ptr<ReleaseFader> ampFader, timeFader;
-    // SUPERPOSE : pastilles 1 (référence) et 2 (dernier coup), légende et choix de l'affichage
-    class TraceChip final : public juce::Button
+    // Boutons du module : une couleur par fonction, repérable de loin ; plein quand il est actif
+    class ScopeButton final : public juce::Button
     {
     public:
-        TraceChip(const juce::String& name, juce::Colour c) : juce::Button(name), colour(c) { setMouseClickGrabsKeyboardFocus(false); }
+        ScopeButton(const juce::String& name, juce::uint32 c) : juce::Button(name), colour(c) { setMouseClickGrabsKeyboardFocus(false); }
         void paintButton(juce::Graphics&, bool over, bool down) override;
     private:
         juce::Colour colour;
     };
     static constexpr juce::uint32 kRefColour = 0xFFFFB454;
-    TraceChip chip1 { "1", juce::Colour(kRefColour) }, chip2 { "2", juce::Colour(0xFF8FF6FF) };
-    TraceChip resetChip { "RESET", juce::Colour(0xFFB8C4CC) };   // efface les captures, retour au direct
-    void layoutChips();
+    // en-tête : réglages de la vue
+    ScopeButton voicesBtn { "ST", 0xFF5AA9FF };          // ST, SPLIT, MONO à chaque clic
+    ScopeButton precisionBtn { "PRECISION", 0xFFB48CFF };   // fenêtres courtes : calage sur la fondamentale plutôt que sur la forme
+    // barre du bas, à côté de TIME : la capture
+    ScopeButton captureBtn { "CAPTURE", 0xFFFF5A52 };    // garde le prochain coup à l'écran
+    ScopeButton superposeBtn { "SUPERPOSE", kRefColour };   // la mesure gardée reste en référence sous les coups suivants
+    ScopeButton chip1 { "1", kRefColour }, chip2 { "2", 0xFF8FF6FF };   // captures affichées, légende des couleurs
+    ScopeButton resetChip { "RESET", 0xFFB8C4CC };       // efface les captures, retour au direct
+    std::unique_ptr<ReleaseFader> ampFader, timeFader;
+    int topDividerX { 0 };
+    void layoutBottomRow();
+    bool roomyLegends(const juce::Font&, float plotW) const;
 
     // réglages lus par le thread GL
     std::atomic<int>   nPts { 512 };
@@ -132,6 +136,10 @@ private:
     std::vector<float> lockSig, lockRef, lockDec, lockRefDec, lockScore;
     int  lockN { 0 };            // fenêtre de la référence, 0 = pas de référence
     int  lockMiss { 0 };         // images de suite sans ressemblance
+    // analyse longue : balayage continu (voir capture())
+    static bool isRollView(int n, double sr) { return (double)n>=sr*0.25; }
+    double rollEnd { 0.0 }, rollMs { 0.0 };   // fin de fenêtre (échantillons absolus), horloge de la dernière image
+    int    plotCols { 1 };                    // colonnes du tracé : le balayage avance d'une colonne à la fois
     bool lockMono { false };
     // CAPTURE : coup copié ici, avec 5 ms avant lui (indices absolus ; capHit 0 = pas encore de coup)
     static constexpr int kCapLen = kMaxWindow;

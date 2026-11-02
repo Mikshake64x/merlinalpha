@@ -44,6 +44,11 @@ namespace Col {
     // quand elle a bougé.
     inline bool paper      { false };
     inline int  generation { 0 };
+    // palette sombre, gardée en écrans Papier : l'oscilloscope reste sombre en
+    // thème clair, titre et faders compris
+    inline juce::Colour darkAccent  { 0xFF00FFB2 };
+    inline juce::Colour darkTextHi  { 0xFFC8FFE8 };
+    inline juce::Colour darkTextMid { 0xFF7AB8A8 };
     // couleur vive pensée pour un fond noir → version lisible sur papier
     // (inchangée sur écran sombre)
     juce::Colour ink(juce::Colour c);
@@ -106,7 +111,8 @@ namespace Neu {
     inline constexpr float screenRadius = 12.f;
     inline constexpr float bezelW       = 4.f;
     void drawBezel(juce::Graphics&, juce::Rectangle<float> screen);        // cadre, sous le module
-    void drawScreenGlass(juce::Graphics&, juce::Rectangle<float> screen);  // coins + bord de la vitre, au-dessus
+    // darkScreen : écran resté sombre en thème clair (oscilloscope)
+    void drawScreenGlass(juce::Graphics&, juce::Rectangle<float> screen, bool darkScreen=false);  // coins + bord de la vitre, au-dessus
 }
 
 // Lisibilité : facteur appliqué aux tailles de texte de l'interface
@@ -140,7 +146,8 @@ namespace Ui {
     inline int titleStyle { 1 };
     inline constexpr float kTitleLineY = 19.f;
     // endX : fin de la ligne si elle doit s'arrêter avant un obstacle (0 = bord)
-    void drawTitleDecor(juce::Graphics&, float width, float lineY=kTitleLineY, float endX=0.f);
+    // darkScreen : écran resté sombre en thème clair (oscilloscope)
+    void drawTitleDecor(juce::Graphics&, float width, float lineY=kTitleLineY, float endX=0.f, bool darkScreen=false);
     // fin de la ligne avant l'anneau d'un vectorscope, s'il monte jusque-là
     float titleEndBeforeRing(float cx, float cy, float r);
     // Corrélation des vectorscopes (à l'essai, Options › Affichage) : 0 barre
@@ -534,6 +541,7 @@ public:
     std::function<void(float)> onValueChange;
     std::function<juce::String(float)> formatValue;   // affichage de la valeur (défaut : secondes, "1.0s")
     void setHorizontal(bool h) { horizontal=h; repaint(); }   // rail horizontal : étiquette à gauche, valeur à droite
+    void setDarkScreen(bool d) { darkScreen=d; repaint(); }   // posé sur un écran resté sombre en thème clair
     // autre usage que le RELEASE (ex. TIME des spectrogrammes) : étiquette,
     // plage (milieu de course = centre), valeur du double-clic
     void configure(const juce::String& newLabel, float lo, float hi, float centre, float def)
@@ -552,7 +560,7 @@ private:
     float value        { 0.4f };
     float defaultValue { 0.4f };
     juce::String label { "REL" };
-    bool  hovered { false }, dragging { false }, horizontal { false };
+    bool  hovered { false }, dragging { false }, horizontal { false }, darkScreen { false };
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ReleaseFader)
 };
 
@@ -1302,6 +1310,8 @@ public:
     void hideAnimated();
     void setLicenseManager(LicenseManager& lm) { license=&lm; }
     std::function<void()> onOpenLicence;   // lien licence du pied de page
+    void setWindowed(bool w) { if(w!=windowed){ windowed=w; chromeCache={}; } }   // appli : dans sa fenêtre, sans voile ni marges
+    void prepareChrome() { if(!chromeCache.isValid()) rebuildChromeCache(); }
 
 private:
     struct Layout
@@ -1317,6 +1327,8 @@ private:
     void startAnimation(bool in);
     void timerCallback() override;
     void rebuildChromeCache();
+    juce::String chromeState() const;   // ce dont dépend le décor : inchangé, il est réutilisé
+    juce::String chromeKey;
     void drawHeader(juce::Graphics&, juce::Rectangle<float>) const;
     void drawTeam  (juce::Graphics&, juce::Rectangle<float>, float scale) const;
     void drawFooter(juce::Graphics&, juce::Rectangle<float>, float scale);
@@ -1332,6 +1344,7 @@ private:
     juce::Viewport viewport[3];
     Column column[3];
 
+    bool windowed=false;
     bool animating=false, animatingIn=false;
     double animStartMs=0.0;
     float animOpacity=1.f, animScale=1.f, animFrom=0.f;
@@ -1378,6 +1391,7 @@ public:
         for(auto& f : floating)   // les modules détachés suivent la fenêtre principale
             if(f.window!=nullptr) f.window->setAlwaysOnTop(b);
         if(optionsWindow!=nullptr) optionsWindow->setAlwaysOnTop(b);   // la fenêtre des Options aussi
+        if(aboutWindow!=nullptr)   aboutWindow->setAlwaysOnTop(b);     // et celle de l'À propos
     }
     void mouseDown(const juce::MouseEvent&) override;
 
@@ -1462,9 +1476,12 @@ private:
     // Les modules GPU sont des fenêtres OpenGL natives : rien ne peut être
     // peint par-dessus, leur rendu est donc suspendu tant qu'About ou
     // Settings est ouvert.
-    void componentVisibilityChanged(juce::Component&) override
+    void componentVisibilityChanged(juce::Component& c) override
     {
         updateGpuSuspension();
+        // À propos refermé depuis sa fenêtre (clic, Échap) : hors de l'événement en cours
+        if(&c==&aboutOverlay && !aboutOverlay.isVisible() && aboutWindow!=nullptr)
+            juce::MessageManager::callAsync([sp=juce::Component::SafePointer<LeakEditor>(this)]{ if(sp!=nullptr) sp->closeAbout(); });
         if(host.holdKeyboard) host.holdKeyboard(licenseOverlay.isVisible());   // saisie de la clé (appli)
     }
     void updateGpuSuspension();
@@ -1525,6 +1542,11 @@ private:
     // Options (appli) : fenêtre à part, déplaçable ; Merlin reste visible et actif
     std::unique_ptr<DetachedWindow> optionsWindow;
     void closeOptions();
+    // À propos (appli) : même principe, les mesures continuent derrière
+    std::unique_ptr<DetachedWindow> aboutWindow;
+    void prepareAbout();   // fenêtre et décor prêts : les montrer ne coûte rien aux mesures
+    void openAbout();
+    void closeAbout();
     FloatingModule* floatingFor(int module);   // nullptr si le module n'est pas dans une fenêtre
     // emplacement quitté par son module, qui est dans une fenêtre (creux partagé)
     bool isDetached(int s) const;
