@@ -891,7 +891,10 @@ void GpuOscilloscopeDisplay::renderOpenGL()
         // leur abscisse exacte (sous-pixel) tant qu'il y en a moins de 12 par
         // pixel réel : l'enveloppe min / max par colonne, utilisée dès 2 par
         // pixel, découpait la courbe en marches (aliasing visible à 25 ms).
-        // Au-delà (très longues fenêtres) : min / max par colonne PHYSIQUE.
+        // Au-delà (longues fenêtres, fenêtre étroite) : premier, extrêmes et
+        // dernier de chaque colonne PHYSIQUE, à leur abscisse exacte : même
+        // courbe que tous les échantillons, sans marches. Les pentes raides sont
+        // redécoupées tous les ~3 px : un long segment laisse voir ses raccords.
         // Tracé « classique » (Options) : l'enveloppe d'avant la v1.66.3, dès
         // 2 échantillons par pixel logique — trait plus net, moins de détail.
         const bool classic=classicTraceA.load();
@@ -901,7 +904,23 @@ void GpuOscilloscopeDisplay::renderOpenGL()
             const float cy=r.getCentreY(), amp=r.getHeight()*0.46f;
             auto add=[&](float x, float y){ verts.push_back(x); verts.push_back(y); if(area){ verts.push_back(x); verts.push_back(cy); } };
             const int cols=juce::jmax(1, classic ? (int)r.getWidth() : (int)(r.getWidth()*scale));
-            if(n>cols*(classic ? 2 : 12)){
+            auto addSample=[&](int i){ add(r.getX()+(float)i/(float)(n-1)*r.getWidth(), cy-juce::jlimit(-1.f, 1.f, buf[i]*gain)*amp); };
+            if(!classic && n>cols*12){
+                constexpr int kMaxSteps=16;   // reste borné sur du bruit plein cadre
+                auto addRun=[&](int from, int to){
+                    const float dy=std::abs(juce::jlimit(-1.f, 1.f, buf[to]*gain)-juce::jlimit(-1.f, 1.f, buf[from]*gain))*amp;
+                    const int steps=juce::jlimit(1, juce::jmin(to-from, kMaxSteps), (int)(dy/3.f));
+                    for(int s=1;s<=steps;++s) addSample(from+(to-from)*s/steps);
+                };
+                int last=-1;
+                for(int c=0;c<cols;++c){
+                    const int i0=c*n/cols, i1=juce::jmin(n, juce::jmax(i0+1, (c+1)*n/cols));
+                    int iMin=i0, iMax=i0;
+                    for(int i=i0+1;i<i1;++i){ if(buf[i]<buf[iMin]) iMin=i; if(buf[i]>buf[iMax]) iMax=i; }
+                    for(int i : { i0, juce::jmin(iMin, iMax), juce::jmax(iMin, iMax), i1-1 })
+                        if(i!=last){ if(last<0) addSample(i); else addRun(last, i); last=i; }
+                }
+            } else if(n>cols*2 && classic){
                 float prevY=cy;
                 for(int c=0;c<cols;++c){
                     const int i0=c*n/cols, i1=juce::jmax(i0+1, (c+1)*n/cols);
@@ -915,7 +934,7 @@ void GpuOscilloscopeDisplay::renderOpenGL()
                     prevY=hiFirst ? yLo : yHi;
                 }
             } else {
-                for(int i=0;i<n;++i) add(r.getX()+(float)i/(float)(n-1)*r.getWidth(), cy-juce::jlimit(-1.f, 1.f, buf[i]*gain)*amp);
+                for(int i=0;i<n;++i) addSample(i);
             }
             return (int)(verts.size()/2);
         };

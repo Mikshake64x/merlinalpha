@@ -6557,9 +6557,10 @@ void LeakEditor::updateLayout()
 
     const int specY   =topY+topH+G;
     const int specH   =juce::jmax(40, H-bandSpace-specY);
-    // bande centrée sur la hauteur entre la carte de l'écran E (qui déborde de
-    // kCardPad) et le bas de la plaque
-    const int ctrlYtop=juce::roundToInt(((float)(specY+specH)+kCardPad+(float)H-(float)ctrlH)*0.5f);
+    // bande centrée sur ce que l'œil voit : entre le bas de l'ombre de la carte
+    // de l'écran E (kCardPad + kCardShadow) et le bas visible de la plaque
+    constexpr float kCardShadow=5.f;
+    const int ctrlYtop=juce::roundToInt(((float)(specY+specH)+kCardPad+kCardShadow+(float)(H+bottomInset)-(float)ctrlH)*0.5f);
     rcSlot[4]={M,            specY, topInnerW,        specH};          // slot E (configurable, prend toute la largeur en bas)
     // slot F (VU Meter, pleine hauteur, à droite du LUFS, aussi bas que le slot E) ;
     // l'interrupteur de style de la section master est au bout de la bande,

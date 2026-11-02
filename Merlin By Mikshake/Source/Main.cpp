@@ -226,6 +226,8 @@ namespace
         {
             if (editor != nullptr)
             {
+                if (auto* leak = dynamic_cast<LeakEditor*> (editor))
+                    leak->setBottomInset (0);
                 editor->setTransform ({});
                 removeChildComponent (editor);
             }
@@ -257,6 +259,8 @@ namespace
             // haut de l'écran (le bas a déjà la marge de la bande de contrôles)
             const int top = juce::roundToInt ((float) getHeight() * 0.011f), bottom = juce::roundToInt ((float) getHeight() * 0.005f);
             editor->setTransform ({});
+            if (auto* leak = dynamic_cast<LeakEditor*> (editor))
+                leak->setBottomInset (juce::roundToInt ((float) bottom / scale));
             editor->setBounds (0, 0, juce::roundToInt ((float) getWidth()  / scale),
                                      juce::roundToInt ((float) (getHeight() - top - bottom) / scale));
             editor->setTransform (juce::AffineTransform::scale (scale).translated (0.f, (float) top));

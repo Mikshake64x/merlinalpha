@@ -1358,6 +1358,8 @@ public:
     // Bouton plein écran de la barre de titre : la fenêtre (Main.cpp) bascule
     std::function<void()> onToggleFullScreen;
     void setFullScreenState(bool b) { topBar.setFullScreenState(b); }
+    // plein écran : hauteur de plaque visible sous l'éditeur (marge de sécurité)
+    void setBottomInset(int px) { if(px!=bottomInset){ bottomInset=px; layoutDirty=true; updateLayout(); } }
     // passage plein écran <-> fenêtré : rendu GPU lâché pendant le transfert
     // de l'éditeur, repris une fois la nouvelle fenêtre peinte
     void beginWindowSwap() { ++windowSwaps; updateGpuSuspension(); }
@@ -1467,6 +1469,7 @@ private:
     }
     void updateGpuSuspension();
     int  windowSwaps { 0 };   // transferts de fenêtre en cours (plein écran)
+    int  bottomInset { 0 };
     juce::Array<juce::Component*> movingModules;   // modules en route vers ou depuis leur fenêtre
 
     // Calque transparent AU-DESSUS des modules mais SOUS les panneaux About /
