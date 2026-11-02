@@ -5400,6 +5400,8 @@ void LeakEditor::applyUiScale()
 LeakEditor::~LeakEditor()
 {
     stopTimer();
+    for(auto& f : floating)
+        if(auto* comp=getComponentForModule(f.module)) comp->setLookAndFeel(nullptr);
     floating.clear();                    // fenêtres détachées fermées (les modules restent à l'éditeur)
     optionsWindow.reset();               // idem pour la fenêtre des Options
     license->removeChangeListener(this);
@@ -5790,7 +5792,8 @@ void LeakEditor::detachSlot(int s)
     auto* comp=getComponentForModule(module);
     if(comp==nullptr || isDetached(s) || s==5 || floatingFor(module)!=nullptr){ dragFollowing=false; dragSlot=-1; return; }
 
-    beginWindowSwap();   // contextes OpenGL lâchés pendant le transfert, comme pour le plein écran
+    beginModuleSwap(comp);   // contexte OpenGL lâché pendant le transfert ; les autres modules continuent
+    comp->setLookAndFeel(&laf);   // sa fenêtre a le style de la barre, le module garde celui de l'éditeur
     removeChildComponent(comp);
     const auto title=juce::String(juce::CharPointer_UTF8("Merlin \xce\xb1 \xc2\xb7 "))+slotModuleName(module);
     // fermeture : le module revient à l'éditeur, dans son emplacement s'il l'attend
@@ -5811,8 +5814,8 @@ void LeakEditor::detachSlot(int s)
 
     layoutDirty=true;   // l'écran laisse place au creux
     updateLayout();
-    juce::Timer::callAfterDelay(150, [sp=juce::Component::SafePointer<LeakEditor>(this)]{
-        if(sp!=nullptr) sp->endWindowSwap();
+    juce::Timer::callAfterDelay(150, [sp=juce::Component::SafePointer<LeakEditor>(this), comp]{
+        if(sp!=nullptr) sp->endModuleSwap(comp);
     });
 }
 
@@ -5929,17 +5932,20 @@ void LeakEditor::dockFloating(int module)
     const auto it=std::find_if(floating.begin(), floating.end(), [module](const FloatingModule& f){ return f.module==module; });
     if(it==floating.end()) return;
     if(dragSlot>=0 && audioProcessor.slotModule[dragSlot]==module){ dragFollowing=false; dragSlot=-1; }
-    beginWindowSwap();
+    auto* comp=getComponentForModule(module);
+    beginModuleSwap(comp);
     it->window->clearContentComponent();
     floating.erase(it);
-    if(auto* comp=getComponentForModule(module))
+    if(comp!=nullptr){
+        comp->setLookAndFeel(nullptr);
         addChildComponent(comp, getIndexOfChildComponent(&overlayLayer));   // sous le calque des bords et les panneaux
+    }
     if(hoverDetachedSlot>=0){ hoverDetachedSlot=-1; setMouseCursor(juce::MouseCursor::NormalCursor); }
     layoutDirty=true;
     updateLayout();   // affiché s'il a un emplacement, caché sinon
     repaint();
-    juce::Timer::callAfterDelay(150, [sp=juce::Component::SafePointer<LeakEditor>(this)]{
-        if(sp!=nullptr) sp->endWindowSwap();
+    juce::Timer::callAfterDelay(150, [sp=juce::Component::SafePointer<LeakEditor>(this), comp]{
+        if(sp!=nullptr) sp->endModuleSwap(comp);
     });
 }
 
@@ -6697,7 +6703,7 @@ void LeakEditor::updateGpuSuspension()
     const bool covered=aboutOverlay.isVisible() || optionsOver
                        || licenseOverlay.isVisible() || windowSwaps>0;
     for(auto* g : gpuModules())
-        g->setSuspended(covered);
+        g->setSuspended(covered || movingModules.contains(g));
 }
 
 void LeakEditor::resized()

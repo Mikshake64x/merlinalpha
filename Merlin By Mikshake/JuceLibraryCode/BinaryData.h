@@ -36,7 +36,7 @@ namespace BinaryData
     const int            signature_sunny_pngSize = 24650;
 
     extern const char*   translations_tsv;
-    const int            translations_tsvSize = 83725;
+    const int            translations_tsvSize = 83917;
 
     // Number of elements in the namedResourceList and originalFileNames arrays.
     const int namedResourceListSize = 10;

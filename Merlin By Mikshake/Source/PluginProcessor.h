@@ -59,7 +59,7 @@ public:
     // Taille des ring-buffers oscilloscope / vectorscope
     // anneau de l'oscilloscope : 16384 échantillons (170 ms à 96 kHz, de quoi
     // trouver une période de basse et afficher jusqu'à 8192 échantillons)
-    static constexpr int SCOPE_SIZE   = 16384;   // puissance de 2
+    static constexpr int SCOPE_SIZE   = 131072;  // puissance de 2 (2,7 s à 48 kHz)
     static constexpr int SCOPE_MAX_READ = SCOPE_SIZE - 4096;   // marge : l'audio écrit pendant la lecture
     static constexpr int VECTOR_SIZE  = 4096;
 

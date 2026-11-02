@@ -81,8 +81,9 @@ void main() { fragColour = col; }
 //==============================================================================
 GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModuleBase(p)
 {
-    for(auto* v : { &rawL, &rawR, &trigSig }) v->assign((size_t)MAXN, 0.f);
-    for(auto* v : { &bufL, &bufR, &bufM, &tmpM }) v->assign((size_t)kMaxWindow, 0.f);
+    for(auto* v : { &rawL, &rawR, &trigSig, &lockSig }) v->assign((size_t)MAXN, 0.f);
+    for(auto* v : { &bufL, &bufR, &bufM, &tmpM, &lockRef }) v->assign((size_t)kMaxWindow, 0.f);
+    for(auto* v : { &capL, &capR }) v->assign((size_t)kCapLen, 0.f);
     for(int i=0;i<kHist;++i){ histL[i].assign((size_t)kMaxWindow, 0.f); histR[i].assign((size_t)kMaxWindow, 0.f); }
     verts.reserve((size_t)kMaxWindow*4);
 
@@ -96,6 +97,13 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
         if(onSplitChanged) onSplitChanged();
     };
     addAndMakeVisible(splitBtn);
+    // calage d'avant la v1.81.7 (phase de la fondamentale) ; éteint à chaque ouverture
+    precisionBtn.setClickingTogglesState(true);
+    precisionBtn.onClick=[this]{ precisionA=precisionBtn.getToggleState(); };
+    addAndMakeVisible(precisionBtn);
+    // arme la capture du prochain coup ; autre appui : retour au direct
+    captureBtn.onClick=[this]{ captureA=captureA.load()==kCapLive ? kCapArmed : kCapLive; };
+    addAndMakeVisible(captureBtn);
 
     // AMP (vertical, à gauche) et TIME (horizontal, en bas) : mêmes plages que
     // les boutons de la barre du bas
@@ -108,7 +116,7 @@ GpuOscilloscopeDisplay::GpuOscilloscopeDisplay(LeakAudioProcessor& p) : GpuModul
     addAndMakeVisible(*ampFader);
     timeFader=std::make_unique<ReleaseFader>();
     timeFader->setHorizontal(true);
-    timeFader->configure("TIME", 128.f, (float)kMaxWindow, 1024.f, 1200.f);
+    timeFader->configure("TIME", 128.f, (float)kMaxWindow, 2048.f, 1200.f);
     timeFader->getDefault=[this]{ return (float)processor.oscDefaultWindow(); };   // double-clic : 25 ms
     timeFader->formatValue=[this](float v){
         const double sr=juce::jmax(1.0, processor.getCurrentSampleRate());
@@ -164,6 +172,13 @@ void GpuOscilloscopeDisplay::resized()
         const int bw=juce::roundToInt(34.f*Ui::textScale), bh=juce::roundToInt(12.f*Ui::textScale);
         monoBtn.setBounds(getWidth()-bw-4, 2, bw, bh);
         splitBtn.setBounds(monoBtn.getX()-bw-3, 2, bw, bh);
+        const int pw=juce::roundToInt(44.f*Ui::textScale);
+        precisionBtn.setBounds(splitBtn.getX()-pw-3, 2, pw, bh);
+        const int cw=juce::roundToInt(38.f*Ui::textScale);
+        captureBtn.setBounds(precisionBtn.getX()-cw-3, 2, cw, bh);
+        const int minX=juce::roundToInt(60.f*Ui::textScale);   // module étroit : le titre d'abord
+        precisionBtn.setVisible(precisionBtn.getX()>=minX);
+        captureBtn.setVisible(captureBtn.getX()>=minX);
     }
     // faders : AMP le long du bord gauche, TIME le long du bas
     if(ampFader)  ampFader ->setBounds(2, 22, (int)kFaderL-4, juce::jmax(10, getHeight()-22-(int)kFaderB-4));
@@ -352,6 +367,10 @@ void GpuOscilloscopeDisplay::rebuildBackgroundIfNeeded()
 void GpuOscilloscopeDisplay::uiTick()
 {
     rebuildBackgroundIfNeeded();   // changement d'écran / d'échelle
+    // CAPTURE : clignote en attendant le coup, allumé tant qu'il est gardé
+    const int cap=captureA.load();
+    const bool lit=cap==kCapHeld || (cap==kCapArmed && (juce::Time::getMillisecondCounter()/250)%2==0);
+    if(lit!=captureBtn.getToggleState()) captureBtn.setToggleState(lit, juce::dontSendNotification);
     if(styleA.load()==1){
         const float vpp=measVpp.load(), hz=measHz.load();
         const juce::String m="Vpp "+juce::String(vpp, 2)+"   f "+(hz>0.f ? juce::String(juce::roundToInt(hz))+" Hz" : juce::String("--"));
@@ -401,7 +420,8 @@ void GpuOscilloscopeDisplay::paint(juce::Graphics& g)
     Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
-    g.drawFittedText(TR("OSCILLOSCOPE"), 6, 5, juce::jmax(20, splitBtn.getX()-10), 13, juce::Justification::left, 1, 0.6f);
+    const int titleEnd=captureBtn.isVisible() ? captureBtn.getX() : precisionBtn.isVisible() ? precisionBtn.getX() : splitBtn.getX();
+    g.drawFittedText(TR("OSCILLOSCOPE"), 6, 5, juce::jmax(20, titleEnd-10), 13, juce::Justification::left, 1, 0.6f);
 
     paintGlFailure(g);
     paintScreenFrame(g);
@@ -481,9 +501,11 @@ void GpuOscilloscopeDisplay::pushHistory()
     histCount=juce::jmin(histCount+1, kHist);
 }
 
-// Nouvelle fenêtre : calée sur la phase de la fondamentale (période par
-// autocorrélation du signal filtré à ~200 Hz), fondu entre les deux dernières
-// périodes : image stable qui évolue en continu, au plus près du direct.
+// Nouvelle fenêtre : celle qui se superpose le mieux aux images d'avant (voir
+// matchShape()). Sans référence (démarrage, nouvelle note), secours : phase de
+// la fondamentale (période par autocorrélation du signal filtré à ~200 Hz).
+// Fondu entre les deux dernières répétitions : image stable qui évolue en
+// continu, au plus près du direct.
 bool GpuOscilloscopeDisplay::capture()
 {
     const int  n=nPts.load();
@@ -505,6 +527,26 @@ bool GpuOscilloscopeDisplay::capture()
         measHz=(crossings>=2 && last>first) ? (float)((double)(crossings-1)*sr/(double)(last-first)) : 0.f;
     };
 
+    // CAPTURE : le coup reste à l'écran ; TIME et AMP y restent actifs
+    auto showHeld=[&]{
+        if(capFresh || n!=curN){
+            capFresh=false;
+            histCount=0;   // rien de pâle du direct d'avant
+            std::memcpy(bufL.data(), capL.data(), (size_t)n*sizeof(float));
+            std::memcpy(bufR.data(), capR.data(), (size_t)n*sizeof(float));
+            finish();
+        }
+    };
+    if(captureA.load()==kCapHeld){
+        // la fin du coup arrive pendant qu'il est à l'écran : TIME peut s'élargir dessus
+        if(capPending && processor.getScopeData(rawL.data(), rawR.data(), 0)>=capStart+(juce::uint64)kCapLen){
+            readCapture();
+            capFresh=true;
+        }
+        showHeld();
+        return false;
+    }
+
     if(!triggerMode.load()){
         pushHistory();
         processor.getScopeData(bufL.data(), bufR.data(), n);
@@ -517,6 +559,15 @@ bool GpuOscilloscopeDisplay::capture()
     const juce::uint64 endAbs=processor.getScopeData(rawL.data(), rawR.data(), fetch);
     const juce::uint64 baseAbs=endAbs-(juce::uint64)fetch;   // indice absolu de rawL[0]
 
+    if(captureA.load()==kCapArmed){
+        if(watchForHit(fetch, endAbs, n, sr)){
+            capWatching=false;
+            int armed=kCapArmed;
+            if(captureA.compare_exchange_strong(armed, kCapHeld)){ capFresh=true; showHeld(); }
+            return false;   // rawL vient d'être relu : pas d'image directe à ce tour
+        }
+    } else capWatching=false;
+
     // Silence (sous -80 dBFS sur la fenêtre la plus récente) : ligne plate
     // tout de suite. Avant, l'image restait figée ~150 ms puis sautait.
     {
@@ -527,61 +578,82 @@ bool GpuOscilloscopeDisplay::capture()
             std::memcpy(bufL.data(), rawL.data()+search, (size_t)n*sizeof(float));
             std::memcpy(bufR.data(), rawR.data()+search, (size_t)n*sizeof(float));
             period=0.0;
+            lockN=lockMiss=0;
             finish();
             return true;
         }
     }
 
-    const float a=1.f-std::exp(-juce::MathConstants<float>::twoPi*200.f/(float)sr);
-    float y1=0.f, y2=0.f;
-    for(int i=0;i<fetch;++i){
-        const float x=mono ? 0.5f*(rawL[(size_t)i]+rawR[(size_t)i]) : rawL[(size_t)i];
-        y1+=a*(x-y1); y2+=a*(y1-y2);
-        trigSig[(size_t)i]=y2;
-    }
-    const int warm=juce::jmin(search/4, (int)(sr*0.01));   // mise en route du filtre ignorée
+    auto trigSrc=[&](int i){ return lockSig[(size_t)i]; };
+    for(int i=0;i<fetch;++i)
+        lockSig[(size_t)i]=mono ? 0.5f*(rawL[(size_t)i]+rawR[(size_t)i]) : rawL[(size_t)i];
 
-    auto trigSrc=[&](int i){ return mono ? 0.5f*(rawL[(size_t)i]+rawR[(size_t)i]) : rawL[(size_t)i]; };
-    period=estimatePeriod(fetch, warm, sr);   // 0 = pas de hauteur nette
     const double maxStart=(double)(baseAbs+(juce::uint64)search);
     double startPos=maxStart;
-    if(period>1.0){
-        // Calage sur la PHASE DE LA FONDAMENTALE (corrélation complexe à 1/P
-        // sur les 4 dernières périodes, fenêtre de Hann) : la fenêtre commence
-        // au passage montant de la fondamentale, le plus récent. Les fronts du
-        // signal (v1.38.1-1.39.1) glissaient d'un point de l'onde à un autre
-        // quand le timbre évolue (note tenue désaccordée) -> sauts.
-        const int W=juce::jmin((int)(4.0*period), fetch-warm);
-        const int a0=fetch-W;
-        const double w0=juce::MathConstants<double>::twoPi/period;
-        const double ph0=std::fmod((double)(baseAbs+(juce::uint64)a0), period)*w0;   // phase absolue de rawL[a0]
-        double re=0.0, im=0.0;
-        double c=std::cos(ph0), s=std::sin(ph0);
-        const double dc=std::cos(w0), ds=std::sin(w0);
-        for(int i=0;i<W;++i){
-            const double h=0.5-0.5*std::cos(juce::MathConstants<double>::twoPi*(double)i/(double)W);
-            const double x=(double)trigSrc(a0+i)*h;
-            re+=x*c; im-=x*s;
-            const double cn=c*dc-s*ds; s=s*dc+c*ds; c=cn;   // rotation d'un échantillon
-        }
-        const double phi=std::atan2(im, re);
-        const double i0=(-juce::MathConstants<double>::halfPi-phi)/w0;   // passage montant (modulo P)
-        startPos=i0+std::floor((maxStart-i0)/period)*period;
+    const bool sameRef=lockN==n && lockMono==mono && !precisionA.load();   // PRÉCISION : secours seul
+    const ShapeMatch match=sameRef ? matchShape(n, search, sr) : ShapeMatch{};
+    if(match.start>=0){
+        startPos=(double)(baseAbs+(juce::uint64)match.start);
+        period=(double)match.repeat;
     } else {
-        // pas de hauteur nette : front le plus récent (montée à 60 % de la crête)
-        float rp=0.f;
-        for(int i=juce::jmax(0, fetch-n-(int)(sr*0.04));i<fetch;++i) rp=juce::jmax(rp, trigSrc(i));
-        bool armed=false; int last=-1;
-        float xPrev=trigSrc(0);
-        for(int i=1;i<=search;++i){
-            const float x=trigSrc(i);
-            if(x<0.2f*rp) armed=true;
-            else if(armed && xPrev<0.6f*rp && x>=0.6f*rp){ last=i; armed=false; }
-            xPrev=x;
+        const float a=1.f-std::exp(-juce::MathConstants<float>::twoPi*200.f/(float)sr);
+        float y1=0.f, y2=0.f;
+        for(int i=0;i<fetch;++i){
+            y1+=a*(trigSrc(i)-y1); y2+=a*(y1-y2);
+            trigSig[(size_t)i]=y2;
         }
-        if(last>=0) startPos=(double)(baseAbs+(juce::uint64)last);
+        const int warm=juce::jmin(search/4, (int)(sr*0.01));   // mise en route du filtre ignorée
+
+        period=estimatePeriod(fetch, warm, sr);   // 0 = pas de hauteur nette
+        if(period>1.0){
+            // Calage sur la PHASE DE LA FONDAMENTALE (corrélation complexe à 1/P
+            // sur les 4 dernières périodes, fenêtre de Hann) : la fenêtre commence
+            // au passage montant de la fondamentale, le plus récent. Les fronts du
+            // signal (v1.38.1-1.39.1) glissaient d'un point de l'onde à un autre
+            // quand le timbre évolue (note tenue désaccordée) -> sauts.
+            const int W=juce::jmin((int)(4.0*period), fetch-warm);
+            const int a0=fetch-W;
+            const double w0=juce::MathConstants<double>::twoPi/period;
+            const double ph0=std::fmod((double)(baseAbs+(juce::uint64)a0), period)*w0;   // phase absolue de rawL[a0]
+            double re=0.0, im=0.0;
+            double c=std::cos(ph0), s=std::sin(ph0);
+            const double dc=std::cos(w0), ds=std::sin(w0);
+            for(int i=0;i<W;++i){
+                const double h=0.5-0.5*std::cos(juce::MathConstants<double>::twoPi*(double)i/(double)W);
+                const double x=(double)trigSrc(a0+i)*h;
+                re+=x*c; im-=x*s;
+                const double cn=c*dc-s*ds; s=s*dc+c*ds; c=cn;   // rotation d'un échantillon
+            }
+            const double phi=std::atan2(im, re);
+            const double i0=(-juce::MathConstants<double>::halfPi-phi)/w0;   // passage montant (modulo P)
+            startPos=i0+std::floor((maxStart-i0)/period)*period;
+        } else {
+            // pas de hauteur nette : front le plus récent (montée à 60 % de la crête)
+            float rp=0.f;
+            for(int i=juce::jmax(0, fetch-n-(int)(sr*0.04));i<fetch;++i) rp=juce::jmax(rp, trigSrc(i));
+            bool armed=false; int last=-1;
+            float xPrev=trigSrc(0);
+            for(int i=1;i<=search;++i){
+                const float x=trigSrc(i);
+                if(x<0.2f*rp) armed=true;
+                else if(armed && xPrev<0.6f*rp && x>=0.6f*rp){ last=i; armed=false; }
+                xPrev=x;
+            }
+            if(last>=0) startPos=(double)(baseAbs+(juce::uint64)last);
+        }
     }
     const int trigPt=juce::jlimit(0, search, (int)std::llround(startPos-(double)baseAbs));
+    // référence : suit la forme doucement ; un coup isolé (kick) ne la remplace
+    // pas, une nouvelle note la remplace après quelques images
+    constexpr float kRefFollow=0.2f;
+    constexpr int   kMaxMiss=6;
+    if(match.start>=0){
+        lockMiss=0;
+        for(int i=0;i<n;++i) lockRef[(size_t)i]+=kRefFollow*(lockSig[(size_t)(trigPt+i)]-lockRef[(size_t)i]);
+    } else if(! sameRef || ++lockMiss>kMaxMiss){
+        lockMiss=0; lockN=n; lockMono=mono;
+        std::memcpy(lockRef.data(), lockSig.data()+trigPt, (size_t)n*sizeof(float));
+    }
     pushHistory();
     std::memcpy(bufL.data(), rawL.data()+trigPt, (size_t)n*sizeof(float));
     std::memcpy(bufR.data(), rawR.data()+trigPt, (size_t)n*sizeof(float));
@@ -601,6 +673,128 @@ bool GpuOscilloscopeDisplay::capture()
     }
     finish();
     return true;
+}
+
+// CAPTURE : guette un coup dans les échantillons arrivés depuis l'image d'avant,
+// nettement au-dessus du fond (qui suit la musique en cours). Une fois le coup
+// remplit la fenêtre affichée, il est copié avec 5 ms avant lui. true : capL/capR prêts.
+bool GpuOscilloscopeDisplay::watchForHit(int fetch, juce::uint64 endAbs, int n, double sr)
+{
+    constexpr float kMinHit=0.01f;    // -40 dBFS
+    constexpr float kHitRatio=2.f;    // 6 dB au-dessus du fond
+
+    auto level=[this](int i){ return juce::jmax(std::abs(rawL[(size_t)i]), std::abs(rawR[(size_t)i])); };
+    if(! capWatching){
+        // armé à l'instant : un coup déjà passé ne compte pas
+        capWatching=true;
+        capHit=0;
+        capSeen=endAbs;
+        capFloor=0.f;
+        for(int i=juce::jmax(0, fetch-(int)(sr*0.05));i<fetch;++i) capFloor=juce::jmax(capFloor, level(i));
+        return false;
+    }
+    if(capHit==0){
+        const int fresh=(int)juce::jmin((juce::uint64)fetch, endAbs-capSeen);
+        const float thr=juce::jmax(kMinHit, kHitRatio*capFloor);
+        float peak=0.f;
+        for(int i=fetch-fresh;i<fetch;++i){
+            const float x=level(i);
+            if(x>=thr){ capHit=endAbs-(juce::uint64)fetch+(juce::uint64)i; break; }
+            peak=juce::jmax(peak, x);
+        }
+        capFloor=juce::jmax(peak, capFloor*std::pow(0.5f, (float)fresh/(float)(sr*0.05)));   // moitié en 50 ms
+        capSeen=endAbs;
+        if(capHit==0) return false;
+    }
+    capStart=capHit-juce::jmin(capHit, (juce::uint64)(sr*0.005));
+    if(endAbs<capStart+(juce::uint64)n) return false;
+    readCapture();
+    return true;
+}
+
+// copie le coup depuis l'anneau ; ce qui n'est pas encore arrivé reste à zéro
+void GpuOscilloscopeDisplay::readCapture()
+{
+    const int readN=LeakAudioProcessor::SCOPE_MAX_READ;
+    const juce::uint64 base=processor.getScopeData(rawL.data(), rawR.data(), readN)-(juce::uint64)readN;
+    const int offset=(int)juce::jlimit<juce::int64>(0, readN, (juce::int64)capStart-(juce::int64)base);
+    const int got=juce::jmin(kCapLen, readN-offset);
+    std::memcpy(capL.data(), rawL.data()+offset, (size_t)got*sizeof(float));
+    std::memcpy(capR.data(), rawR.data()+offset, (size_t)got*sizeof(float));
+    std::fill(capL.begin()+got, capL.end(), 0.f);
+    std::fill(capR.begin()+got, capR.end(), 0.f);
+    capPending=got<kCapLen;
+}
+
+// Fenêtre la plus récente qui se superpose à la référence (corrélation
+// normalisée, grossière puis à pleine résolution). La phase de la fondamentale
+// ne veut plus rien dire quand cette fondamentale est faible dans le son : sur
+// une basse de Massive, le tracé glissait au hasard de 20 % de la largeur entre
+// deux images. Ici seule la ressemblance compte, quel que soit le timbre.
+GpuOscilloscopeDisplay::ShapeMatch GpuOscilloscopeDisplay::matchShape(int n, int search, double sr)
+{
+    constexpr float kMinScore=0.7f;     // en dessous : autre chose joue (nouvelle note)
+    constexpr float kSameScore=0.01f;   // écart de score entre deux répétitions équivalentes (0,03 : sauts d'une demi-période sans fondamentale)
+
+    ShapeMatch m;
+    const int D=juce::jmax(1, (int)(sr/12000.0), juce::jmin(n/128, (int)(sr/750.0)));   // longues fenêtres : assez fin pour une période
+    const int pts=n/D, span=juce::jmin(search, (int)(sr*0.06))/D;   // 60 ms en arrière : basses jusqu'à ~17 Hz
+    if(pts<4 || span<4) return m;
+    const int base=search-span*D;   // rawL[base] = lockDec[0]
+
+    auto reduce=[D](const float* src){ float s=0.f; for(int i=0;i<D;++i) s+=src[i]; return s/(float)D; };
+    lockDec.resize((size_t)(span+pts));
+    lockRefDec.resize((size_t)pts);
+    lockScore.resize((size_t)span+1);
+    for(int k=0;k<span+pts;++k) lockDec[(size_t)k]=reduce(lockSig.data()+base+k*D);
+    double er=0.0;
+    for(int j=0;j<pts;++j){ lockRefDec[(size_t)j]=reduce(lockRef.data()+j*D); er+=(double)lockRefDec[(size_t)j]*lockRefDec[(size_t)j]; }
+    if(er<=1.0e-12) return m;
+
+    double ex=0.0;
+    for(int j=0;j<pts;++j) ex+=(double)lockDec[(size_t)j]*lockDec[(size_t)j];
+    float best=-1.f;
+    for(int c=0;c<=span;++c){
+        double acc=0.0;
+        for(int j=0;j<pts;++j) acc+=(double)lockRefDec[(size_t)j]*lockDec[(size_t)(c+j)];
+        const float score=ex>1.0e-12 ? (float)(acc/std::sqrt(er*ex)) : 0.f;
+        lockScore[(size_t)c]=score;
+        best=juce::jmax(best, score);
+        if(c<span){
+            const double out=lockDec[(size_t)c], in=lockDec[(size_t)(c+pts)];
+            ex=juce::jmax(0.0, ex-out*out+in*in);
+        }
+    }
+    if(best<kMinScore) return m;
+
+    // pics, du plus récent au plus ancien (un bord ne dit pas où est le pic)
+    auto isPeak=[this](int c){ return lockScore[(size_t)c]>=lockScore[(size_t)(c-1)] && lockScore[(size_t)c]>=lockScore[(size_t)(c+1)]; };
+    int peak=-1, older=-1;
+    for(int c=span-1;c>=1;--c){
+        if(! isPeak(c) || lockScore[(size_t)c]<best-kSameScore) continue;
+        if(peak<0) peak=c;
+        else if(peak-c>1){ older=c; break; }
+    }
+    if(peak<0) return m;
+
+    // à pleine résolution, autour du pic (au plus ~512 points par essai)
+    const int stride=juce::jmax(1, n/512);
+    auto refine=[&](int around){
+        int bestT=around; double bv=-2.0;
+        for(int t=juce::jmax(0, around-D); t<=juce::jmin(search, around+D); ++t){
+            double acc=0.0, e=0.0;
+            for(int i=0;i<n;i+=stride){
+                const double x=lockSig[(size_t)(t+i)];
+                acc+=x*lockRef[(size_t)i]; e+=x*x;
+            }
+            const double v=e>1.0e-12 ? acc/std::sqrt(e) : 0.0;
+            if(v>bv){ bv=v; bestT=t; }
+        }
+        return bestT;
+    };
+    m.start=refine(base+peak*D);
+    if(older>=0) m.repeat=m.start-refine(base+older*D);
+    return m;
 }
 
 // Période de la fondamentale en échantillons (0 = pas de hauteur nette) :

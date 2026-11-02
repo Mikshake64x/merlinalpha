@@ -1362,6 +1362,9 @@ public:
     // de l'éditeur, repris une fois la nouvelle fenêtre peinte
     void beginWindowSwap() { ++windowSwaps; updateGpuSuspension(); }
     void endWindowSwap()   { if(windowSwaps>0) --windowSwaps; updateGpuSuspension(); }
+    // un seul module change de fenêtre : lui seul lâche son contexte
+    void beginModuleSwap(juce::Component* c) { movingModules.add(c); updateGpuSuspension(); }
+    void endModuleSwap(juce::Component* c)   { movingModules.removeFirstMatchingValue(c); updateGpuSuspension(); }
     void setKeyboardState(bool b);   // bouton clavier : aussi appliqué aux modules détachés
     // fenêtres détachées (modules, Options) : elles repassent devant la fenêtre
     // principale quand celle-ci vient d'être remontée
@@ -1464,6 +1467,7 @@ private:
     }
     void updateGpuSuspension();
     int  windowSwaps { 0 };   // transferts de fenêtre en cours (plein écran)
+    juce::Array<juce::Component*> movingModules;   // modules en route vers ou depuis leur fenêtre
 
     // Calque transparent AU-DESSUS des modules mais SOUS les panneaux About /
     // Settings : décor nature qui déborde sur la plaque + bords creusés des

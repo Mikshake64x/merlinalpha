@@ -276,7 +276,14 @@ void* WindowsDisplay::foregroundWindow() { return GetForegroundWindow(); }
 void WindowsDisplay::activate(void* nativeHandle)
 {
     auto hwnd=static_cast<HWND>(nativeHandle);
-    if(hwnd!=nullptr && IsWindow(hwnd)) SetForegroundWindow(hwnd);
+    if(hwnd==nullptr || !IsWindow(hwnd) || SetForegroundWindow(hwnd)) return;
+    // Refus de Windows : ce droit vient du lancement depuis le bureau (pas de
+    // l'installeur) et les fenêtres de Merlin ne s'activent pas au clic. On passe
+    // par la file d'entrée de la fenêtre de devant, sinon les menus se referment.
+    const DWORD self=GetCurrentThreadId(), front=GetWindowThreadProcessId(GetForegroundWindow(), nullptr);
+    if(front==0 || front==self || !AttachThreadInput(self, front, TRUE)) return;
+    SetForegroundWindow(hwnd);
+    AttachThreadInput(self, front, FALSE);
 }
 
 //==============================================================================
