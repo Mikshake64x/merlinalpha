@@ -8,6 +8,8 @@
 #include "GpuVectorscope.h"
 #include "GpuOscilloscope.h"
 #include "GpuSurface.h"
+#include "GpuSpectroFx.h"
+#include "TourOverlay.h"
 #include "Lang.h"
 #include "OptionsOverlay.h"
 #include "LicenseOverlay.h"
@@ -144,6 +146,7 @@ namespace Ui {
     // ligne tient dans la place du titre, les mesures ne bougent pas : à 19 px,
     // sous le texte et au-dessus du contenu (22 px) ; plus bas si un bouton descend.
     inline int titleStyle { 1 };
+    inline int logoColour { 0 };   // lettres du logo de Sunny (à l'essai) : 0 gris gravé, 1 vert de Sunny
     inline constexpr float kTitleLineY = 19.f;
     // endX : fin de la ligne si elle doit s'arrêter avant un obstacle (0 = bord)
     // darkScreen : écran resté sombre en thème clair (oscilloscope)
@@ -242,6 +245,8 @@ public:
     // marge plus large pour un bouton isolé : tout le relief tient dans les bounds
     // (sinon l'ombre est coupée en carré), seul le bouton lui-même reste cliquable
     void setReliefMargin(float m) { reliefMargin=m; repaint(); }
+    // symbole marche/arrêt à la place du texte (accent en marche, rouge à l'arrêt)
+    void setPowerIcon() { arrowDir=2; repaint(); }
     bool hitTest(int x, int y) override { return reliefMargin<0.f || getLocalBounds().toFloat().reduced(reliefMargin).contains((float)x, (float)y); }
 private:
     int   arrowDir { 0 };
@@ -578,7 +583,7 @@ public:
     // reverseFlag/tiltRef/skewRef : références aux champs persistés du
     // processor propres à CE module (sens de défilement et perspective).
     Spectrogram3DBase(LeakAudioProcessor&, bool& reverseFlag, float& tiltRef, float& skewRef, float& timeRef);
-    ~Spectrogram3DBase() override { stopTimer(); }
+    ~Spectrogram3DBase() override;   // garde HOLD et image figée (fenêtre du plugin fermée)
     void resized() override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
@@ -618,6 +623,8 @@ protected:
     bool hovering { false };
     NeuAnimButton holdBtn { "HOLD" };   // fige l'image (plus de nouvelles courbes)
     bool frozen { false };
+    int  snapshotId { 0 };   // ModuleID (mémoire du HOLD dans le processeur), posé par la classe dérivée
+    void restoreHold();      // fenêtre du plugin rouverte : HOLD et image figée retrouvés
 
     float  rows[NROWS][NPTS] {};   // anneau de courbes, valeurs 0..1
     int    head { 0 }, rowCount { 0 };
@@ -642,7 +649,7 @@ class Spectrogram3DPeaksDisplay : public Spectrogram3DBase
 {
 public:
     Spectrogram3DPeaksDisplay(LeakAudioProcessor& p, bool& reverseFlag, float& tiltRef, float& skewRef, float& timeRef)
-        : Spectrogram3DBase(p,reverseFlag,tiltRef,skewRef,timeRef) {}
+        : Spectrogram3DBase(p,reverseFlag,tiltRef,skewRef,timeRef) { snapshotId=(int)LeakAudioProcessor::ModuleID::Spectrogram3DPeaks; restoreHold(); }
     void paint(juce::Graphics&) override;
 };
 
@@ -654,7 +661,7 @@ class Spectrogram3DSurfaceDisplay : public Spectrogram3DBase
 {
 public:
     Spectrogram3DSurfaceDisplay(LeakAudioProcessor& p, bool& reverseFlag, float& tiltRef, float& skewRef, float& timeRef)
-        : Spectrogram3DBase(p,reverseFlag,tiltRef,skewRef,timeRef) {}
+        : Spectrogram3DBase(p,reverseFlag,tiltRef,skewRef,timeRef) { snapshotId=(int)LeakAudioProcessor::ModuleID::Spectrogram3DSurface; restoreHold(); }
     void paint(juce::Graphics&) override;
 };
 
@@ -740,7 +747,7 @@ public:
     void mouseUp  (const juce::MouseEvent&) override;
     // Efface la sélection de bandes locale (appelé quand un AUTRE module
     // efface celle des autres — un seul module sélectionné à la fois).
-    void clearBandSelection() { multiSelectMask=0; soloBand=-1; lastDragBand=-1; repaint(); }
+    void clearBandSelection() { multiSelectMask=0; soloBand=-1; lastDragBand=-1; repaint(); }   // comme Merlin MTR : ne touche pas à l'écoute
     // Notifié quand CE module vient de modifier sa propre sélection (clic/glisser) —
     // câblé par LeakEditor pour effacer la sélection des autres modules.
     std::function<void()> onSelectionChanged;
@@ -878,7 +885,7 @@ public:
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
     void mouseExit(const juce::MouseEvent&) override;
-    void clearBandSelection() { multiSelectMask=0; soloBand=-1; lastDragBand=-1; repaint(); }
+    void clearBandSelection() { multiSelectMask=0; soloBand=-1; lastDragBand=-1; repaint(); }   // comme Merlin MTR : ne touche pas à l'écoute
     std::function<void()> onSelectionChanged;
 private:
     void timerCallback() override;
@@ -919,7 +926,7 @@ public:
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
     void mouseExit(const juce::MouseEvent&) override;
-    void clearBandSelection() { multiSelectMask=0; soloBand=-1; lastDragBand=-1; repaint(); }
+    void clearBandSelection() { multiSelectMask=0; soloBand=-1; lastDragBand=-1; repaint(); }   // comme Merlin MTR : ne touche pas à l'écoute
     std::function<void()> onSelectionChanged;
 private:
     void timerCallback() override;
@@ -1026,7 +1033,13 @@ class NeedleVuMeter : public juce::Component, private juce::Timer
 {
 public:
     explicit NeedleVuMeter(LeakAudioProcessor&);
-    ~NeedleVuMeter() override { stopTimer(); }
+    ~NeedleVuMeter() override
+    {
+        stopTimer();
+        // fenêtre du plugin fermée : HOLD et valeur retenue gardés (v1.81.46)
+        auto& sn=processor.moduleSnapshots[(int)LeakAudioProcessor::ModuleID::NeedleVU];
+        sn.hold=holding; sn.value=holdPeakDb;
+    }
     void paint  (juce::Graphics&) override;
     void resized() override;
     void setFrameRateHz(int hz) { if(hz<=0){ stopTimer(); return; } currentHz=hz; startTimerHz(hz); }
@@ -1173,12 +1186,26 @@ public:
     std::function<void()>    onTitleClicked;
     std::function<void()>    onSettingsClicked;
     std::function<void()>    onResetClicked;     // RESET (loudness, crêtes, VU)
+    std::function<void(bool)> onPowerToggled;    // marche/arrêt des mesures (true = en marche)
+    void setMeasuringState(bool on);
     std::function<void(bool)> onThemeToggled;    // true = sombre (nuit)
     std::function<void(bool)> onContrastToggled; // true = contraste renforcé
     std::function<void(bool)> onModules3DToggled; // true = modules en 3D
     std::function<void(bool)> onLargeTextToggled; // true = textes agrandis
     std::function<void(bool)> onAlwaysOnTopToggled; // true = fenêtre toujours au premier plan
     void setAlwaysOnTopState(bool b) { onTopToggle.setToggleState(b, juce::dontSendNotification); }
+    // visite guidée : zone d'une commande, en coordonnées de la barre
+    // (0 RESET, 1 marche/arrêt, 2 épingle, 3 clavier, 4 Options) ; vide si masquée
+    juce::Rectangle<int> tourRect(int which) const
+    {
+        switch(which){
+            case 0:  return resetBtn.getBounds().reduced(7);
+            case 1:  return powerBtn.getBounds().reduced(7);
+            case 2:  return onTopToggle.isVisible() ? onTopToggle.getBounds() : juce::Rectangle<int>();
+            case 3:  return keyboardToggle.isVisible() ? keyboardToggle.getBounds() : juce::Rectangle<int>();
+            default: return gearBtn.getBounds();
+        }
+    }
     std::function<void()>     onFullScreenClicked;  // bouton plein écran (à côté de PRESET)
     void setFullScreenState(bool b) { fullScreenBtn.setFullScreen(b); }
     std::function<void(bool)> onKeyboardToggled;    // true = le clavier va à Merlin
@@ -1217,6 +1244,7 @@ private:
     KebabButton      gearBtn;   // menu d'options (trois points, comme Sevenpack Alpha)
     FullScreenButton fullScreenBtn;
     NeuAnimButton    resetBtn { "RESET" };
+    NeuAnimButton    powerBtn { "" };   // marche/arrêt des mesures, à droite de RESET
     VolumeRing       volKnob;   // volume général de la sortie Windows (appli)
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TopBar)
 };
@@ -1353,6 +1381,20 @@ private:
 };
 
 //==============================================================================
+// MeasurePauseVeil — mesures arrêtées (bouton marche/arrêt de l'en-tête,
+// v1.81.35) : voile sur les modules et la bande du bas, plaque au centre ;
+// un clic reprend les mesures.
+//==============================================================================
+class MeasurePauseVeil : public juce::Component
+{
+public:
+    MeasurePauseVeil() { setMouseCursor(juce::MouseCursor::PointingHandCursor); }
+    std::function<void()> onResume;
+    void paint(juce::Graphics&) override;
+    void mouseUp(const juce::MouseEvent& e) override { if(e.mouseWasClicked() && onResume) onResume(); }
+};
+
+//==============================================================================
 // LeakEditor — système de 6 slots configurables par clic droit
 //==============================================================================
 class LeakEditor : public juce::AudioProcessorEditor,
@@ -1466,11 +1508,14 @@ private:
     Spectrogram3DSurfaceDisplay spectro3dSurface;
     GpuSpectrogramDisplay gpuTerrain, gpuNeon, gpuCrystal;
     GpuSurfaceDisplay     gpuSurface;   // Spectrogram Surface GPU
+    GpuSpectroFxDisplay   gpuBars, gpuLed, gpuRibbons, gpuMatrix, gpuSplash;   // spectrogrammes d'ambiance (v1.81.37)
     GpuDotSpectrumDisplay gpuDotChroma, gpuDotNebula;
     GpuDotPanoramaDisplay gpuDotPano;
     GpuVectorscopeDisplay gpuVecPhosphor, gpuVecDensity;
     // tous les modules OpenGL (suspension sous les panneaux, Options > Image)
-    std::array<GpuModuleBase*, 10> gpuModules() { return { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano, &gpuVecPhosphor, &gpuVecDensity, &oscilloscope }; }
+    std::array<GpuModuleBase*, 15> gpuModules() { return { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuSurface,
+                                                          &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash,
+                                                          &gpuDotChroma, &gpuDotNebula, &gpuDotPano, &gpuVecPhosphor, &gpuVecDensity, &oscilloscope }; }
     ControlsBarLeak      controls;
 
     // Les modules GPU sont des fenêtres OpenGL natives : rien ne peut être
@@ -1485,6 +1530,16 @@ private:
         if(host.holdKeyboard) host.holdKeyboard(licenseOverlay.isVisible());   // saisie de la clé (appli)
     }
     void updateGpuSuspension();
+    // bouton marche/arrêt : calcul, rendu GPU et voile des modules
+    void setMeasuring(bool on);
+    // visite guidée (v1.81.43) : lancée une fois à l'ouverture, relancée par les Options
+    void startTour();
+    void tourStep(TourOverlay::Id);
+    void endTour();
+    TourTargets tourTargets();
+    int  tourSavedSlots[5] {};
+    bool tourSlotsSaved { false }, tourAutoChecked { false };
+    juce::uint32 tourOpenMs { juce::Time::getMillisecondCounter() };
     int  windowSwaps { 0 };   // transferts de fenêtre en cours (plein écran)
     int  bottomInset { 0 };
     juce::Array<juce::Component*> movingModules;   // modules en route vers ou depuis leur fenêtre
@@ -1500,6 +1555,8 @@ private:
     };
     OverlayLayer         overlayLayer;
     AboutOverlay         aboutOverlay;
+    MeasurePauseVeil     pauseVeil;      // mesures arrêtées : voile sous les panneaux, au-dessus des modules
+    TourOverlay          tourOverlay;    // visite guidée : au-dessus de tout
     OptionsOverlay       optionsOverlay;    // menu Options (trois points)
     // licence (DRM SideKey) : un gestionnaire partagé par l'appli et toutes les instances du plugin
     juce::SharedResourcePointer<LicenseManager> license;
@@ -1518,15 +1575,43 @@ private:
     {
         // fenêtre native créée une seule fois, une fois taillée (sinon sa partie
         // droite pouvait ne pas être dessinée)
-        DetachedWindow(const juce::String& name, juce::Component& content, std::function<void()> close)
-            : juce::DocumentWindow(name, Col::bg, juce::DocumentWindow::minimiseButton | juce::DocumentWindow::closeButton, false),
+        // fullScreenButton : modules détachés (v1.81.35), bouton plein écran dans la barre
+        DetachedWindow(const juce::String& name, juce::Component& content, std::function<void()> close, bool fullScreenButton=false)
+            : juce::DocumentWindow(name, Col::bg, juce::DocumentWindow::minimiseButton | juce::DocumentWindow::closeButton
+                                                  | (fullScreenButton ? juce::DocumentWindow::maximiseButton : 0), false),
               onClose(std::move(close))
         {
             barLook->install(*this);
             setContentNonOwned(&content, true);
             setResizable(true, false);
-            setResizeLimits(220, 140, 6000, 4000);
+            setResizeLimits(220, 140, 8000, 5000);
+            if(auto* b=getMaximiseButton()){ b->getProperties().set("fullScreen", true); b->setTooltip(TR("Plein écran")); }
         }
+        // plein écran : la fenêtre couvre tout l'écran où elle se trouve, barre
+        // comprise ; même bouton, double-clic sur la barre ou Échap pour revenir
+        void maximiseButtonPressed() override { setModuleFullScreen(! moduleFullScreen); }
+        bool keyPressed(const juce::KeyPress& k) override
+        {
+            if(moduleFullScreen && k==juce::KeyPress::escapeKey){ setModuleFullScreen(false); return true; }
+            return juce::DocumentWindow::keyPressed(k);
+        }
+        void setModuleFullScreen(bool on)
+        {
+            if(on==moduleFullScreen) return;
+            if(on){
+                restoreBounds=getBounds();
+                if(auto* d=juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds()))
+                    setBounds(d->logicalBounds.toNearestInt());
+            } else if(! restoreBounds.isEmpty())
+                setBounds(restoreBounds);
+            moduleFullScreen=on;
+            if(auto* b=getMaximiseButton()){
+                b->setToggleState(on, juce::dontSendNotification);
+                b->setTooltip(on ? TR("Quitter le plein écran") : TR("Plein écran"));
+            }
+        }
+        bool moduleFullScreen=false;
+        juce::Rectangle<int> restoreBounds;
         ~DetachedWindow() override { clearContentComponent(); setLookAndFeel(nullptr); }   // le module appartient à l'éditeur
         void closeButtonPressed() override { if(onClose) onClose(); }
         // écart entre le coin de la fenêtre et son contenu (barre Merlin, bord)

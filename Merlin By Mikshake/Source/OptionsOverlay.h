@@ -1168,6 +1168,7 @@ public:
         int plateTint = 1;                  // thème sombre : 0 gris, 1 ardoise
         int lightScreens = 1;               // thème clair : 1 écrans Papier, 0 écrans noirs
         int titleStyle = 1;                 // titres des modules : 0 sans, 1 filet, 2 bandeau
+        int logoColour = 0;                 // lettres du logo : 0 gris gravé, 1 vert de Sunny
         int corrStyle = 1;                  // corrélation des vectorscopes : 0 barre, 1 curseur, 2 gradué
         int oscStyle = 0;                   // 0 tube, 1 numérique, 2 vintage, 3 rempli
         bool oscSplit = false;              // L et R l'une au-dessus de l'autre
@@ -1265,6 +1266,7 @@ public:
         plateSeg.setSelected (juce::jlimit (0, 1, s.plateTint));
         screensSeg.setSelected (s.lightScreens != 0 ? 0 : 1);
         titleSeg.setSelected (juce::jlimit (0, 2, s.titleStyle));
+        logoSeg.setSelected (juce::jlimit (0, 1, s.logoColour));
         corrSeg.setSelected (juce::jlimit (0, 2, s.corrStyle));
         for (int i = 0; i < kNumUiScales; ++i)
             if (uiScaleValues[i] == s.uiScale) uiScaleSeg.setSelected (i);
@@ -1385,7 +1387,7 @@ public:
         g.drawText (TR ("Options"), brand.removeFromTop (brand.getHeight() * 0.5f + 1.0f), juce::Justification::bottomLeft, true);
         g.setColour (th.muted);
         g.setFont (OptionsUi::font (11.5f));
-        g.drawText (juce::String (juce::CharPointer_UTF8 ("Merlin \xce\xb1 ")) + ProjectInfo::versionString, brand, juce::Justification::topLeft, true);
+        g.drawText (juce::String (juce::CharPointer_UTF8 ("Merlin \xce\xb1 ")) + merlinVersionLabel(), brand, juce::Justification::topLeft, true);
 
         g.setColour (th.fg);
         g.setFont (OptionsUi::font (22.0f, 2));
@@ -1430,6 +1432,7 @@ public:
     std::function<void (int)>   onPlateTintSelected;     // thème sombre : 0 gris, 1 ardoise
     std::function<void (bool)>  onLightScreensSelected;  // thème clair : écrans Papier ou noirs
     std::function<void (int)>   onTitleStyleSelected;    // titres des modules : 0 sans, 1 filet, 2 bandeau
+    std::function<void (int)>   onLogoColourSelected;    // lettres du logo : 0 gris, 1 vert de Sunny
     std::function<void (int)>   onCorrStyleSelected;     // corrélation des vectorscopes : 0 barre, 1 curseur, 2 gradué
     std::function<void (bool)>  onOscPersistChanged;
     // Apparence
@@ -1438,6 +1441,7 @@ public:
     std::function<void()>       onColoursReset;
     // Presets / à propos
     std::function<void()>       onSavePreset, onOpenPresetFolder, onResetLayout, onOpenAbout, onOpenLicence;
+    std::function<void()>       onShowTour;   // visite guidée (v1.81.43)
     // pastille α de Merlin (ligne Version de « À propos »), dessinée par l'éditeur
     std::function<void (juce::Graphics&, juce::Rectangle<float>)> drawAppBadge;
     // Langue
@@ -1560,6 +1564,9 @@ private:
         titleSeg.setLabels ({ TR ("Sans"), TR ("Filet"), TR ("Bandeau") });
         p.addRow (Icon::theme, juce::Colour (0xff8e8e93), TR ("Titres des modules"), TR ("Ligne sous le titre"), &titleSeg, titleSeg.getIdealWidth());
         titleSeg.onChange = [this] (int i) { if (onTitleStyleSelected) onTitleStyleSelected (i); };
+        logoSeg.setLabels ({ TR ("Gris"), TR ("Vert") });
+        p.addRow (Icon::theme, juce::Colour (0xff8e8e93), TR ("Logo"), TR ("Lettres de MERLIN"), &logoSeg, logoSeg.getIdealWidth());
+        logoSeg.onChange = [this] (int i) { if (onLogoColourSelected) onLogoColourSelected (i); };
         corrSeg.setLabels ({ TR ("Barre"), TR ("Curseur"), TR ("Gradué") });
         p.addRow (Icon::theme, juce::Colour (0xff8e8e93), TR ("Corrélation des vectorscopes"), TR ("Sur le cerclage du cercle"), &corrSeg, corrSeg.getIdealWidth());
         corrSeg.onChange = [this] (int i) { if (onCorrStyleSelected) onCorrStyleSelected (i); };
@@ -1649,11 +1656,14 @@ private:
         aboutButton.setButtonText (TR ("À propos"));
         p.addGroup ({});
         const juce::String appName (juce::CharPointer_UTF8 ("Merlin \xce\xb1"));
-        p.addRow (Icon::info, juce::Colour (0xff8e8e93), appName, TR ("Version") + " " + ProjectInfo::versionString);
+        p.addRow (Icon::info, juce::Colour (0xff8e8e93), appName, TR ("Version") + " " + merlinVersionLabel());
         p.setRowPainter (appName, [this] (juce::Graphics& g, juce::Rectangle<float> r) { if (drawAppBadge) drawAppBadge (g, r); });
         p.addRow (Icon::key, juce::Colour (0xffffcc00), "Side Key System", "sidekeysystem.com", &aboutButton, 90);
         licenceButton.setButtonText (TR ("Gérer"));
         p.addRow (Icon::check, juce::Colour (0xff30d158), TR ("Licence"), {}, &licenceButton, 90);
+        tourButton.setButtonText (TR ("Revoir"));
+        p.addRow (Icon::info, juce::Colour (0xff0a84ff), TR ("Visite guidée"), TR ("Présentation des gestes utiles"), &tourButton, 90);
+        tourButton.onClick = [this] { if (onShowTour) onShowTour(); };
         aboutButton.onClick = [this] { if (onOpenAbout) onOpenAbout(); };
         licenceButton.onClick = [this] { if (onOpenLicence) onOpenLicence(); };
     }
@@ -1692,6 +1702,7 @@ private:
     OptionsUi::Segmented plateSeg { { "Gris", "Ardoise" } };
     OptionsUi::Segmented screensSeg { { "Clairs", "Noirs" } };
     OptionsUi::Segmented titleSeg { { "Sans", "Filet", "Bandeau" } };
+    OptionsUi::Segmented logoSeg { { "Gris", "Vert" } };
     OptionsUi::Segmented corrSeg { { "Barre", "Curseur", "Gradué" } };
     OptionsUi::Segmented masterSeg { { "Instrument", "Console" } };
     OptionsUi::Segmented oscStyleSeg { juce::StringArray { juce::String ("Tube"), TR ("Numérique"), juce::String ("Vintage"), juce::String ("Rempli") } };
@@ -1716,6 +1727,7 @@ private:
     // À propos
     OptionsUi::PillButton aboutButton { juce::CharPointer_UTF8 ("À propos") };
     OptionsUi::PillButton licenceButton { "Licence" };
+    OptionsUi::PillButton tourButton { "Tour" };
 
     OptionsUi::Page pages[kNumCategories];
     juce::OwnedArray<OptionsUi::CategoryItem> categoryItems;

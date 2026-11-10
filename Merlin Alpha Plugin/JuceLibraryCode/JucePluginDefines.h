@@ -17,7 +17,7 @@
  #define JucePlugin_Build_VST3             1
 #endif
 #ifndef  JucePlugin_Build_AU
- #define JucePlugin_Build_AU               1
+ #define JucePlugin_Build_AU               0
 #endif
 #ifndef  JucePlugin_Build_AUv3
  #define JucePlugin_Build_AUv3             0
@@ -77,13 +77,13 @@
  #define JucePlugin_EditorRequiresKeyboardFocus  0
 #endif
 #ifndef  JucePlugin_Version
- #define JucePlugin_Version                1.81.32
+ #define JucePlugin_Version                1.81.48
 #endif
 #ifndef  JucePlugin_VersionCode
- #define JucePlugin_VersionCode            0x15120
+ #define JucePlugin_VersionCode            0x15130
 #endif
 #ifndef  JucePlugin_VersionString
- #define JucePlugin_VersionString          "1.81.32"
+ #define JucePlugin_VersionString          "1.81.48"
 #endif
 #ifndef  JucePlugin_VSTUniqueID
  #define JucePlugin_VSTUniqueID            JucePlugin_PluginCode
@@ -158,7 +158,7 @@
  #define JucePlugin_ARAFactoryID           "com.SideKeySystem.MerlinAlphaPlugin.factory"
 #endif
 #ifndef  JucePlugin_ARADocumentArchiveID
- #define JucePlugin_ARADocumentArchiveID   "com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.81.32"
+ #define JucePlugin_ARADocumentArchiveID   "com.SideKeySystem.MerlinAlphaPlugin.aradocumentarchive.1.81.48"
 #endif
 #ifndef  JucePlugin_ARACompatibleArchiveIDs
  #define JucePlugin_ARACompatibleArchiveIDs  ""

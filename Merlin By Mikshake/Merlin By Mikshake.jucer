@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="MrlnBM" name="Merlin Alpha" projectType="guiapp" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="Side Key System"
-              companyEmail="https://sidekey.fr" version="1.81.32" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
+              companyEmail="https://sidekey.fr" version="1.81.48" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
               displaySplashScreen="0">
   <MAINGROUP id="MbmGrp" name="Merlin Alpha">
     <GROUP id="{6B1F2C7A-3D4E-4F50-9A61-7C8D9E0F1A2B}" name="Source">
@@ -40,6 +40,9 @@
             file="Source/GpuSpectrogram.h"/>
       <FILE id="MbGSfC" name="GpuSurface.cpp" compile="1" resource="0" file="Source/GpuSurface.cpp"/>
       <FILE id="MbGSfH" name="GpuSurface.h" compile="0" resource="0" file="Source/GpuSurface.h"/>
+      <FILE id="MbGFxC" name="GpuSpectroFx.cpp" compile="1" resource="0" file="Source/GpuSpectroFx.cpp"/>
+      <FILE id="MbGFxH" name="GpuSpectroFx.h" compile="0" resource="0" file="Source/GpuSpectroFx.h"/>
+      <FILE id="MbTouH" name="TourOverlay.h" compile="0" resource="0" file="Source/TourOverlay.h"/>
       <FILE id="MbGpuMC" name="GpuModule.cpp" compile="1" resource="0" file="Source/GpuModule.cpp"/>
       <FILE id="MbGpuMH" name="GpuModule.h" compile="0" resource="0" file="Source/GpuModule.h"/>
       <FILE id="MbDotC" name="GpuDotSpectrum.cpp" compile="1" resource="0"

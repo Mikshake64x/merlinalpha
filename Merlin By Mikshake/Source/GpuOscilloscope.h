@@ -74,6 +74,7 @@ private:
     public:
         ScopeButton(const juce::String& name, juce::uint32 c) : juce::Button(name), colour(c) { setMouseClickGrabsKeyboardFocus(false); }
         void paintButton(juce::Graphics&, bool over, bool down) override;
+        void setColour(juce::Colour c) { if(c!=colour){ colour=c; repaint(); } }
     private:
         juce::Colour colour;
     };
@@ -83,8 +84,12 @@ private:
     ScopeButton precisionBtn { "PRECISION", 0xFFB48CFF };   // fenêtres courtes : calage sur la fondamentale plutôt que sur la forme
     // barre du bas, à côté de TIME : la capture
     ScopeButton captureBtn { "CAPTURE", 0xFFFF5A52 };    // garde le prochain coup à l'écran
-    ScopeButton superposeBtn { "SUPERPOSE", kRefColour };   // la mesure gardée reste en référence sous les coups suivants
-    ScopeButton chip1 { "1", kRefColour }, chip2 { "2", 0xFF8FF6FF };   // captures affichées, légende des couleurs
+    ScopeButton superposeBtn { "SUPERPOSE", kRefColour };   // garde le coup affiché et en attend un autre (4 au plus)
+    // captures superposées (v1.81.35 : 4 au lieu de 2), de la plus vieille (1, à
+    // gauche) à la plus récente ; légende des couleurs, un clic montre / cache
+    static constexpr int kMaxShots = 4;
+    ScopeButton chips[kMaxShots] { { "1", kRefColour }, { "2", 0xFF8FF6FF }, { "3", 0xFF8FF6FF }, { "4", 0xFF8FF6FF } };
+    static juce::Colour shotColour(int i, int count);   // couleur de la capture i parmi count
     ScopeButton resetChip { "RESET", 0xFFB8C4CC };       // efface les captures, retour au direct
     std::unique_ptr<ReleaseFader> ampFader, timeFader;
     int topDividerX { 0 };
@@ -102,7 +107,9 @@ private:
     enum { kCapLive, kCapArmed, kCapHeld };          // direct, attente du coup, coup gardé
     std::atomic<int>   captureA { kCapLive };        // le thread GL passe d'attente à gardé
     std::atomic<bool>  superposeA { false }, capValidA { false };   // capValidA : un coup est dans capL/capR
-    std::atomic<bool>  refReadyA { false }, showFirstA { true }, showLastA { true };   // référence prête, captures affichées
+    std::atomic<int>   refCountA { 0 };              // captures gardées sous le dernier coup (0..kMaxShots-1)
+    std::atomic<int>   showMaskA { 0xF };            // bit i : capture i+1 affichée
+    std::atomic<bool>  pushRefA { false };           // SUPERPOSE : le coup gardé rejoint les captures (thread GL)
     static constexpr int kMinView = 32;              // zoom maximal, en échantillons
     std::atomic<int>   viewStartA { 0 }, viewLenA { 0 };   // portion du coup affichée, viewLenA 0 = fenêtre entière
     int  dragStartView { 0 };
@@ -145,13 +152,16 @@ private:
     static constexpr int kCapLen = kMaxWindow;
     bool watchForHit(int fetch, juce::uint64 endAbs, int n, double sr);
     void readHit(juce::uint64 start, std::vector<float>& l, std::vector<float>& r, bool& pending);
-    std::vector<float> capL, capR, refL, refR;
-    juce::uint64 capSeen { 0 }, capHit { 0 }, capStart { 0 }, refStart { 0 };
+    std::vector<float> capL, capR;
+    juce::uint64 capSeen { 0 }, capHit { 0 }, capStart { 0 };
+    // SUPERPOSE : coups gardés sous le dernier, du plus vieux au plus récent
+    struct HeldShot { std::vector<float> l, r; juce::uint64 start { 0 }; bool pending { false }; };
+    HeldShot refs[kMaxShots-1];
+    int refCount { 0 };
     float capFloor { 0.f };      // niveau de fond
     bool  capWatching { false }, capFresh { false };
     bool  capPending { false };  // gardé dès que la fenêtre affichée est pleine, le reste arrive ensuite
-    bool  refValid { false }, refPending { false };
-    int   heldStart { 0 };       // début de la portion affichée, dans capL et refL
+    int   heldStart { 0 };       // début de la portion affichée, dans capL et les coups gardés
 
     // mesures (style numérique), affichées par le calque
     std::atomic<float> measVpp { 0.f }, measHz { 0.f };

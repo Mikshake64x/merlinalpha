@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "AppMode.h"
+#include <map>
 #include <atomic>
 #include <cstdint>
 
@@ -50,11 +51,19 @@ public:
         VectorscopeDensity   = 23,
         PanoramaLed          = 24,
         // même rendu que le Spectrogram 3D Surface, tracé par la carte graphique
-        GpuSpectroSurface    = 25
+        GpuSpectroSurface    = 25,
+        // spectrogrammes d'ambiance GPU (v1.81.37, GpuSpectroFx)
+        GpuSpectroBars       = 26,
+        GpuSpectroLed        = 27,
+        GpuSpectroRibbons    = 28,
+        GpuSpectroMatrix     = 29,
+        GpuSpectroSplash     = 30
     };
     static constexpr int NUM_SLOTS = 6;
     // Assignation par défaut : Vectorscope, Multiband Corr, VU à aiguille, Loudness, Spectrum, VuMeter
-    int slotModule[NUM_SLOTS] { 1, 7, 12, 4, 6, 5 };
+    // disposition d'ouverture (v1.81.45, capture du user) : Needle VU, Multiband
+    // Correlator, Oscilloscope, Loudness, Spectrogram GPU Crystal, VU master
+    int slotModule[NUM_SLOTS] { 12, 7, 2, 4, 18, 5 };
 
     // Taille des ring-buffers oscilloscope / vectorscope
     // anneau de l'oscilloscope : 16384 échantillons (170 ms à 96 kHz, de quoi
@@ -127,6 +136,7 @@ public:
     int  plateTint    { 1 };       // thème sombre : 0 gris d'origine, 1 ardoise (design de Sunny, v1.73)
     int  lightScreens { 1 };       // thème clair : 1 écrans des modules « Papier » (v1.75), 0 écrans noirs
     int  titleStyle   { 1 };       // titres des modules (à l'essai) : 0 sans, 1 filet d'accent, 2 bandeau
+    int  logoColour   { 0 };       // lettres du logo de Sunny (à l'essai) : 0 gris gravé, 1 vert de Sunny
     int  corrStyle    { 1 };       // corrélation des vectorscopes (à l'essai) : 0 barre, 1 curseur sur le cerclage, 2 cerclage gradué
     bool masterConsole{ false };   // section master : false = A "Instrument", true = C "Console mastering"
 
@@ -145,12 +155,16 @@ public:
     // Spectrogram Surface GPU : mêmes réglages que le 3D Surface, gardés à part
     bool  gpuSurfaceReverse { false };
     float gpuSurfaceTilt { 0.3f }, gpuSurfaceSkew { 0.f }, gpuSurfaceTimeSec { 2.1f };
-    float gpuTerrainTimeSec { 2.1f }, gpuNeonTimeSec { 2.1f }, gpuCrystalTimeSec { 2.1f };
+    float gpuTerrainTimeSec { 2.1f }, gpuNeonTimeSec { 2.1f }, gpuCrystalTimeSec { 9.2f };
     // vue 3D des spectrogrammes GPU (orbite souris), mémorisée
     float gpuTerrainYaw { 0.f }, gpuTerrainPitch { 1.018f };
     float gpuNeonYaw    { 0.f }, gpuNeonPitch    { 1.018f };
     float gpuCrystalYaw { 0.f }, gpuCrystalPitch { 1.018f };
-    float gpuTerrainZoom { 0.f }, gpuNeonZoom { 0.f }, gpuCrystalZoom { 0.f };   // zoom molette, -0,25..0,25
+    float gpuTerrainZoom { 0.f }, gpuNeonZoom { 0.f }, gpuCrystalZoom { 0.f };
+    // spectrogrammes d'ambiance (GpuSpectroFx : 0 Bars, 1 LED, 2 Ribbons, 3 Matrix, 4 Splash) :
+    // TIME (s), vue (écarts de rotation / inclinaison à la vue d'origine), zoom molette
+    float fxTimeSec[5] { 1.f, 1.f, 1.5f, 2.f, 2.f };
+    float fxYaw[5] {}, fxPitch[5] {}, fxZoom[5] {};   // zoom molette, -0,25..0,25
 
     // ── Presets utilisateur (menu PRESET) ───────────────────────────────────
     static juce::File getPresetFolder();   // %APPDATA%\Side Key System\Merlin Alpha Presets
@@ -280,7 +294,40 @@ public:
     float getPSDBinFreq (int bin) const { return (float)bin*(float)currentSampleRate/(float)PSD_FFT_SIZE; }
 
 
+    // bouton marche/arrêt de l'en-tête (v1.81.35) : false = plus aucun calcul,
+    // le son passe tel quel (libère le processeur). Pas mémorisé : marche au lancement.
+    std::atomic<bool> measuring { true };
+    // visite guidée (v1.81.43) : modules placés le temps d'une étape ; la
+    // sauvegarde garde la disposition du user (fermeture ou projet enregistré
+    // pendant le tour)
+    std::atomic<bool> tourLayoutActive { false };
+    // États gardés quand la fenêtre du plugin se ferme et se rouvre (v1.81.46) :
+    // HOLD de chaque module (par ModuleID) avec son image figée, valeur retenue
+    // du Needle VU, PRÉCISION de l'oscilloscope. En mémoire seulement (pas dans
+    // les presets) : une nouvelle session démarre en direct. Thread de messages.
+    struct ModuleSnapshot { bool hold { false }; int head { 0 }, rowCount { 0 }, count2 { 0 };
+                            float frac { 0.f }, value { 0.f }; std::vector<float> rows, rows2; };
+    std::map<int, ModuleSnapshot> moduleSnapshots;
+    const ModuleSnapshot* heldSnapshot(int id) const
+    { const auto it=moduleSnapshots.find(id); return it!=moduleSnapshots.end() && it->second.hold ? &it->second : nullptr; }
+    bool oscPrecision { false };
+    // Écoute d'une bande (v1.81.44, repris de Merlin MTR) : clic maintenu sur le
+    // Spectrum, le Multiband Correlator ou le Panorama = la bande seule en sortie ;
+    // Ctrl+clic / Ctrl+glisser = plusieurs bandes. Plugin seulement (l'appli n'a
+    // pas de sortie : elle écoute la carte son).
+    void setAuditionBand (int b)          { auditionMask.store(bandBit(b), std::memory_order_relaxed); }
+    void setAuditionBands(uint64_t mask)  { auditionMask.store(mask, std::memory_order_relaxed); }
+    int tourLayoutSaved[5] {};
 private:
+    // ── Écoute (plugin) : un filtre passe-bande d'état variable par bande ──
+    std::atomic<uint64_t> auditionMask { 0 };
+    struct AuditionBandState {
+        float a1=0,a2=0,a3=0,g=0,makeup=1.f;
+        float ic1L=0,ic2L=0,ic1R=0,ic2R=0;
+        bool  designed=false;
+    };
+    AuditionBandState auditionStates[N_BANDS];
+    int   auditionStatesConfigBands { -1 };   // bandes utilisées au dernier calcul des filtres
     // ── Filtres spectre (copie exacte Keystone) ───────────────────────────
     struct BandFilter {
         float x1=0,x2=0,y1=0,y2=0;

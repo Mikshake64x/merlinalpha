@@ -333,6 +333,13 @@ static float snapYaw(float y, float tolRad)
 }
 static constexpr float kSnapAtLoad=juce::degreesToRadians(5.f), kSnapDrag=juce::degreesToRadians(2.5f);
 
+// identifiant du module (mémoire du HOLD dans le processeur)
+static int snapshotIdFor(GpuSpectrogramDisplay::Style s)
+{
+    using M=LeakAudioProcessor::ModuleID;
+    return (int)(s==GpuSpectrogramDisplay::Style::Terrain ? M::GpuSpectroTerrain : s==GpuSpectrogramDisplay::Style::Neon ? M::GpuSpectroNeon : M::GpuSpectroCrystal);
+}
+
 GpuSpectrogramDisplay::GpuSpectrogramDisplay(LeakAudioProcessor& p, Style s)
     : GpuModuleBase(p), style(s)
 {
@@ -351,11 +358,23 @@ GpuSpectrogramDisplay::GpuSpectrogramDisplay(LeakAudioProcessor& p, Style s)
     lastCaptureMs=juce::Time::getMillisecondCounterHiRes();
     logMap.setExtendedAxis(true);   // axe jusqu'à Nyquist au-delà de 48 kHz
     syncFromProcessor();            // vue mémorisée (ramenée pile sur une vue droite si elle en est tout près)
+    // fenêtre du plugin rouverte : HOLD et image figée retrouvés (v1.81.46)
+    if(auto* sn=processor.heldSnapshot(snapshotIdFor(style)); sn!=nullptr && sn->rows.size()==(size_t)(NZ*NX)){
+        std::copy(sn->rows.begin(), sn->rows.end(), &rows[0][0]);
+        head=sn->head; heldFrac=sn->frac;
+        frozen=true;
+        holdBtn->setToggleState(true, juce::dontSendNotification);
+    }
 }
 
 GpuSpectrogramDisplay::~GpuSpectrogramDisplay()
 {
     detachGL();
+    // fenêtre du plugin fermée : HOLD et image figée gardés pour la réouverture
+    auto& sn=processor.moduleSnapshots[snapshotIdFor(style)];
+    sn.hold=frozen.load();
+    if(sn.hold){ sn.rows.assign(&rows[0][0], &rows[0][0]+NZ*NX); sn.head=head; sn.frac=heldFrac; }
+    else sn.rows.clear();
 }
 
 void GpuSpectrogramDisplay::syncFromProcessor()

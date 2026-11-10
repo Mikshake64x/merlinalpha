@@ -4,12 +4,18 @@
 #include "Lang.h"
 #include "OptionsOverlay.h"   // OptionsUi : thème et police des Options
 #include "LicenseManager.h"
+#include "DiscordLogo.h"
 
 //==============================================================================
 // Écran de licence de Merlin α (aperçu validé : preview/merlin_licence_preview.html).
 // Feuille au style des Options posée sur un voile. Tant que Merlin n'est ni
 // activé ni en démo, elle ne se ferme pas ; sinon Échap / OK la referme.
 // Le logotype (MERLIN + pastille α) est dessiné par l'éditeur via drawBrand.
+//
+// Programme bêta (v1.81.34, même système que Sevenpack Alpha) : le bouton
+// « Rejoindre le programme bêta » ouvre une vue à part, sans champ de clé :
+// conditions du programme, prénom / nom / email (obligatoire), Retour |
+// Rejoindre la bêta, lien Discord. Voir LicenseManager::joinBeta().
 //==============================================================================
 class LicenseOverlay : public juce::Component,
                        private juce::ChangeListener
@@ -29,19 +35,26 @@ public:
             e->setJustification (juce::Justification::centredLeft);
             e->setIndents (0, 0);
             e->setBorder ({});
-            e->onReturnKey = [this] { activate(); };
+            e->onReturnKey = [this] { submit(); };
         }
         keyEdit.setInputRestrictions (64);
+        emailEdit.onTextChange = [this] { if (betaEmailMissing) { betaEmailMissing = false; repaint(); } };
 
-        for (auto* b : { &buyButton, &demoButton, &activateButton, &okButton, &deactivateButton })
+        for (auto* b : std::initializer_list<juce::Button*> { &buyButton, &demoButton, &activateButton, &okButton,
+                                                              &deactivateButton, &betaButton, &joinButton, &backButton,
+                                                              &discordButton })
         {
             addAndMakeVisible (*b);
             b->setMouseCursor (juce::MouseCursor::PointingHandCursor);
         }
         buyButton.onClick      = [] { juce::URL (buyUrl).launchInDefaultBrowser(); };
-        demoButton.onClick     = [this] { manager.startDemo(); };
+        demoButton.onClick     = [this] { manager.clearBetaJoinError(); manager.startDemo(); };
         activateButton.onClick = [this] { activate(); };
         okButton.onClick       = [this] { dismiss(); };
+        betaButton.onClick     = [this] { setBetaMode (true); };
+        joinButton.onClick     = [this] { joinBeta(); };
+        backButton.onClick     = [this] { setBetaMode (false); };
+        discordButton.onClick  = [] { juce::URL (discordUrl).launchInDefaultBrowser(); };
         // deux temps : le premier clic demande confirmation
         deactivateButton.onClick = [this]
         {
@@ -74,6 +87,8 @@ public:
     void refresh()
     {
         laf.refresh();
+        if (! canJoinBeta())
+            betaMode = false;   // inscription réussie (licence bêta) ou plus proposable
         const auto th = OptionsUi::Theme::current();
         for (auto* e : { &keyEdit, &firstEdit, &lastEdit, &emailEdit })
         {
@@ -84,7 +99,8 @@ public:
             e->setColour (juce::TextEditor::highlightColourId, th.accent.withAlpha (0.35f));
             e->setColour (juce::CaretComponent::caretColourId, th.accent);
             e->setFont (OptionsUi::font (13.0f));
-            e->setTextToShowWhenEmpty (e == &keyEdit ? juce::String ("XXXX-XXXX-XXXX-XXXX") : TR ("facultatif"), th.muted);
+            e->setTextToShowWhenEmpty (e == &keyEdit ? juce::String ("XXXX-XXXX-XXXX-XXXX")
+                                       : (betaMode && e == &emailEdit) ? TR ("obligatoire") : TR ("facultatif"), th.muted);
         }
         buyButton.setButtonText (TR ("Acheter une licence"));
         demoButton.setButtonText (TR ("Essayer 15 jours"));
@@ -102,12 +118,23 @@ public:
         deactivateButton.setEnabled (! manager.isDeactivating());
         deactivateButton.setVisible (licensed);
 
-        for (auto* e : { &keyEdit, &firstEdit, &lastEdit, &emailEdit })
+        keyEdit.setVisible (! licensed && ! betaMode);
+        for (auto* e : { &firstEdit, &lastEdit, &emailEdit })
             e->setVisible (! licensed);
-        buyButton.setVisible (! licensed);
-        activateButton.setVisible (! licensed);
-        demoButton.setVisible (! licensed && manager.canStartDemo());
-        okButton.setVisible (licensed || manager.isUsable());
+        buyButton.setVisible (! licensed && ! betaMode);
+        activateButton.setVisible (! licensed && ! betaMode);
+        demoButton.setVisible (! licensed && ! betaMode && manager.canStartDemo() && s != LicenseManager::Status::betaExpired);
+        okButton.setVisible (! betaMode && (licensed || manager.isUsable()));
+
+        // programme bêta : proposé tant qu'il n'y a pas de licence (démo comprise)
+        betaButton.setButtonText (TR ("Rejoindre le programme bêta"));
+        betaButton.setVisible (! betaMode && canJoinBeta());
+        joinButton.setButtonText (TR ("Rejoindre la bêta"));
+        joinButton.setEnabled (! manager.isJoiningBeta());
+        backButton.setButtonText (TR ("Retour"));
+        discordButton.setButtonText (TR ("Discord de la bêta"));
+        for (auto* b : std::initializer_list<juce::Button*> { &joinButton, &backButton, &discordButton })
+            b->setVisible (betaMode);
 
         resized();
         repaint();
@@ -129,15 +156,40 @@ public:
 
         g.setColour (licensed ? juce::Colour (0xff30d158) : th.fg);
         g.setFont (OptionsUi::font (15.0f, 1));
-        g.drawText (title(), titleArea, juce::Justification::centredLeft, true);
-        g.setColour (th.muted);
-        g.setFont (OptionsUi::font (12.0f));
-        g.drawFittedText (subtitle(), textArea.toNearestInt(), juce::Justification::topLeft, 3, 1.0f);
+        g.drawText (betaMode ? TR ("Rejoindre le programme bêta") : title(), titleArea, juce::Justification::centredLeft, true);
+        if (betaMode)
+        {
+            // conditions du programme bêta (mêmes termes que Sevenpack Alpha)
+            auto t = textArea;
+            const std::pair<juce::String, bool> paras[] = {
+                { TR ("Accès gratuit jusqu'à la fin de la bêta, sans clé de licence."), true },
+                { TR ("Le programme bêta ne donne pas droit à une licence de la version commerciale. "
+                      "Side Key System se réserve le droit de modifier la durée du programme bêta."), false } };
+            for (auto& [text, strong] : paras)
+            {
+                juce::AttributedString as;
+                as.setText (text);
+                as.setFont (OptionsUi::font (12.0f, strong ? 1 : 0));
+                as.setColour (strong ? th.fg : th.muted);
+                as.setJustification (juce::Justification::topLeft);
+                juce::TextLayout tl;
+                tl.createLayout (as, t.getWidth());
+                tl.draw (g, t.removeFromTop (tl.getHeight()));
+                t.removeFromTop (6.0f);
+            }
+        }
+        else
+        {
+            g.setColour (th.muted);
+            g.setFont (OptionsUi::font (12.0f));
+            g.drawFittedText (subtitle(), textArea.toNearestInt(), juce::Justification::topLeft, 3, 1.0f);
+        }
 
         // groupe de lignes (champs, ou clé + ordinateur)
         g.setColour (th.group);
         g.fillRoundedRectangle (groupArea, 10.0f);
         const auto labels = licensed ? juce::StringArray { TR ("Clé"), TR ("Ordinateur") }
+                          : betaMode ? juce::StringArray { TR ("Prénom"), TR ("Nom de famille"), TR ("Email") }
                                      : juce::StringArray { TR ("Clé de licence"), TR ("Prénom"), TR ("Nom de famille"), TR ("Email") };
         for (int i = 0; i < labels.size(); ++i)
         {
@@ -159,12 +211,26 @@ public:
                         juce::Justification::centredLeft, true);
         }
 
-        const auto err = errorText();
-        if (err.isNotEmpty())
+        if (betaMode)
         {
-            g.setColour (juce::Colour (0xffff6961));
-            g.setFont (OptionsUi::font (12.0f));
-            g.drawText (err, errorArea, juce::Justification::centredLeft, true);
+            // inscription en cours (gris) ou erreur (rouge)
+            const auto [msg, isError] = betaMessage();
+            if (msg.isNotEmpty())
+            {
+                g.setColour (isError ? juce::Colour (0xffff6961) : th.muted);
+                g.setFont (OptionsUi::font (12.0f));
+                g.drawFittedText (msg, errorArea.toNearestInt(), juce::Justification::centredLeft, 1, 0.85f);
+            }
+        }
+        else
+        {
+            const auto err = errorText();
+            if (err.isNotEmpty())
+            {
+                g.setColour (juce::Colour (0xffff6961));
+                g.setFont (OptionsUi::font (12.0f));
+                g.drawText (err, errorArea, juce::Justification::centredLeft, true);
+            }
         }
     }
 
@@ -172,25 +238,33 @@ public:
     {
         const auto b = getLocalBounds().toFloat();
         const float w = juce::jmin (460.0f, b.getWidth() - 40.0f);
-        const int rows = licensed ? 2 : 4;
-        const float h = 22.0f + 30.0f + 26.0f + 40.0f + rows * rowH + 12.0f + 22.0f + 34.0f + 18.0f;
+        const int rows = licensed ? 2 : betaMode ? 3 : 4;
+        const float textH = betaMode ? 84.0f : 40.0f;                       // conditions du programme bêta
+        const bool betaRow = ! betaMode && betaButton.isVisible();           // ligne « Rejoindre le programme bêta »
+        const float h = 22.0f + 30.0f + 26.0f + textH + rows * rowH + 12.0f + 22.0f + 34.0f + 18.0f + (betaRow ? 38.0f : 0.0f);
         sheet = b.withSizeKeepingCentre (w, h);
 
         auto r = sheet.reduced (22.0f, 18.0f);
         brandArea = r.removeFromTop (30.0f);
         r.removeFromTop (4.0f);
         titleArea = r.removeFromTop (22.0f);
-        textArea  = r.removeFromTop (40.0f);
+        textArea  = r.removeFromTop (textH);
         groupArea = r.removeFromTop (rows * rowH);
         r.removeFromTop (4.0f);
         errorArea = r.removeFromTop (22.0f);
         r.removeFromTop (8.0f);
         auto buttons = r.removeFromTop (32.0f);
+        if (betaRow)
+        {
+            r.removeFromTop (8.0f);
+            betaButton.setBounds (r.removeFromTop (30.0f).toNearestInt());
+        }
 
         if (! licensed)
         {
-            juce::TextEditor* eds[] = { &keyEdit, &firstEdit, &lastEdit, &emailEdit };
-            for (int i = 0; i < 4; ++i)
+            juce::TextEditor* all[] = { &keyEdit, &firstEdit, &lastEdit, &emailEdit };
+            juce::TextEditor* const* eds = betaMode ? all + 1 : all;   // vue bêta : pas de champ de clé
+            for (int i = 0; i < rows; ++i)
                 eds[i]->setBounds (rowArea (i).withTrimmedLeft (12.0f + labelW).withTrimmedRight (10.0f)
                                               .withSizeKeepingCentre (rowArea (i).getWidth() - 22.0f - labelW, 22.0f).toNearestInt());
         }
@@ -202,14 +276,18 @@ public:
             buttons.removeFromRight (8.0f);
         };
         place (okButton, 70.0f);
+        place (joinButton, 150.0f);
+        place (backButton, 84.0f);
         place (activateButton, 96.0f);
         place (demoButton, 128.0f);
         buyButton.setBounds (buttons.withWidth (juce::jmin (buttons.getWidth(), 150.0f)).toNearestInt());
         deactivateButton.setBounds (buttons.withWidth (juce::jmin (buttons.getWidth(), 220.0f)).toNearestInt());
+        discordButton.setBounds (buttons.withWidth (juce::jmin (buttons.getWidth(), discordButton.idealWidth())).toNearestInt());
     }
 
     bool keyPressed (const juce::KeyPress& k) override
     {
+        if (k == juce::KeyPress::escapeKey && betaMode) { setBetaMode (false); return true; }
         if (k == juce::KeyPress::escapeKey && ! isBlocking()) { dismiss(); return true; }
         return false;
     }
@@ -244,12 +322,46 @@ private:
         Kind kind;
     };
 
+    static constexpr const char* discordUrl = "https://discord.gg/pHHWfqdEE";   // même serveur que Sevenpack Alpha
+
+    // Lien Discord du programme bêta : logo officiel + texte en couleur de lien
+    struct DiscordButton : public juce::Button
+    {
+        DiscordButton() : juce::Button ("Discord")
+        {
+            setTooltip (discordUrl);
+            logo = juce::ImageCache::getFromMemory (DiscordLogo::png, DiscordLogo::pngSize);
+        }
+        float idealWidth() const
+        {
+            return 22.0f + 8.0f + juce::GlyphArrangement::getStringWidth (OptionsUi::font (12.5f), getButtonText()) + 4.0f;
+        }
+        void paintButton (juce::Graphics& g, bool over, bool down) override
+        {
+            const auto th = OptionsUi::Theme::current();
+            auto r = getLocalBounds().toFloat();
+            g.setOpacity (down ? 0.8f : 1.0f);
+            g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);   // 256 px -> 22 px, net
+            g.drawImage (logo, r.removeFromLeft (22.0f).withSizeKeepingCentre (22.0f, 22.0f), juce::RectanglePlacement::centred);
+            g.setOpacity (1.0f);
+            r.removeFromLeft (8.0f);
+            g.setColour (over ? juce::Colour (0xff5865f2) : th.accent);
+            g.setFont (OptionsUi::font (12.5f));
+            g.drawFittedText (getButtonText(), r.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+        }
+        juce::Image logo;
+    };
+
     LicenseManager& manager;
     OptionsUi::LookAndFeel laf;
     juce::TextEditor keyEdit, firstEdit, lastEdit, emailEdit;
     SheetButton buyButton { SheetButton::link }, demoButton { SheetButton::secondary },
                 activateButton { SheetButton::primary }, okButton { SheetButton::primary },
-                deactivateButton { SheetButton::secondary };
+                deactivateButton { SheetButton::secondary }, betaButton { SheetButton::secondary },
+                joinButton { SheetButton::primary }, backButton { SheetButton::secondary };
+    DiscordButton discordButton;
+    bool betaMode = false;           // vue « Rejoindre le programme bêta »
+    bool betaEmailMissing = false;   // « Rejoindre la bêta » sans email valide
     bool confirmDeactivate = false;
     juce::Rectangle<float> sheet, brandArea, titleArea, textArea, groupArea, errorArea;
     bool licensed = false;
@@ -262,6 +374,55 @@ private:
         if (keyEdit.getText().trim().isEmpty()) { keyEdit.grabKeyboardFocus(); return; }
         showError = true;
         manager.activate (keyEdit.getText(), firstEdit.getText(), lastEdit.getText(), emailEdit.getText());
+    }
+
+    void submit() { if (betaMode) joinBeta(); else activate(); }
+
+    // Programme bêta : proposé tant qu'il n'y a pas de licence (démo comprise)
+    bool canJoinBeta() const
+    {
+        using S = LicenseManager::Status;
+        const auto s = manager.getStatus();
+        return s == S::unlicensed || s == S::invalid || s == S::trial || s == S::trialExpired;
+    }
+
+    void setBetaMode (bool on)
+    {
+        betaMode = on;
+        betaEmailMissing = false;
+        manager.clearBetaJoinError();
+        refresh();
+        repaint();
+        if (betaMode && firstEdit.isShowing())       firstEdit.grabKeyboardFocus();
+        else if (! betaMode && keyEdit.isShowing())  keyEdit.grabKeyboardFocus();
+    }
+
+    void joinBeta()
+    {
+        const auto email = emailEdit.getText().trim();
+        if (email.isEmpty() || ! email.containsChar ('@'))
+        {
+            betaEmailMissing = true;
+            emailEdit.grabKeyboardFocus();
+            repaint();
+            return;
+        }
+        betaEmailMissing = false;
+        manager.joinBeta (firstEdit.getText(), lastEdit.getText(), email);
+    }
+
+    // Ligne sous les champs de la vue bêta : { texte, erreur ? }
+    std::pair<juce::String, bool> betaMessage() const
+    {
+        if (manager.isJoiningBeta()) return { TR ("Inscription au programme bêta…"), false };
+        if (betaEmailMissing)        return { TR ("Entrez votre email pour rejoindre la bêta."), true };
+        const auto e = manager.getBetaJoinError();
+        if (e.isEmpty())                          return {};
+        if (e == "beta_closed" || e == "expired") return { TR ("Le programme bêta est terminé."), true };
+        if (e == "revoked")                       return { TR ("Votre accès à la bêta a été révoqué."), true };
+        if (e == "no_beta_program")               return { TR ("Aucun programme bêta n'est ouvert pour Merlin α."), true };
+        if (e == "network_error")                 return { TR ("Impossible de joindre le serveur. Vérifiez votre connexion internet."), true };
+        return { TR ("Inscription impossible pour le moment. Réessayez plus tard."), true };
     }
 
     void dismiss()
@@ -288,19 +449,27 @@ private:
         {
             case S::licensed:     return TR ("Licence activée");
             case S::trialExpired: return TR ("Votre démo de 15 jours est terminée");
+            case S::betaExpired:  return TR ("La bêta de Merlin α est terminée");
             case S::revoked:      return TR ("Licence révoquée");
             default:              return TR ("Activer Merlin α");
         }
     }
+
+    // fin de bêta en heure locale, chiffres seuls (lisible dans toutes les langues)
+    juce::String betaEndText() const { return manager.getBetaEnd().formatted ("%Y-%m-%d %H:%M"); }
 
     juce::String subtitle() const
     {
         using S = LicenseManager::Status;
         switch (manager.getStatus())
         {
-            case S::licensed:     return TR ("Merlin α est activé sur cet ordinateur et fonctionne hors ligne. "
+            case S::licensed:     return manager.isBetaKey()
+                                       ? TR ("Clé bêta : Merlin α fonctionne sur cet ordinateur jusqu'au {0}, même hors ligne.")
+                                             .replace ("{0}", betaEndText())
+                                       : TR ("Merlin α est activé sur cet ordinateur et fonctionne hors ligne. "
                                              "Pour le passer sur un autre ordinateur, désactivez-le ici.");
             case S::trialExpired: return TR ("Merci d'avoir essayé Merlin α. Entrez votre clé de licence pour continuer à l'utiliser.");
+            case S::betaExpired:  return TR ("Merci d'avoir testé Merlin α. Entrez une clé de licence pour continuer à l'utiliser.");
             case S::revoked:      return TR ("Cette licence a été révoquée. Contactez Side Key System ou entrez une autre clé.");
             case S::trial:        return TR ("Démo : {0} jours restants. Entrez votre clé de licence pour activer Merlin α.")
                                         .replace ("{0}", juce::String (manager.getTrialDaysLeft()));
@@ -320,6 +489,7 @@ private:
             return TR ("Connexion internet nécessaire pour désactiver Merlin α.");
         if (e == "invalid_license" || e == "wrong_product") return TR ("Cette clé n'est pas valide pour Merlin α.");
         if (e == "revoked")                                return TR ("Cette licence a été révoquée.");
+        if (e == "expired")                                return TR ("Cette clé bêta a expiré.");
         if (e == "machine_limit_reached")                  return TR ("Cette licence est déjà activée sur {0} ordinateurs. Désactivez-la sur l'un d'eux.")
                                                                       .replace ("{0}", juce::String (manager.getMaxMachines()));
         if (e == "network_error")                          return TR ("Impossible de joindre le serveur. Vérifiez votre connexion internet.");

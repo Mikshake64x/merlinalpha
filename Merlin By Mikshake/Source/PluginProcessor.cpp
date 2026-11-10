@@ -100,6 +100,8 @@ void LeakAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     juce::ignoreUnused(samplesPerBlock);
     currentSampleRate = sampleRate;
     setNumActiveBands(bandMode);   // bandes jusqu'à la moitié de la nouvelle fréquence (+ filtres)
+    auditionStatesConfigBands=-1;  // écoute : filtres à refaire pour la nouvelle fréquence d'échantillonnage
+    for(auto& st : auditionStates) st.designed=false;
     rmsCoeff    = 1.f - std::exp(-1.f / (0.3f*(float)sampleRate));
     holdRelease = std::exp(-1.f        / (0.8f*(float)sampleRate));
 
@@ -281,6 +283,7 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     // ralentit alors radicalement (jusqu'à 100x sur certains x86) tant que ces
     // valeurs restent coincées entre le plancher normal et zéro exact.
     juce::ScopedNoDenormals noDenormals;
+    if(! measuring.load(std::memory_order_relaxed)) return;   // mesures arrêtées (bouton de l'en-tête)
     const int numSamples  = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
     const float* L = buffer.getReadPointer(0);
@@ -410,6 +413,64 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
             computePSDFrame();
         }
     }
+
+    // ── Écoute d'une bande (plugin seulement, comme Merlin MTR) ───────────
+    // placée après les mesures : elles lisent toujours le signal d'origine
+    const uint64_t aMask = AppMode::isPlugin ? auditionMask.load(std::memory_order_relaxed) : 0ULL;
+    if(aMask != 0ULL)
+    {
+        float* outL = buffer.getWritePointer(0);
+        float* outR = (numChannels>1) ? buffer.getWritePointer(1) : nullptr;
+        // résolution de bandes changée : fréquences centrales différentes, filtres à refaire
+        if(auditionStatesConfigBands != numActiveBands){
+            for(int i=0;i<N_BANDS;++i) auditionStates[i].designed=false;
+            auditionStatesConfigBands = numActiveBands;
+        }
+        int activeList[N_BANDS]; int nActive=0;
+        for(int b=0;b<nBands && b<64; ++b)
+            if(aMask & bandBit(b)) activeList[nActive++]=b;
+
+        const float Q=(bandMode==62)?6.f:(bandMode==15)?2.f:3.f;
+        for(int k=0;k<nActive;++k){
+            auto& st = auditionStates[activeList[k]];
+            if(!st.designed){
+                const float fc=getBandFreqs()[activeList[k]];
+                const float gv=std::tan(juce::MathConstants<float>::pi*fc/(float)currentSampleRate);
+                const float kk=1.f/Q;
+                st.a1=1.f/(1.f+gv*(gv+kk));
+                st.a2=gv*st.a1;
+                st.a3=gv*st.a2;
+                st.g=gv; st.makeup=kk;
+                st.ic1L=st.ic2L=st.ic1R=st.ic2R=0.f;
+                st.designed=true;
+            }
+        }
+        // plusieurs bandes : somme compensée en 1/racine(n)
+        const float norm = (nActive>1) ? 1.f/std::sqrt((float)nActive) : 1.f;
+        for(int s=0;s<numSamples;++s){
+            float sumL=0.f, sumR=0.f;
+            for(int k=0;k<nActive;++k){
+                auto& st = auditionStates[activeList[k]];
+                {
+                    const float v3=L[s]-st.ic2L;
+                    const float v1=st.a1*st.ic1L+st.a2*v3;
+                    const float v2=st.ic2L+st.a2*st.ic1L+st.a3*v3;
+                    st.ic1L=2.f*v1-st.ic1L; st.ic2L=2.f*v2-st.ic2L;
+                    sumL += v1*st.makeup;
+                }
+                if(outR){
+                    const float v3=R[s]-st.ic2R;
+                    const float v1=st.a1*st.ic1R+st.a2*v3;
+                    const float v2=st.ic2R+st.a2*st.ic1R+st.a3*v3;
+                    st.ic1R=2.f*v1-st.ic1R; st.ic2R=2.f*v2-st.ic2R;
+                    sumR += v1*st.makeup;
+                }
+            }
+            outL[s]=sumL*norm;
+            if(outR) outR[s]=sumR*norm;
+        }
+    }
+    else { for(int i=0;i<N_BANDS;++i) auditionStates[i].designed=false; }
 }
 
 void LeakAudioProcessor::updateLevels()
@@ -732,7 +793,7 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("numBands",    bandMode);
     xml.setAttribute("analysisMode",(int)analysisMode);
     for(int i=0;i<NUM_SLOTS;++i)
-        xml.setAttribute("slot"+juce::String(i), slotModule[i]);
+        xml.setAttribute("slot"+juce::String(i), (tourLayoutActive.load() && i<5) ? tourLayoutSaved[i] : slotModule[i]);
     xml.setAttribute("customAccentColor", (int)customAccentColor);
     xml.setAttribute("customGridColor",   (int)customGridColor);
     xml.setAttribute("customBgColor",     (int)customBgColor);
@@ -751,6 +812,7 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("plateTint", plateTint);
     xml.setAttribute("lightScreens", lightScreens);
     xml.setAttribute("titleStyle", titleStyle);
+    xml.setAttribute("logoColour", logoColour);
     xml.setAttribute("corrStyle", corrStyle);
     xml.setAttribute("masterConsole", masterConsole);
     xml.setAttribute("peakHoldOn", peakHoldOn);
@@ -799,6 +861,11 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("gpuCrystalYaw", (double)gpuCrystalYaw); xml.setAttribute("gpuCrystalPitch", (double)gpuCrystalPitch);
     xml.setAttribute("gpuTerrainZoom", (double)gpuTerrainZoom); xml.setAttribute("gpuNeonZoom", (double)gpuNeonZoom);
     xml.setAttribute("gpuCrystalZoom", (double)gpuCrystalZoom);
+    for(int i=0;i<5;++i){
+        const juce::String n(i);
+        xml.setAttribute("fxTime"+n, (double)fxTimeSec[i]); xml.setAttribute("fxTurn"+n, (double)fxYaw[i]);
+        xml.setAttribute("fxPitch"+n, (double)fxPitch[i]);  xml.setAttribute("fxZoom"+n, (double)fxZoom[i]);
+    }
     xml.setAttribute("presetName", currentPresetName);
     copyXmlToBinary(xml,destData);
 }
@@ -883,7 +950,7 @@ bool LeakAudioProcessor::applyPresetXml(const juce::XmlElement& pre)
 bool LeakAudioProcessor::loadFactoryTV()
 {
     static const char* const kTV = R"(<LeakState
-    numBands="62" analysisMode="0" transientThr="-18.0" slot0="12" slot1="7" slot2="15" slot3="4"
+    numBands="62" analysisMode="0" transientThr="-18.0" slot0="12" slot1="7" slot2="25" slot3="4"
     slot4="6" slot5="5" customAccentColor="-16711758" customGridColor="-16043984"
     customBgColor="-16578038" customTextColor="-3604504" customSideColor="-5085441" uiTemplate="2"
     lightTint="0" highContrast="1" modules3D="0" largeText="1" masterConsole="1" peakHoldOn="1"
@@ -955,10 +1022,26 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             editorHeight =xml->getIntAttribute("editorH",620);
             setNumActiveBands(xml->getIntAttribute("numBands",31));
             setAnalysisMode((AnalysisMode)xml->getIntAttribute("analysisMode",0));
-            static const int def[NUM_SLOTS]={1,7,12,4,6,5};
+            static const int def[NUM_SLOTS]={12,7,2,4,18,5};   // disposition d'ouverture (v1.81.45)
             for(int i=0;i<NUM_SLOTS;++i)
                 slotModule[i]=xml->getIntAttribute("slot"+juce::String(i),def[i]);
             for(auto& m : slotModule) if(m==(int)ModuleID::Transient) m=0;   // module retiré : slot vide
+            // v1.81.42 (bêta) : modules retirés du menu remplacés par un équivalent
+            for(auto& m : slotModule){
+                switch((ModuleID)m){
+                    case ModuleID::DotSpectrumChroma:
+                    case ModuleID::DotSpectrumNebula:    m=(int)ModuleID::Spectrum;          break;
+                    case ModuleID::Spectrogram3DSurface:
+                    case ModuleID::GpuSpectroSplash:     m=(int)ModuleID::GpuSpectroSurface; break;
+                    case ModuleID::GpuSpectroNeon:       m=(int)ModuleID::GpuSpectroCrystal; break;
+                    case ModuleID::GpuSpectroRibbons:    m=(int)ModuleID::GpuSpectroMatrix;  break;
+                    default: break;
+                }
+            }
+            // un module n'est que dans un emplacement : le remplaçant déjà en place laisse le slot vide
+            for(int i=0;i<NUM_SLOTS;++i)
+                for(int j=0;j<i;++j)
+                    if(slotModule[i]!=0 && slotModule[i]==slotModule[j]) slotModule[i]=0;
             customAccentColor = (uint32_t)xml->getIntAttribute("customAccentColor", (int)0xFF00FFB2);
             customGridColor   = (uint32_t)xml->getIntAttribute("customGridColor",   (int)0xFF0B3030);
             customBgColor     = (uint32_t)xml->getIntAttribute("customBgColor",     (int)0xFF030A0A);
@@ -979,6 +1062,7 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             plateTint = juce::jlimit(0, 1, xml->getIntAttribute("plateTint", plateTint));   // absent : inchangé
             lightScreens = juce::jlimit(0, 1, xml->getIntAttribute("lightScreens", lightScreens));
             titleStyle = juce::jlimit(0, 2, xml->getIntAttribute("titleStyle", titleStyle));
+            logoColour = juce::jlimit(0, 1, xml->getIntAttribute("logoColour", logoColour));
             corrStyle  = juce::jlimit(0, 2, xml->getIntAttribute("corrStyle", corrStyle));
             masterConsole = xml->getBoolAttribute("masterConsole", false);
             peakHoldOn  = xml->getBoolAttribute("peakHoldOn", true);
@@ -1023,7 +1107,7 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             gpuSurfaceTimeSec = (float)xml->getDoubleAttribute("gpuSurfaceTimeSec", 2.1);
             gpuTerrainTimeSec = (float)xml->getDoubleAttribute("gpuTerrainTimeSec", 2.1);
             gpuNeonTimeSec    = (float)xml->getDoubleAttribute("gpuNeonTimeSec",    2.1);
-            gpuCrystalTimeSec = (float)xml->getDoubleAttribute("gpuCrystalTimeSec", 2.1);
+            gpuCrystalTimeSec = (float)xml->getDoubleAttribute("gpuCrystalTimeSec", 9.2);
             gpuTerrainYaw   = (float)xml->getDoubleAttribute("gpuTerrainYaw",   0.0);
             gpuTerrainPitch = (float)xml->getDoubleAttribute("gpuTerrainPitch", 1.018);
             gpuNeonYaw      = (float)xml->getDoubleAttribute("gpuNeonYaw",      0.0);
@@ -1033,6 +1117,16 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             gpuTerrainZoom  = (float)xml->getDoubleAttribute("gpuTerrainZoom",  0.0);
             gpuNeonZoom     = (float)xml->getDoubleAttribute("gpuNeonZoom",     0.0);
             gpuCrystalZoom  = (float)xml->getDoubleAttribute("gpuCrystalZoom",  0.0);
+            {
+                static constexpr float kTimeDef[5]={ 1.f, 1.f, 1.5f, 2.f, 2.f };
+                for(int i=0;i<5;++i){
+                    const juce::String n(i);
+                    fxTimeSec[i]=(float)xml->getDoubleAttribute("fxTime"+n, kTimeDef[i]);
+                    fxYaw[i]    =(float)xml->getDoubleAttribute("fxTurn"+n,  0.0);   // v1.81.40 : fxYaw (ancien sens du temps) ignoré
+                    fxPitch[i]  =(float)xml->getDoubleAttribute("fxPitch"+n, 0.0);
+                    fxZoom[i]   =(float)xml->getDoubleAttribute("fxZoom"+n,  0.0);
+                }
+            }
             currentPresetName = xml->getStringAttribute("presetName");
         }
     }

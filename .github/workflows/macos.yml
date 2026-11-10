@@ -1,4 +1,4 @@
-name: macOS build (app + AU + VST3 + pkg)
+name: macOS build (app + VST3 + pkg)
 
 on:
   push:
@@ -23,12 +23,15 @@ jobs:
         run: |
           V=$(grep -o ' version="[0-9]*\.[0-9]*\.[0-9]*"' "Merlin By Mikshake/Merlin By Mikshake.jucer" | head -1 | sed 's/.*"\(.*\)"/\1/')
           echo "VERSION=$V" >> "$GITHUB_ENV"
-          echo "Version $V"
+          # étiquette de build (comme l'installeur Windows, MyAppLabel) : vide = version finale
+          echo "LABEL=_beta" >> "$GITHUB_ENV"
+          echo "Version $V beta"
 
       - name: Build app
         run: bash packaging/ci_build.sh "Merlin By Mikshake/Builds/MacOSX/Merlin Alpha.xcodeproj" app.log
 
-      - name: Build plugins (AU + VST3)
+      # pas d'Audio Unit depuis la v1.81.48 : le plugin n'existe qu'en VST3
+      - name: Build plugin (VST3)
         run: bash packaging/ci_build.sh "Merlin Alpha Plugin/Builds/MacOSX/Merlin Alpha Plugin.xcodeproj" plugin.log
 
       - name: Ad-hoc signing
@@ -38,44 +41,33 @@ jobs:
           PLG="Merlin Alpha Plugin/Builds/MacOSX/build/Release"
           echo "::notice::produits app : $(ls "Merlin By Mikshake/Builds/MacOSX/build/Release" 2>&1 | tr '\n' ' ')"
           echo "::notice::produits plugin : $(ls "$PLG" 2>&1 | tr '\n' ' ')"
-          for b in "$APP" "$PLG/Merlin Alpha.component" "$PLG/Merlin Alpha.vst3"; do
+          for b in "$APP" "$PLG/Merlin Alpha.vst3"; do
             codesign --force --deep -s - "$b"
             codesign --verify --verbose "$b"
             lipo -archs "$b/Contents/MacOS/"* || true
           done
-
-      - name: AU validation
-        continue-on-error: true
-        run: |
-          mkdir -p ~/Library/Audio/Plug-Ins/Components
-          cp -R "Merlin Alpha Plugin/Builds/MacOSX/build/Release/Merlin Alpha.component" ~/Library/Audio/Plug-Ins/Components/
-          killall -9 AudioComponentRegistrar 2>/dev/null || true
-          auval -v aufx Mrla SdKy
 
       - name: Package (.pkg)
         run: |
           set -e
           APP="Merlin By Mikshake/Builds/MacOSX/build/Release/Merlin Alpha.app"
           PLG="Merlin Alpha Plugin/Builds/MacOSX/build/Release"
-          mkdir -p stage/app stage/au stage/vst3 pkgs
+          mkdir -p stage/app stage/vst3 pkgs
           cp -R "$APP" stage/app/
-          cp -R "$PLG/Merlin Alpha.component" stage/au/
           cp -R "$PLG/Merlin Alpha.vst3" stage/vst3/
           chmod +x packaging/scripts/postinstall
           # bundles non relocalisables : toujours installés à leur place
-          for c in app au vst3; do
+          for c in app vst3; do
             pkgbuild --analyze --root "stage/$c" "stage/$c.plist"
             plutil -replace BundleIsRelocatable -bool NO "stage/$c.plist"
           done
           pkgbuild --root stage/app  --component-plist stage/app.plist  --install-location /Applications \
                    --identifier com.SideKeySystem.MerlinAlpha.app  --version "$VERSION" pkgs/app.pkg
-          pkgbuild --root stage/au   --component-plist stage/au.plist   --install-location /Library/Audio/Plug-Ins/Components \
-                   --identifier com.SideKeySystem.MerlinAlpha.au   --version "$VERSION" pkgs/au.pkg
           pkgbuild --root stage/vst3 --component-plist stage/vst3.plist --install-location /Library/Audio/Plug-Ins/VST3 \
                    --identifier com.SideKeySystem.MerlinAlpha.vst3 --version "$VERSION" \
                    --scripts packaging/scripts pkgs/vst3.pkg
-          productbuild --synthesize --package pkgs/app.pkg --package pkgs/au.pkg --package pkgs/vst3.pkg distribution.xml
-          productbuild --distribution distribution.xml --package-path pkgs "MerlinAlpha_macOS_v$VERSION.pkg"
+          productbuild --synthesize --package pkgs/app.pkg --package pkgs/vst3.pkg distribution.xml
+          productbuild --distribution distribution.xml --package-path pkgs "MerlinAlpha_macOS_v$VERSION$LABEL.pkg"
           ls -la *.pkg
 
       # Chaque build stockait un .pkg de ~22 Mo pendant 90 jours : quota plein
@@ -93,6 +85,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: MerlinAlpha_macOS_v${{ env.VERSION }}
+          name: MerlinAlpha_macOS_v${{ env.VERSION }}${{ env.LABEL }}
           path: MerlinAlpha_macOS_v*.pkg
           retention-days: 14

@@ -92,11 +92,28 @@ GpuSurfaceDisplay::GpuSurfaceDisplay(LeakAudioProcessor& p) : GpuModuleBase(p)
     logMap.setExtendedAxis(true);   // axe jusqu'à Nyquist au-delà de 48 kHz (comme le module CPU)
     verts.reserve(200000);
     syncFromProcessor();
+    // fenêtre du plugin rouverte : HOLD et image figée retrouvés (v1.81.46)
+    if(auto* sn=processor.heldSnapshot((int)LeakAudioProcessor::ModuleID::GpuSpectroSurface);
+       sn!=nullptr && sn->rows.size()==(size_t)(NROWS*NPTS) && sn->rows2.size()==(size_t)NPTS){
+        std::copy(sn->rows.begin(), sn->rows.end(), &rows[0][0]);
+        std::copy(sn->rows2.begin(), sn->rows2.end(), liveRow);
+        head=sn->head; rowCount=sn->rowCount; haveLive=sn->count2!=0; glideFrac=sn->frac;
+        frozen=true;
+        holdBtn->setToggleState(true, juce::dontSendNotification);
+    }
 }
 
 GpuSurfaceDisplay::~GpuSurfaceDisplay()
 {
     detachGL();
+    // fenêtre du plugin fermée : HOLD et image figée gardés pour la réouverture
+    auto& sn=processor.moduleSnapshots[(int)LeakAudioProcessor::ModuleID::GpuSpectroSurface];
+    sn.hold=frozen.load();
+    if(sn.hold){
+        sn.rows.assign(&rows[0][0], &rows[0][0]+NROWS*NPTS);
+        sn.rows2.assign(liveRow, liveRow+NPTS);
+        sn.head=head; sn.rowCount=rowCount; sn.count2=haveLive ? 1 : 0; sn.frac=glideFrac;
+    } else { sn.rows.clear(); sn.rows2.clear(); }
 }
 
 void GpuSurfaceDisplay::syncFromProcessor()

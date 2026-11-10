@@ -3,8 +3,8 @@
 <JUCERPROJECT id="MrlaPg" name="Merlin Alpha Plugin" projectType="audioplug"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
               companyName="Side Key System" companyEmail="https://sidekey.fr"
-              companyWebsite="https://sidekey.fr" version="1.81.32" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
-              displaySplashScreen="0" defines="MERLIN_PLUGIN=1" pluginFormats="buildAU,buildVST3"
+              companyWebsite="https://sidekey.fr" version="1.81.48" bundleIdentifier="com.SideKeySystem.MerlinAlphaPlugin"
+              displaySplashScreen="0" defines="MERLIN_PLUGIN=1" pluginFormats="buildVST3"
               pluginName="Merlin Alpha" pluginDesc="Advanced Audio Analyzer"
               pluginManufacturer="Side Key System" pluginManufacturerCode="SdKy"
               pluginCode="Mrla" pluginCharacteristicsValue="" pluginVST3Category="Analyzer,Fx"
@@ -29,6 +29,9 @@
             file="../Merlin By Mikshake/Source/GpuSpectrogram.h"/>
       <FILE id="MpGSfC" name="GpuSurface.cpp" compile="1" resource="0" file="../Merlin By Mikshake/Source/GpuSurface.cpp"/>
       <FILE id="MpGSfH" name="GpuSurface.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/GpuSurface.h"/>
+      <FILE id="MpGFxC" name="GpuSpectroFx.cpp" compile="1" resource="0" file="../Merlin By Mikshake/Source/GpuSpectroFx.cpp"/>
+      <FILE id="MpGFxH" name="GpuSpectroFx.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/GpuSpectroFx.h"/>
+      <FILE id="MpTouH" name="TourOverlay.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/TourOverlay.h"/>
       <FILE id="MpGMC" name="GpuModule.cpp" compile="1" resource="0" file="../Merlin By Mikshake/Source/GpuModule.cpp"/>
       <FILE id="MpGMH" name="GpuModule.h" compile="0" resource="0" file="../Merlin By Mikshake/Source/GpuModule.h"/>
       <FILE id="MpDotC" name="GpuDotSpectrum.cpp" compile="1" resource="0"

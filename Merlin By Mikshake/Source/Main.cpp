@@ -402,7 +402,7 @@ public:
         PopupFocus::beforePopup() = [this] { menuFocus.begin(); };
         wireEditor();
 
-        alwaysOnTop = settings.getBoolValue ("alwaysOnTop", false);
+        alwaysOnTop = settings.getBoolValue ("alwaysOnTop", true);   // v1.81.45 : épingle allumée à la première ouverture
         setAlwaysOnTop (alwaysOnTop);
         if (auto* leak = dynamic_cast<LeakEditor*> (editor.get()))
             leak->setAlwaysOnTopState (alwaysOnTop);
