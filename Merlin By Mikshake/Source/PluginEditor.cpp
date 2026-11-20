@@ -7729,6 +7729,14 @@ void LeakEditor::updateLicenseUi()
                                     : juce::String());
     if(! license->isUsable() && s!=S::activating && ! licenseOverlay.isVisible())
         openLicence();
+    // v1.81.64 (comme Sevenpack au début) : en démo, l'écran de licence s'ouvre
+    // aussi au lancement, avec le programme bêta ; OK le referme. Une fois par
+    // lancement de l'appli (ou du DAW), pas à chaque réouverture du plugin.
+    static bool shownThisLaunch=false;
+    if(s==S::trial && ! shownThisLaunch && ! licenseOverlay.isVisible()){
+        shownThisLaunch=true;
+        openLicence();
+    }
 }
 
 void LeakEditor::openLicence()
