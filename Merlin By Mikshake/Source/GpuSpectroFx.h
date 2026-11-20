@@ -71,8 +71,8 @@ private:
 
     // ── thread GL ──
     void newOpenGLContextCreated() override;
-    void renderOpenGL() override;
-    void openGLContextClosing() override;
+    void renderGL() override;
+    void closingGL() override;
     void uiTick() override;
     // Précision (v1.81.40) : la ligne en cours garde la crête de toutes les images
     // de sa durée (aucun coup bref perdu en TIME long) et se remplit en direct au

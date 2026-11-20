@@ -963,6 +963,12 @@ private:
 
         void mouseDown (const juce::MouseEvent&) override
         {
+            // v1.81.62 : ce clic vient d'ouvrir un menu (slot vide) ou une
+            // fenêtre : JUCE nous prévient APRÈS l'éditeur. Épinglée, la fenêtre
+            // remontée passait par-dessus le menu (lui aussi « toujours devant »)
+            // et le cachait aussitôt : rien à remonter dans ce cas.
+            if (menuOrModalOpen())
+                return;
             frontWindow().toFront (false);
             if (auto* leak = dynamic_cast<LeakEditor*> (owner.editor.get()))
                 leak->raiseDetachedWindows();   // les modules détachés restent devant

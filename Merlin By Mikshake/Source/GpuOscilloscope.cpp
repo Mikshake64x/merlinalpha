@@ -642,7 +642,7 @@ void GpuOscilloscopeDisplay::newOpenGLContextCreated()
     onContextCreated();
 }
 
-void GpuOscilloscopeDisplay::openGLContextClosing()
+void GpuOscilloscopeDisplay::closingGL()
 {
     for(auto* b : { &vboLines, &vboFill }) if(*b){ glDeleteBuffers(1, b); *b=0; }
     for(auto* a : { &vaoQuad, &vaoLines, &vaoFill }) if(*a){ glDeleteVertexArrays(1, a); *a=0; }
@@ -798,7 +798,7 @@ bool GpuOscilloscopeDisplay::capture()
     // de l'audio par blocs, et le tracé avance d'une colonne entière pour que
     // l'enveloppe ne scintille pas. PRÉCISION ne joue que sur les fenêtres courtes.
     if(isRollView(n, sr)){
-        const double nowMs=juce::Time::getMillisecondCounterHiRes();
+        const double nowMs=frameClockMs();
         const double target=(double)endAbs-sr*0.03;   // 30 ms de marge : l'audio est toujours arrivé
         rollEnd+=juce::jlimit(0.0, 0.1, (nowMs-rollMs)*0.001)*sr;
         rollMs=nowMs;
@@ -1080,7 +1080,7 @@ double GpuOscilloscopeDisplay::estimatePeriod(int fetch, int warm, double sr)
     return (double)bestLag + (den<0.0 ? juce::jlimit(-0.5, 0.5, 0.5*(a-c)/den) : 0.0);
 }
 
-void GpuOscilloscopeDisplay::renderOpenGL()
+void GpuOscilloscopeDisplay::renderGL()
 {
     glClearColor(0.f, 0.f, 0.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);

@@ -1167,12 +1167,13 @@ public:
         int uiScale = 0;                    // taille de l'interface : 0 automatique, sinon pourcentage
         int plateTint = 1;                  // thème sombre : 0 gris, 1 ardoise
         int lightScreens = 1;               // thème clair : 1 écrans Papier, 0 écrans noirs
+        int colorVivid = 0;                 // intensité des couleurs : 0 actuel, 1 vif, 2 très vif
         int titleStyle = 1;                 // titres des modules : 0 sans, 1 filet, 2 bandeau
         int logoColour = 0;                 // lettres du logo : 0 gris gravé, 1 vert de Sunny
         int corrStyle = 1;                  // corrélation des vectorscopes : 0 barre, 1 curseur, 2 gradué
         int oscStyle = 0;                   // 0 tube, 1 numérique, 2 vintage, 3 rempli
         bool oscSplit = false;              // L et R l'une au-dessus de l'autre
-        int oscFps = 30;                    // 24, 30 ou 60
+        int oscFps = 60;                    // 24, 30 ou 60
         int oscLineWidth = 20;              // curseur 0..100 (0 = le plus fin)
         int oscTraceMode = 0;               // 0 précis, 1 classique
         bool oscPersist = true;
@@ -1265,6 +1266,7 @@ public:
         largeTextSwitch.setOn (s.largeText);
         plateSeg.setSelected (juce::jlimit (0, 1, s.plateTint));
         screensSeg.setSelected (s.lightScreens != 0 ? 0 : 1);
+        vividSeg.setSelected (juce::jlimit (0, 2, s.colorVivid));
         titleSeg.setSelected (juce::jlimit (0, 2, s.titleStyle));
         logoSeg.setSelected (juce::jlimit (0, 1, s.logoColour));
         corrSeg.setSelected (juce::jlimit (0, 2, s.corrStyle));
@@ -1431,6 +1433,7 @@ public:
     std::function<void (int)>   onUiScaleSelected;       // taille de l'interface : 0 automatique, sinon pourcentage
     std::function<void (int)>   onPlateTintSelected;     // thème sombre : 0 gris, 1 ardoise
     std::function<void (bool)>  onLightScreensSelected;  // thème clair : écrans Papier ou noirs
+    std::function<void (int)>   onColorVividSelected;    // intensité des couleurs : 0, 1, 2
     std::function<void (int)>   onTitleStyleSelected;    // titres des modules : 0 sans, 1 filet, 2 bandeau
     std::function<void (int)>   onLogoColourSelected;    // lettres du logo : 0 gris, 1 vert de Sunny
     std::function<void (int)>   onCorrStyleSelected;     // corrélation des vectorscopes : 0 barre, 1 curseur, 2 gradué
@@ -1617,6 +1620,9 @@ private:
         resetColoursButton.setButtonText (TR ("Réinitialiser"));
         p.addGroup (TR ("Couleurs"), TR ("Couleurs des écrans sombres ; en thème clair, les écrans Papier en reprennent l'accent."));
         p.addRow (Icon::palette, juce::Colour (0xff0a84ff), TR ("Couleur d'accent"), TR ("Palettes prêtes à l'emploi"), &accentSwatches, accentSwatches.getIdealWidth() + 140);
+        vividSeg.setLabels ({ TR ("Actuel"), TR ("Vif"), TR ("Très vif") });
+        p.addRow (Icon::palette, juce::Colour (0xffff375f), TR ("Intensité des couleurs"), TR ("Tous les modules, thème clair et sombre"), &vividSeg, vividSeg.getIdealWidth());
+        vividSeg.onChange = [this] (int i) { if (onColorVividSelected) onColorVividSelected (i); };
         static const char* const roleNames[8] = { "Accent", "Grille", "Fond des écrans", "Texte", "Canal Side",
                                                   "Spectrogramme : creux", "Spectrogramme : milieu", "Spectrogramme : crêtes" };
         for (int i = 0; i < 8; ++i)
@@ -1676,9 +1682,9 @@ private:
         p.addGroup (TR ("Langue de l'interface"),
                     TR ("Appliquée tout de suite. Les termes techniques (LUFS, True Peak, RMS, dB, Hz…) restent en anglais."));
         static const char* const names[Lang::Count] = { "Français", "Anglais", "Allemand", "Italien", "Espagnol",
-                                                        "Portugais (Brésil)", "Russe", "Japonais", "Chinois simplifié", "Coréen" };
+                                                        "Portugais (Brésil)", "Russe", "Japonais", "Chinois simplifié", "Coréen", "Arabe" };
         static const juce::uint32 colours[Lang::Count] = { 0xff0a84ff, 0xffff453a, 0xffff9f0a, 0xff30b158, 0xffd4a20a,
-                                                           0xff34c759, 0xff5e5ce6, 0xffff375f, 0xffff6961, 0xff30b0c7 };
+                                                           0xff34c759, 0xff5e5ce6, 0xffff375f, 0xffff6961, 0xff30b0c7, 0xff1f9d8b };
         for (int i = 0; i < Lang::Count; ++i)
             p.addChoiceRow (Lang::code (i), juce::Colour (colours[i]), Lang::nativeName (i), TR (names[i]),
                             i == Lang::current(), [this, i] { if (onLanguageSelected) onLanguageSelected (i); });
@@ -1701,6 +1707,7 @@ private:
     OptionsUi::Switch fullScreenSwitch, alwaysOnTopSwitch, darkSwitch, contrastSwitch, modules3DSwitch, largeTextSwitch;
     OptionsUi::Segmented plateSeg { { "Gris", "Ardoise" } };
     OptionsUi::Segmented screensSeg { { "Clairs", "Noirs" } };
+    OptionsUi::Segmented vividSeg { { "Actuel", "Vif", "Très vif" } };
     OptionsUi::Segmented titleSeg { { "Sans", "Filet", "Bandeau" } };
     OptionsUi::Segmented logoSeg { { "Gris", "Vert" } };
     OptionsUi::Segmented corrSeg { { "Barre", "Curseur", "Gradué" } };

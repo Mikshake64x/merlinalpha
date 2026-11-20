@@ -55,8 +55,8 @@ private:
 
     // ── thread GL ──
     void newOpenGLContextCreated() override;
-    void renderOpenGL() override;
-    void openGLContextClosing() override;
+    void renderGL() override;
+    void closingGL() override;
     bool capture();              // nouvelle fenêtre déclenchée (false : image gardée)
     void pushHistory();
     void uploadBackground();

@@ -66,7 +66,21 @@ namespace Col {
     // comme le spectre), à la place d'inferno qui part du noir
     juce::Colour paperHeat(float t);
     inline juce::Colour hot(juce::Colour c, float k) { return paper ? c.interpolatedWith(textHi, k*0.45f) : c.interpolatedWith(juce::Colours::white, k); }
+
+    // Options > Apparence > Intensité des couleurs (v1.81.59) : 0 actuel, 1 vif,
+    // 2 très vif. Appliquée à l'image finale de chaque module (filtre CPU ou
+    // passe GPU) : saturation + contraste des seules couleurs, gris/noir/blanc intacts.
+    inline std::atomic<int> vivid { 0 };
+    inline void vividParams(int v, float& sat, float& con)
+    {
+        sat = v>=2 ? 1.5f  : v==1 ? 1.25f : 1.f;
+        con = v>=2 ? 1.08f : v==1 ? 1.04f : 1.f;
+    }
+    // couleur / dégradé intensifiés selon vivid (tels quels à 0) : modules 2D
+    juce::Colour viv(juce::Colour c);
+    juce::ColourGradient viv(juce::ColourGradient g);
 }
+
 
 // ── Thème (couleurs) ─────────────────────────────────────────────────────────
 namespace Theme {
@@ -194,6 +208,11 @@ namespace SpectroReadout {
     void drawLines(juce::Graphics&, juce::Rectangle<float> area, juce::Point<float> at,
                    const juce::String& line1, const juce::String& line2, const juce::String& line3);
     juce::String formatHz(float hz);
+    // la bulle de draw() rendue dans une image (scale : pixels par point) ; box :
+    // sa place dans area. Sert aux modules GPU : la bulle est collée par le thread
+    // de rendu, sans repeindre le calque 2D (v1.81.57)
+    juce::Image renderBubble(juce::Rectangle<float> area, juce::Point<float> at,
+                             float hz, float db, float ageSec, float scale, juce::Rectangle<float>& box);
 
     // Repères des spectrogrammes (CPU et GPU)
     // échelle de temps : pas lisible selon la durée affichée, libellé "0 s" / "-1.5 s"
@@ -994,6 +1013,89 @@ private:
 };
 
 //==============================================================================
+// BitMeterDisplay — "Bit Meter" (v1.81.50, variante A validée sur preview) :
+// signe + valeur absolue à l'échelle 32 bits : S allumé si un échantillon est
+// négatif, 2 à 32 = bits de |x| du poids fort (-6 dBFS) au poids faible, pour
+// L et R. Allumé si le bit a valu 1 pendant la dernière fenêtre (0,4 s) ;
+// HOLD garde allumé tout bit utilisé depuis son activation.
+// Lectures : bits utilisés (le plus bas qui bouge), bits bas toujours à 0,
+// échantillons au-dessus de 0 dBFS. Mesures seulement, aucune estimation.
+//==============================================================================
+class BitMeterDisplay : public juce::Component, private juce::Timer
+{
+public:
+    explicit BitMeterDisplay(LeakAudioProcessor&);
+    ~BitMeterDisplay() override;
+    void paint  (juce::Graphics&) override;
+    void resized() override;
+    void setFrameRateHz(int hz)
+    {
+        processor.bitMeterWanted.store(hz>0, std::memory_order_relaxed);   // module caché : plus de calcul
+        if(hz<=0){ stopTimer(); return; }
+        currentHz=hz; startTimerHz(hz);
+    }
+private:
+    void timerCallback() override;
+    void resetCounts();
+    juce::uint32 litMask(int ch) const;    // bit 31 = S ... bit 0 = 32
+    juce::uint32 oneMask(int ch) const;    // bits qui ont valu 1
+    LeakAudioProcessor& processor;
+    int   currentHz { 60 };
+    static constexpr int NB = 32;
+    static constexpr int kNever = 1<<24;
+    int   ageToggle[2][NB], ageOne[2][NB];          // images depuis le dernier changement / le dernier 1
+    juce::uint32 heldToggle[2] { 0u, 0u }, heldOne[2] { 0u, 0u };   // cumul depuis HOLD / RESET
+    juce::uint64 overCount { 0 };
+    bool  holding { false };
+    juce::int64 shownKey { -1 };
+    NeuAnimButton holdBtn { "HOLD" }, resetBtn { "RESET" };
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BitMeterDisplay)
+};
+
+//==============================================================================
+// TunerDisplay — "Tuner" (v1.81.51, aperçu merlin_tuner_preview.html, « les
+// deux en un ») : fondamentale mesurée (YIN sur l'anneau de l'oscilloscope,
+// 30 Hz à 1 kHz), note la plus proche et écart en cents, référence A4 réglable.
+// Vue AIGUILLE : note, Hz, cents, aiguille ±50 cents ; la dernière mesure
+// reste affichée. Vue TRACÉ : hauteur sur 4 s sur une grille de notes, et les
+// 4 derniers coups (kick, snare...) : médiane des mesures de 60 à 500 ms
+// après l'attaque, une fois passée la chute de hauteur du coup.
+//==============================================================================
+class TunerDisplay : public juce::Component, private juce::Timer
+{
+public:
+    explicit TunerDisplay(LeakAudioProcessor&);
+    ~TunerDisplay() override { stopTimer(); }
+    void paint  (juce::Graphics&) override;
+    void resized() override;
+    void setFrameRateHz(int hz) { if(hz<=0){ stopTimer(); return; } currentHz=hz; startTimerHz(hz); }
+private:
+    void timerCallback() override;
+    float detectPitch(int nFull, int D, double sr);   // Hz, 0 = pas de hauteur nette
+    void  updateTexts();
+    void  paintNeedle(juce::Graphics&, juce::Rectangle<float>);
+    void  paintTrace (juce::Graphics&, juce::Rectangle<float>);
+    struct NoteInfo { juce::String name; int octave { 0 }; float cents { 0.f }; float refHz { 0.f }; float midi { 0.f }; };
+    NoteInfo noteOf(float hz) const;
+    static juce::Colour centsColour(float cents);
+    LeakAudioProcessor& processor;
+    int   currentHz { 60 };
+    std::vector<float> bufL, bufR, mono, dec, cmnd;
+    juce::uint64 lastTotal { 0 };
+    float slowDb { -120.f };
+    float liveHz { 0.f };  bool liveValid { false };
+    float shownHz { 0.f };                     // aiguille : dernière mesure gardée
+    bool  inHit { false }; float hitAge { 0.f }, hitPeakDb { -120.f };
+    std::vector<float> hitEst;
+    float hits[4] { 0.f, 0.f, 0.f, 0.f };      // le plus récent en 0
+    std::vector<float> trace;  int traceHead { 0 };
+    NeuAnimButton modeBtn { "TRACE" }, a4Down, a4Up, resetBtn { "RESET" };
+    juce::Rectangle<int> a4Area;
+    int   contentTop { 26 };   // sous l'en-tête (une ou deux rangées de boutons)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TunerDisplay)
+};
+
+//==============================================================================
 // SpectralDensityDisplay — PSD (densité spectrale de puissance), FFT réelle
 // moyennée façon Welch (EMA ~300ms), 4096 points, recouvrement 75%.
 //==============================================================================
@@ -1462,6 +1564,7 @@ private:
     std::map<const juce::Component*, int> appliedFrameRate;   // dernière cadence appliquée par module
     void refreshChassis();   // reconstruit les caches du châssis
     void applyLook();   // teinte + contraste du processeur -> châssis, caches, vignettes
+    void applyVivid();  // intensité des couleurs : couleurs des modules 2D, passe des modules GPU
     void applyTextScale();   // taille de texte du processeur -> toute l'interface
     // Taille de l'interface (plugin) : échelle de l'hôte × celle choisie, appliquée
     // par AudioProcessorEditor::setScaleFactor (la DAW suit la taille de la fenêtre).
@@ -1501,19 +1604,21 @@ private:
     MultibandCorrDisplay corrDisplay;
     MultipanoramaDisplay panoDisplay;
     PanoramaLedDisplay   panoLed;
+    BitMeterDisplay      bitMeter;
+    TunerDisplay         tuner;
     SpectralDensityDisplay  spectralDensity;
     NeedleVuMeter        needleVu;
     MultibandVectorscopeDisplay mbVectorscope;
     Spectrogram3DPeaksDisplay   spectro3dPeaks;
     Spectrogram3DSurfaceDisplay spectro3dSurface;
-    GpuSpectrogramDisplay gpuTerrain, gpuNeon, gpuCrystal;
+    GpuSpectrogramDisplay gpuTerrain, gpuNeon, gpuCrystal, gpuCrystal2;
     GpuSurfaceDisplay     gpuSurface;   // Spectrogram Surface GPU
     GpuSpectroFxDisplay   gpuBars, gpuLed, gpuRibbons, gpuMatrix, gpuSplash;   // spectrogrammes d'ambiance (v1.81.37)
     GpuDotSpectrumDisplay gpuDotChroma, gpuDotNebula;
     GpuDotPanoramaDisplay gpuDotPano;
     GpuVectorscopeDisplay gpuVecPhosphor, gpuVecDensity;
     // tous les modules OpenGL (suspension sous les panneaux, Options > Image)
-    std::array<GpuModuleBase*, 15> gpuModules() { return { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuSurface,
+    std::array<GpuModuleBase*, 16> gpuModules() { return { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuSurface,
                                                           &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash,
                                                           &gpuDotChroma, &gpuDotNebula, &gpuDotPano, &gpuVecPhosphor, &gpuVecDensity, &oscilloscope }; }
     ControlsBarLeak      controls;

@@ -44,6 +44,15 @@ public:
     void setSuspended(bool shouldSuspend) { if(shouldSuspend!=suspended){ suspended=shouldSuspend; updateAttachment(); } }
 
 protected:
+    // Heure de l'image (ms) : celle du rafraîchissement d'écran qui l'a déclenchée.
+    // Une image en plus dans la même période (repeint du calque 2D quand on
+    // touche un réglage) montre alors le même instant : plus d'à-coups (v1.81.57).
+    double frameClockMs() const
+    {
+        const double now=juce::Time::getMillisecondCounterHiRes(), t=frameTickMs.load();
+        return (t>0.0 && now-t>=0.0 && now-t<40.0) ? t : now;
+    }
+    std::atomic<double> frameTickMs { 0.0 };
     void detachGL();
     bool isGlAttached() const { return context.isAttached(); }
 
@@ -52,6 +61,10 @@ protected:
     std::unique_ptr<juce::OpenGLShaderProgram> compileProgram(const char* vs, const char* fs, const char* gs=nullptr);
     void onContextCreated();     // mémorise la carte, réarme la V-Sync
     void applyVsync();           // en tête de renderOpenGL()
+    // rendu propre au module ; la base y ajoute la passe « intensité des
+    // couleurs » (v1.81.59) et libère ses objets GL à la fermeture du contexte
+    virtual void renderGL() = 0;
+    virtual void closingGL() = 0;
     float renderingScale() const { return (float)context.getRenderingScale(); }
     // anticrénelage étendu à l'intérieur des surfaces (ombrage par
     // échantillon) : à placer autour du dessin des reliefs
@@ -90,6 +103,15 @@ private:
     bool sampleShadingOk { false };   // thread GL : contexte multi-échantillonné + ombrage par échantillon dispo
     void* minSampleShadingFn { nullptr };   // glMinSampleShadingARB
     std::shared_ptr<GpuFramePacer> pacer;
+    void renderOpenGL() final;
+    void openGLContextClosing() final;
+    bool ensureVividTargets(int w, int h);
+    void releaseVivid();
+    std::unique_ptr<juce::OpenGLShaderProgram> vividProg;   // thread GL
+    unsigned int vividMsFbo { 0 }, vividMsColor { 0 }, vividMsDepth { 0 };   // image du module (multi-échantillonnée)
+    unsigned int vividTex { 0 }, vividFbo { 0 }, vividVao { 0 };            // image résolue, lue par la passe
+    int vividW { 0 }, vividH { 0 }, vividSamples { -1 };
+    void followMonitor();   // thread de messages : fil de cadence de l'écran de la fenêtre
     double lastTickTs { 0.0 }, framePeriod { 1.0/60.0 }, nextFrameTs { 0.0 };   // fil de cadence uniquement
     int    uiTickDiv { 0 };
     double shownSampleRate { 0.0 };   // fréquence des graduations du calque 2D
@@ -107,6 +129,9 @@ struct PsdLogMap
     static constexpr int N = 160;
     // remplit outDb[N] ; false tant que la fréquence d'échantillonnage est inconnue
     bool read(LeakAudioProcessor&, float* outDb);
+    // même chose pour la PSD à l'instant timeMs (voir LeakAudioProcessor::getPSDAt) ;
+    // repli sur la dernière trame tant qu'il n'y a pas d'historique daté
+    bool readAt(LeakAudioProcessor&, double timeMs, float* outDb);
     static float freqAt(float u) { return 20.f*std::pow(1000.f, u); }   // u 0..1 (axe 20 Hz–20 kHz)
 
     // Axe étendu (spectrogrammes, Dot Spectrum) : jusqu'à la moitié de la

@@ -361,7 +361,7 @@ void GpuDotSpectrumDisplay::newOpenGLContextCreated()
     onContextCreated();
 }
 
-void GpuDotSpectrumDisplay::openGLContextClosing()
+void GpuDotSpectrumDisplay::closingGL()
 {
     for(auto* b : { &vboDots, &vboRibbon }) if(*b){ glDeleteBuffers(1, b); *b=0; }
     for(auto* a : { &vaoQuad, &vaoDots, &vaoRibbon }) if(*a){ glDeleteVertexArrays(1, a); *a=0; }
@@ -443,7 +443,7 @@ void GpuDotSpectrumDisplay::updateParticles(float dt, float pw, float ph)
     }
 }
 
-void GpuDotSpectrumDisplay::renderOpenGL()
+void GpuDotSpectrumDisplay::renderGL()
 {
     const auto bg=Col::bg;
     glClearColor(bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue(), 1.f);
@@ -451,7 +451,7 @@ void GpuDotSpectrumDisplay::renderOpenGL()
     if(hazeShader==nullptr || dotShader==nullptr || ribbonShader==nullptr || vaoQuad==0) return;
     applyVsync();
 
-    const double now=juce::Time::getMillisecondCounterHiRes();
+    const double now=frameClockMs();
     const float dt=(float)juce::jlimit(0.0, 0.1, (now-lastFrameMs)*0.001);
     lastFrameMs=now;
 
@@ -721,7 +721,7 @@ void GpuDotPanoramaDisplay::newOpenGLContextCreated()
     onContextCreated();
 }
 
-void GpuDotPanoramaDisplay::openGLContextClosing()
+void GpuDotPanoramaDisplay::closingGL()
 {
     if(vboDots){ glDeleteBuffers(1, &vboDots); vboDots=0; }
     for(auto* a : { &vaoQuad, &vaoDots }) if(*a){ glDeleteVertexArrays(1, a); *a=0; }
@@ -811,7 +811,7 @@ void GpuDotPanoramaDisplay::updateParticles(float dt, float pw, float ph)
     }
 }
 
-void GpuDotPanoramaDisplay::renderOpenGL()
+void GpuDotPanoramaDisplay::renderGL()
 {
     const auto bg=Col::bg;
     glClearColor(bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue(), 1.f);
@@ -819,7 +819,7 @@ void GpuDotPanoramaDisplay::renderOpenGL()
     if(hazeShader==nullptr || dotShader==nullptr || vaoQuad==0) return;
     applyVsync();
 
-    const double now=juce::Time::getMillisecondCounterHiRes();
+    const double now=frameClockMs();
     const float dt=(float)juce::jlimit(0.0, 0.1, (now-lastFrameMs)*0.001);
     lastFrameMs=now;
 

@@ -245,13 +245,50 @@ juce::String formatHz(float hz)
                       : juce::String(hz*0.001f,1)+" kHz";
 }
 
+static void bubbleTexts(float hz, float db, float ageSec, juce::String& f, juce::String& a, juce::String& t)
+{
+    f = formatHz(hz);
+    a = db<=-99.9f ? juce::String(juce::CharPointer_UTF8("\xe2\x89\xa4 -100 dB")) : juce::String(db,1)+" dB";
+    t = ageSec<=0.02f ? juce::String("LIVE") : "-"+juce::String(ageSec,2)+" s";
+}
+
 void draw(juce::Graphics& g, juce::Rectangle<float> area, juce::Point<float> at,
           float hz, float db, float ageSec)
 {
-    const juce::String a = db<=-99.9f ? juce::String(juce::CharPointer_UTF8("\xe2\x89\xa4 -100 dB"))
-                                      : juce::String(db,1)+" dB";
-    const juce::String t = ageSec<=0.02f ? juce::String("LIVE") : "-"+juce::String(ageSec,2)+" s";
-    drawLines(g, area, at, formatHz(hz), a, t);
+    juce::String f, a, t;
+    bubbleTexts(hz, db, ageSec, f, a, t);
+    drawLines(g, area, at, f, a, t);
+}
+
+// place de la bulle : à droite et au-dessus du point, retournée près des bords
+static juce::Rectangle<float> bubbleBox(juce::Rectangle<float> area, juce::Point<float> at,
+                                        const juce::String& f, const juce::String& a, const juce::String& t)
+{
+    const auto fBig=Ui::iceland(13.f), fSmall=Ui::iceland(10.5f);
+    const float tw=juce::jmax(juce::GlyphArrangement::getStringWidth(fBig, f),
+                              juce::GlyphArrangement::getStringWidth(fBig, a),
+                              juce::GlyphArrangement::getStringWidth(fSmall, t));
+    const float bw=tw+16.f, bh=fBig.getHeight()*2.f+fSmall.getHeight()+10.f;
+    float x=at.x+14.f, y=at.y-bh-10.f;
+    if(x+bw>area.getRight()-4.f)  x=at.x-14.f-bw;
+    if(y<area.getY()+20.f)        y=at.y+14.f;
+    x=juce::jlimit(area.getX()+4.f, juce::jmax(area.getX()+4.f, area.getRight()-bw-4.f), x);
+    y=juce::jlimit(area.getY()+4.f, juce::jmax(area.getY()+4.f, area.getBottom()-bh-4.f), y);
+    return { x, y, bw, bh };
+}
+
+juce::Image renderBubble(juce::Rectangle<float> area, juce::Point<float> at,
+                         float hz, float db, float ageSec, float scale, juce::Rectangle<float>& box)
+{
+    juce::String f, a, t;
+    bubbleTexts(hz, db, ageSec, f, a, t);
+    box=bubbleBox(area, at, f, a, t);
+    juce::Image img(juce::Image::ARGB, juce::jmax(1, (int)std::ceil(box.getWidth()*scale)),
+                    juce::jmax(1, (int)std::ceil(box.getHeight()*scale)), true, juce::SoftwareImageType());
+    juce::Graphics g(img);
+    g.addTransform(juce::AffineTransform::translation(-box.getX(), -box.getY()).scaled(scale));
+    drawLines(g, area, at, f, a, t);
+    return img;
 }
 
 void drawLines(juce::Graphics& g, juce::Rectangle<float> area, juce::Point<float> at,
@@ -259,18 +296,7 @@ void drawLines(juce::Graphics& g, juce::Rectangle<float> area, juce::Point<float
 {
     const auto fBig=Ui::iceland(13.f), fSmall=Ui::iceland(10.5f);
     const float lineBig=fBig.getHeight(), lineSmall=fSmall.getHeight();
-    const float tw=juce::jmax(juce::GlyphArrangement::getStringWidth(fBig, f),
-                              juce::GlyphArrangement::getStringWidth(fBig, a),
-                              juce::GlyphArrangement::getStringWidth(fSmall, t));
-    const float bw=tw+16.f, bh=lineBig*2.f+lineSmall+10.f;
-
-    // à droite et au-dessus du point, retournée près des bords
-    float x=at.x+14.f, y=at.y-bh-10.f;
-    if(x+bw>area.getRight()-4.f)  x=at.x-14.f-bw;
-    if(y<area.getY()+20.f)        y=at.y+14.f;
-    x=juce::jlimit(area.getX()+4.f, juce::jmax(area.getX()+4.f, area.getRight()-bw-4.f), x);
-    y=juce::jlimit(area.getY()+4.f, juce::jmax(area.getY()+4.f, area.getBottom()-bh-4.f), y);
-    const juce::Rectangle<float> box(x, y, bw, bh);
+    const juce::Rectangle<float> box=bubbleBox(area, at, f, a, t);
 
     g.setColour(Col::pick(juce::Colours::black.withAlpha(0.72f), juce::Colours::white.withAlpha(0.92f)));
     g.fillRoundedRectangle(box, 5.f);
@@ -405,6 +431,33 @@ void drawBezel(juce::Graphics& g, juce::Rectangle<float> s)
     g.drawRoundedRectangle(o.expanded(0.5f), R+0.5f, 1.f);
 }
 
+// creux des écrans Papier, mis en cache (voir drawScreenGlass)
+static juce::Image paperRecessImage(float w, float h, float k)
+{
+    struct Entry { int w, h, k100; juce::Image img; };
+    static std::mutex m;
+    static std::vector<Entry> cache;
+    const int iw=juce::roundToInt(w), ih=juce::roundToInt(h), k100=juce::roundToInt(k*100.f);
+    if(iw<4 || ih<4) return {};
+    const std::lock_guard<std::mutex> lock(m);
+    for(auto& e : cache) if(e.w==iw && e.h==ih && e.k100==k100) return e.img;
+    juce::Image img(juce::Image::ARGB, juce::jmax(1, juce::roundToInt((float)iw*k)), juce::jmax(1, juce::roundToInt((float)ih*k)), true, juce::SoftwareImageType());
+    {
+        juce::Graphics gi(img);
+        gi.addTransform(juce::AffineTransform::scale(k));
+        const juce::Rectangle<float> r(0.f, 0.f, (float)iw, (float)ih);
+        juce::Path glass; glass.addRoundedRectangle(r, screenRadius);
+        juce::Path ring; ring.addRectangle(r.expanded(24.f)); ring.addRoundedRectangle(r, screenRadius);
+        ring.setUsingNonZeroWinding(false);
+        gi.reduceClipRegion(glass);
+        juce::DropShadow(juce::Colour(0xFF283C5A).withAlpha(0.20f), 9, { 3,  3}).drawForPath(gi, ring);
+        juce::DropShadow(juce::Colours::white.withAlpha(0.85f),     7, {-2, -2}).drawForPath(gi, ring);
+    }
+    if(cache.size()>=12) cache.erase(cache.begin());   // tailles d'écran d'avant (redimensionnements)
+    cache.push_back({ iw, ih, k100, img });
+    return img;
+}
+
 void drawScreenGlass(juce::Graphics& g, juce::Rectangle<float> s, bool darkScreen)
 {
     // coins : les modules peignent des rectangles, la lunette les arrondit
@@ -420,13 +473,14 @@ void drawScreenGlass(juce::Graphics& g, juce::Rectangle<float> s, bool darkScree
             g.drawRoundedRectangle(s.reduced(0.5f), screenRadius, 1.f);
             return;
         }
-        juce::Path ring; ring.addRectangle(s.expanded(24.f)); ring.addRoundedRectangle(s, screenRadius);
-        ring.setUsingNonZeroWinding(false);
-        g.saveState();
-        g.reduceClipRegion(glass);
-        juce::DropShadow(juce::Colour(0xFF283C5A).withAlpha(0.20f), 9, { 3,  3}).drawForPath(g, ring);
-        juce::DropShadow(juce::Colours::white.withAlpha(0.85f),     7, {-2, -2}).drawForPath(g, ring);
-        g.restoreState();
+        // Creux (deux ombres floues) calculé une fois par taille et par échelle,
+        // puis recollé (v1.81.59). Recalculé à chaque repeint, il coûtait des
+        // dizaines de ms sur un grand écran : les modules GPU en thème clair
+        // bloquaient l'interface (glisser un spectrogramme détaché : 6 i/s).
+        const float k=juce::jlimit(1.f, 4.f, (float)g.getInternalContext().getPhysicalPixelScaleFactor());
+        const auto img=paperRecessImage(s.getWidth(), s.getHeight(), k);
+        if(img.isValid())
+            g.drawImage(img, s, juce::RectanglePlacement::stretchToFit);
         g.setColour(juce::Colour(0xFFC3CCD7));
         g.drawRoundedRectangle(s.reduced(0.5f), screenRadius, 1.f);
         return;
@@ -754,6 +808,31 @@ struct BandAxis
 //==============================================================================
 // Spec3D — style "Blocks 3D" du Spectrum
 //==============================================================================
+// Intensité des couleurs (v1.81.60) : même formule que la passe GPU
+// (GpuModule.cpp, kVividFS). Gris, noir et blanc rendus tels quels.
+juce::Colour Col::viv(juce::Colour c)
+{
+    const int v=vivid.load();
+    if(v<=0) return c;
+    float sat=1.f, con=1.f;
+    vividParams(v, sat, con);
+    float r=c.getFloatRed(), g=c.getFloatGreen(), b=c.getFloatBlue();
+    const float mx=juce::jmax(r, g, b), mn=juce::jmin(r, g, b);
+    if(mx-mn<0.004f) return c;
+    const float L=0.2126f*r+0.7152f*g+0.0722f*b;
+    r=L+(r-L)*sat; g=L+(g-L)*sat; b=L+(b-L)*sat;
+    const float w=juce::jmin(1.f, (mx-mn)*4.f);
+    auto k=[&](float x){ return juce::jlimit(0.f, 1.f, x+(((x-0.5f)*con+0.5f)-x)*w); };
+    return juce::Colour::fromFloatRGBA(k(r), k(g), k(b), c.getFloatAlpha());
+}
+
+juce::ColourGradient Col::viv(juce::ColourGradient grad)
+{
+    if(vivid.load()<=0) return grad;
+    for(int i=0; i<grad.getNumColours(); ++i) grad.setColour(i, viv(grad.getColour(i)));
+    return grad;
+}
+
 namespace Spec3D {
 float depthFor(float slotW) { return juce::jlimit(2.f, 10.f, slotW*0.32f); }
 
@@ -776,7 +855,7 @@ void drawSocle(juce::Graphics& g, juce::Rectangle<float> slot)
     const float fw=juce::jmax(1.f, slot.getWidth()-d), x=slot.getX(), b=slot.getBottom();
     juce::Path top;
     top.startNewSubPath(x, b); top.lineTo(x+d, b-dy); top.lineTo(x+fw+d, b-dy); top.lineTo(x+fw, b); top.closeSubPath();
-    g.setColour(Col::grid.withAlpha(0.8f)); g.fillPath(top);
+    g.setColour(Col::viv(Col::grid.withAlpha(0.8f))); g.fillPath(top);
 }
 
 void drawBlock(juce::Graphics& g, juce::Rectangle<float> slot, float top, juce::Colour topCol,
@@ -788,29 +867,29 @@ void drawBlock(juce::Graphics& g, juce::Rectangle<float> slot, float top, juce::
     const float h=bottom-top;
     if(h>0.5f){
         // face avant : dégradé de niveau + lumière sur le tiers gauche
-        g.setGradientFill(front); g.fillRect(x, top, fw, h);
-        g.setColour(juce::Colours::white.withAlpha(0.12f)); g.fillRect(x, top, fw*0.35f, h);
+        g.setGradientFill(Col::viv(front)); g.fillRect(x, top, fw, h);
+        g.setColour(Col::viv(juce::Colours::white.withAlpha(0.12f))); g.fillRect(x, top, fw*0.35f, h);
         // flanc : même dégradé (décalé), assombri
         juce::Path sideP;
         sideP.startNewSubPath(x+fw, top); sideP.lineTo(x+fw+d, top-dy); sideP.lineTo(x+fw+d, bottom-dy);
         sideP.lineTo(x+fw, bottom); sideP.closeSubPath();
-        g.setGradientFill(side); g.fillPath(sideP);
-        g.setColour(juce::Colours::black.withAlpha(0.5f)); g.fillPath(sideP);
+        g.setGradientFill(Col::viv(side)); g.fillPath(sideP);
+        g.setColour(Col::viv(juce::Colours::black.withAlpha(0.5f))); g.fillPath(sideP);
         // dessus : couleur du niveau atteint, éclairée
         juce::Path topP;
         topP.startNewSubPath(x, top); topP.lineTo(x+d, top-dy); topP.lineTo(x+fw+d, top-dy); topP.lineTo(x+fw, top);
         topP.closeSubPath();
-        g.setColour(topCol.interpolatedWith(juce::Colours::white, 0.35f)); g.fillPath(topP);
+        g.setColour(Col::viv(topCol.interpolatedWith(juce::Colours::white, 0.35f))); g.fillPath(topP);
         // arête avant gauche
-        g.setColour(juce::Colours::white.withAlpha(0.35f)); g.fillRect(x, top, 1.f, h);
+        g.setColour(Col::viv(juce::Colours::white.withAlpha(0.35f))); g.fillRect(x, top, 1.f, h);
     }
     if(peakY>=0.f){
         // crête : fine dalle flottante avec son dessus
         const float py=peakY-1.5f;
-        g.setColour(peakCol); g.fillRect(x, py, fw, 2.5f);
+        g.setColour(Col::viv(peakCol)); g.fillRect(x, py, fw, 2.5f);
         juce::Path pt;
         pt.startNewSubPath(x, py); pt.lineTo(x+d, py-dy); pt.lineTo(x+fw+d, py-dy); pt.lineTo(x+fw, py); pt.closeSubPath();
-        g.setColour(peakCol.interpolatedWith(juce::Colours::white, 0.4f)); g.fillPath(pt);
+        g.setColour(Col::viv(peakCol.interpolatedWith(juce::Colours::white, 0.4f))); g.fillPath(pt);
     }
 }
 }
@@ -1286,7 +1365,7 @@ void VectorscopeDisplay::renderTrail()
             const float px1=cx-s1*sc1*r, py1=cy-m1*sc1*r;
             const float a=juce::jlimit(0.08f,0.88f,(n0+n1)*1.0f);
             const float k=juce::jlimit(0.f,1.f,(n0+n1)*0.8f);
-            g.setColour(Col::hot(Col::accent,k).withAlpha(a));
+            g.setColour(Col::viv(Col::hot(Col::accent,k).withAlpha(a)));
             g.drawLine(px0,py0,px1,py1,0.9f);
         }
     } else {
@@ -1298,7 +1377,7 @@ void VectorscopeDisplay::renderTrail()
             const float px=cx-s*scale*r, py=cy-m*scale*r;
             const float k=juce::jlimit(0.f,1.f,norm*1.6f);
             const float a=juce::jlimit(0.10f,0.95f,norm*2.4f);
-            g.setColour(Col::hot(Col::accent,k).withAlpha(a));
+            g.setColour(Col::viv(Col::hot(Col::accent,k).withAlpha(a)));
             g.fillEllipse(px-1.1f,py-1.1f,2.2f,2.2f);
         }
     }
@@ -1331,22 +1410,22 @@ void VectorscopeDisplay::paint(juce::Graphics& g)
 void VectorscopeDisplay::paintBackground(juce::Graphics& g, float cx, float cy, float r)
 {
     juce::ColourGradient bgGrad(Col::pick(juce::Colour(0xFF04130F), Col::bg),cx,cy,Col::pick(juce::Colour(0xFF010706), Col::panel),cx,cy+r*1.3f,true);
-    g.setGradientFill(bgGrad); g.fillRect(getLocalBounds());
-    g.setColour(Col::accent.withAlpha(0.04f));
+    g.setGradientFill(Col::viv(bgGrad)); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::accent.withAlpha(0.04f)));
     g.fillEllipse(cx-r*1.02f,cy-r*1.02f,r*2.04f,r*2.04f);
-    g.setColour(Col::grid.withAlpha(0.9f));
+    g.setColour(Col::viv(Col::grid.withAlpha(0.9f)));
     for(float k : {0.66f,0.33f}) g.drawEllipse(cx-r*k,cy-r*k,r*2*k,r*2*k,0.6f);
     // Anneau extérieur en blanc — plus stylé, se détache nettement (comme la maquette)
-    g.setColour(Col::light(0.35f));
+    g.setColour(Col::viv(Col::light(0.35f)));
     g.drawEllipse(cx-r,cy-r,r*2,r*2,1.1f);
-    g.setColour(Col::gridCtr.withAlpha(0.8f));
+    g.setColour(Col::viv(Col::gridCtr.withAlpha(0.8f)));
     g.drawLine(cx,cy-r,cx,cy+r,0.6f);
     g.drawLine(cx-r,cy,cx+r,cy,0.6f);
-    g.setColour(Col::grid.withAlpha(0.6f));
+    g.setColour(Col::viv(Col::grid.withAlpha(0.6f)));
     g.drawLine(cx-r*0.707f,cy-r*0.707f,cx+r*0.707f,cy+r*0.707f,0.6f);
     g.drawLine(cx+r*0.707f,cy-r*0.707f,cx-r*0.707f,cy+r*0.707f,0.6f);
     g.setFont(Ui::iceland((9.5f)));
-    g.setColour(Col::light(0.7f));
+    g.setColour(Col::viv(Col::light(0.7f)));
     // "M" au-dessus du cercle, sauf s'il tombe sur le titre (gros texte,
     // module large et bas) : il passe alors juste sous le haut de l'anneau
     {
@@ -1368,18 +1447,18 @@ void VectorscopeDisplay::paintForeground(juce::Graphics& g, float cx, float cy, 
     else {
         // Jauge de corrélation : indicateur purement graphique, sans aucun texte.
         const float mh=2.5f, my=(float)H-mh-8.f, mx=cx-r*0.80f, mw=r*1.60f;
-        g.setColour(Col::knobDim.darker(0.3f));
+        g.setColour(Col::viv(Col::knobDim.darker(0.3f)));
         g.fillRoundedRectangle(mx,my,mw,mh,1.f);
         const float t=(corr*0.5f+0.5f);
         juce::Colour cc=(corr>=0.f)?Col::accent.interpolatedWith(Col::ink(juce::Colour(0xFFFFD200)),1.f-corr):Col::ink(juce::Colour(0xFFFF5530));
-        g.setColour(cc.withAlpha(0.92f));
+        g.setColour(Col::viv(cc.withAlpha(0.92f)));
         g.fillRect(mx+t*mw-1.5f,my-0.5f,3.f,mh+1.f);
-        g.setColour(Col::gridCtr.withAlpha(0.45f));
+        g.setColour(Col::viv(Col::gridCtr.withAlpha(0.45f)));
         g.drawLine(mx+mw*0.5f,my,mx+mw*0.5f,my+mh,0.5f);
     }
     Ui::drawTitleDecor(g, (float)getWidth(), Ui::kTitleLineY, Ui::titleEndBeforeRing(cx, cy, r));
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(TR("VECTORSCOPE"),6,5,getWidth()-12,13,juce::Justification::left,1,0.7f);
 }
 
@@ -1447,7 +1526,7 @@ void MultibandVectorscopeDisplay::renderTrail(int band)
         const float px=cx-s*scale*r, py=cy-m*scale*r;
         const float k=juce::jlimit(0.f,1.f,norm*1.6f);
         const float a=juce::jlimit(0.10f,0.95f,norm*2.4f);
-        g.setColour(Col::hot(Col::accent,k).withAlpha(a));
+        g.setColour(Col::viv(Col::hot(Col::accent,k).withAlpha(a)));
         g.fillEllipse(px-1.0f,py-1.0f,2.0f,2.0f);
     }
 }
@@ -1455,27 +1534,27 @@ void MultibandVectorscopeDisplay::paint(juce::Graphics& g)
 {
     const int W=getWidth(),H=getHeight();
     if(W<30||H<30) return;
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
     static const char* labels[3]={"LOW","MID|band","HIGH"};
     for(int b=0;b<3;++b){
         float cx,cy,r; getBandCircle(b,cx,cy,r);
         juce::ColourGradient bgGrad(Col::pick(juce::Colour(0xFF04130F), Col::bg),cx,cy,Col::pick(juce::Colour(0xFF010706), Col::panel),cx,cy+r*1.3f,true);
-        g.setGradientFill(bgGrad); g.fillEllipse(cx-r,cy-r,r*2,r*2);
-        g.setColour(Col::grid.withAlpha(0.9f));
+        g.setGradientFill(Col::viv(bgGrad)); g.fillEllipse(cx-r,cy-r,r*2,r*2);
+        g.setColour(Col::viv(Col::grid.withAlpha(0.9f)));
         for(float k : {0.66f,0.33f}) g.drawEllipse(cx-r*k,cy-r*k,r*2*k,r*2*k,0.5f);
-        g.setColour(Col::light(0.30f));
+        g.setColour(Col::viv(Col::light(0.30f)));
         g.drawEllipse(cx-r,cy-r,r*2,r*2,1.0f);
-        g.setColour(Col::gridCtr.withAlpha(0.7f));
+        g.setColour(Col::viv(Col::gridCtr.withAlpha(0.7f)));
         g.drawLine(cx,cy-r,cx,cy+r,0.5f);
         g.drawLine(cx-r,cy,cx+r,cy,0.5f);
         if(trailValid[b]) g.drawImageAt(trailImage[b],0,0);
         g.setFont(Ui::iceland((9.f)));
-        g.setColour(Col::textMid.withAlpha(0.85f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.85f)));
         g.drawFittedText(TR(labels[b]),(int)(cx-r),(int)(cy+r+2),(int)(r*2),12,juce::Justification::centred,1,0.7f);
     }
     Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(TR("MULTIBAND VECTORSCOPE"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
 }
 
@@ -1569,15 +1648,15 @@ void Spectrogram3DBase::drawDirectionButton(juce::Graphics& g)
     const int W=getWidth();
     const float bs=16.f;
     dirBtnBounds = juce::Rectangle<float>((float)W-bs-6.f, 4.f, bs, bs);
-    g.setColour(Col::light(0.06f));
+    g.setColour(Col::viv(Col::light(0.06f)));
     g.fillRoundedRectangle(dirBtnBounds,3.f);
-    g.setColour(Col::border);
+    g.setColour(Col::viv(Col::border));
     g.drawRoundedRectangle(dirBtnBounds.reduced(0.5f),3.f,1.f);
     juce::Path arrow;
     const float cx=dirBtnBounds.getCentreX(), cy=dirBtnBounds.getCentreY(), s=4.5f;
     if(reverseScroll) arrow.addTriangle(cx-s,cy, cx+s*0.4f,cy-s, cx+s*0.4f,cy+s);
     else               arrow.addTriangle(cx+s,cy, cx-s*0.4f,cy-s, cx-s*0.4f,cy+s);
-    g.setColour(Col::accent.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::accent.withAlpha(0.85f)));
     g.fillPath(arrow);
 }
 void Spectrogram3DBase::mouseDown(const juce::MouseEvent& e)
@@ -1661,7 +1740,7 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
 {
     const int W=getWidth(), H=getHeight();
     if(W<40||H<40) return;
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
 
     // géométrie : profondeur 0 = devant (en bas), 1 = fond (en haut, décalé
     // sur le côté) ; la zone commence après le fader TIME à gauche
@@ -1684,12 +1763,12 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
                                  bl(x0+dir*totalDx, base-totalDy), br(x0+dir*totalDx+pw, base-totalDy);
         juce::Path floor;
         floor.startNewSubPath(fl); floor.lineTo(fr); floor.lineTo(br); floor.lineTo(bl); floor.closeSubPath();
-        g.setGradientFill(juce::ColourGradient(Col::pick(juce::Colour(0xFF2E2B66), juce::Colour(0xFFE4E9F0)), 0.f, base-totalDy,
-                                               Col::pick(juce::Colour(0xFF6A6FC8), juce::Colour(0xFFCBD4E1)), 0.f, base, false));
+        g.setGradientFill(Col::viv(juce::ColourGradient(Col::pick(juce::Colour(0xFF2E2B66), juce::Colour(0xFFE4E9F0)), 0.f, base-totalDy,
+                                               Col::pick(juce::Colour(0xFF6A6FC8), juce::Colour(0xFFCBD4E1)), 0.f, base, false)));
         g.setOpacity(0.85f);
         g.fillPath(floor);
         g.setOpacity(1.f);
-        g.setColour(Col::pick(juce::Colour(0xFFC8D0FF).withAlpha(0.13f), Col::textHi.withAlpha(0.10f)));
+        g.setColour(Col::viv(Col::pick(juce::Colour(0xFFC8D0FF).withAlpha(0.13f), Col::textHi.withAlpha(0.10f))));
         for(int k=0;k<=16;++k){
             const float u=(float)k/16.f;
             g.drawLine(juce::Line<float>(fl+(fr-fl)*u, bl+(br-bl)*u), 0.6f);
@@ -1728,18 +1807,18 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
                                     inferno(0.95f), 0.f, oy-peakH, false);
             sg.addColour(0.35, inferno(0.45f));
             sg.addColour(0.65, inferno(0.72f));
-            g.setGradientFill(sg);
+            g.setGradientFill(Col::viv(sg));
             g.setOpacity(Col::paper ? 0.80f+0.20f*a : 0.35f+0.65f*a);   // papier : sans voile blanc
             g.fillPath(p);
             g.setOpacity(1.f);
-            g.setColour(Col::pick(juce::Colours::black.withAlpha(0.35f), Col::textHi.withAlpha(0.30f)));
+            g.setColour(Col::viv(Col::pick(juce::Colours::black.withAlpha(0.35f), Col::textHi.withAlpha(0.30f))));
             g.strokePath(p, juce::PathStrokeType(0.8f));
         } else {
             // lignes : fond masquant (occultation) + trait coloré par ancienneté
-            g.setColour(Col::bg.withAlpha(0.88f));
+            g.setColour(Col::viv(Col::bg.withAlpha(0.88f)));
             g.fillPath(p);
-            if(Col::paper) g.setColour(inferno(0.40f+0.60f*a).withAlpha(0.45f+0.55f*a));
-            else           g.setColour(inferno(0.25f+0.75f*a).withAlpha(0.25f+0.75f*a));
+            if(Col::paper) g.setColour(Col::viv(inferno(0.40f+0.60f*a).withAlpha(0.45f+0.55f*a)));
+            else           g.setColour(Col::viv(inferno(0.25f+0.75f*a).withAlpha(0.25f+0.75f*a)));
             g.strokePath(p, juce::PathStrokeType(r==0 ? 1.8f : 1.f));
         }
     }
@@ -1758,7 +1837,7 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
         for(float t=0.f; t<=T+1e-3f; t+=step){
             const float d=1.f-t/T;
             const float ex=x0+dir*totalDx*d+pw, ey=base-totalDy*d;
-            g.setColour(Col::textMid.withAlpha(0.6f));
+            g.setColour(Col::viv(Col::textMid.withAlpha(0.6f)));
             g.drawLine(ex+2.f, ey, ex+6.f, ey, 1.f);
             const auto lbl=SpectroReadout::formatTimeTick(t, step);
             const float w=juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), lbl)+2.f;
@@ -1770,7 +1849,7 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
     drawDirectionButton(g);
     Ui::drawTitleDecor(g, (float)getWidth(), (float)holdBtn.getBottom()+2.f);   // sous HOLD
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     Ui::drawTitleFit(g, TR(title), { 6.f, 5.f, (float)juce::jmax(20, holdBtn.getX()-12), 13.f }, g.getCurrentFont());   // plutôt que "…"
 
     // Survol : la courbe visible sous la souris est la plus en avant qui couvre
@@ -1789,11 +1868,11 @@ void Spectrogram3DBase::paintCurves(juce::Graphics& g, const char* title, bool f
             if(hoverPos.y<topY-2.f || hoverPos.y>oy) continue;
 
             // repère : trait vertical jusqu'à la base de la courbe + point
-            g.setColour(Col::accent.withAlpha(0.55f));
+            g.setColour(Col::viv(Col::accent.withAlpha(0.55f)));
             g.drawLine(hoverPos.x, topY, hoverPos.x, oy, 1.f);
-            g.setColour(juce::Colours::white);
+            g.setColour(Col::viv(juce::Colours::white));
             g.fillEllipse(juce::Rectangle<float>(7.f,7.f).withCentre({hoverPos.x, topY}));
-            g.setColour(Col::accent);
+            g.setColour(Col::viv(Col::accent));
             g.drawEllipse(juce::Rectangle<float>(9.f,9.f).withCentre({hoverPos.x, topY}), 1.2f);
 
             SpectroReadout::draw(g, getLocalBounds().toFloat(), { hoverPos.x, topY },
@@ -1908,7 +1987,7 @@ void VuMeterLeak::paint(juce::Graphics& g)
     // Communs : pastilles TP en haut (max en dBTP, rouges > 0 dBTP), maintien
     // de crête, bande rouge en haut de barre quand l'échantillon clippe.
     const float W=(float)getWidth(), H=(float)getHeight();
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
     if(W<40.f || H<120.f) return;
 
     const float gy0=PAD_T;
@@ -1935,45 +2014,45 @@ void VuMeterLeak::paint(juce::Graphics& g)
         juce::Path p; p.addRoundedRectangle(pill, 6.f);
         if(over){
             juce::DropShadow(Col::ink(juce::Colour(0xFFFF2A2A)).withAlpha(Col::paper ? 0.35f : 0.8f), 8, {}).drawForPath(g, p);
-            g.setColour(Col::pick(juce::Colour(0xE6A00A0A), juce::Colour(0xFFFDE6E3))); g.fillPath(p);
-            g.setColour(Col::ink(juce::Colour(0xFFFF4A4A))); g.strokePath(p, juce::PathStrokeType(1.2f));
+            g.setColour(Col::viv(Col::pick(juce::Colour(0xE6A00A0A), juce::Colour(0xFFFDE6E3)))); g.fillPath(p);
+            g.setColour(Col::viv(Col::ink(juce::Colour(0xFFFF4A4A)))); g.strokePath(p, juce::PathStrokeType(1.2f));
         } else {
-            g.setColour(Col::pick(juce::Colour(0xFF0D1416), Col::knobDim)); g.fillPath(p);
-            g.setColour(Col::light(Col::paper ? 0.14f : 0.08f)); g.strokePath(p, juce::PathStrokeType(1.f));
+            g.setColour(Col::viv(Col::pick(juce::Colour(0xFF0D1416), Col::knobDim))); g.fillPath(p);
+            g.setColour(Col::viv(Col::light(Col::paper ? 0.14f : 0.08f))); g.strokePath(p, juce::PathStrokeType(1.f));
         }
         g.setFont(Ui::iceland(8.5f));
-        g.setColour(over ? Col::pick(juce::Colour(0xFFFFD0D0), Col::ink(juce::Colour(0xFFFF4A4A))) : Col::textHi.withAlpha(0.55f));
+        g.setColour(Col::viv(over ? Col::pick(juce::Colour(0xFFFFD0D0), Col::ink(juce::Colour(0xFFFF4A4A))) : Col::textHi.withAlpha(0.55f)));
         g.drawFittedText("TP", pill.withHeight(11.f).translated(0.f, 1.f).toNearestInt(), juce::Justification::centred, 1);
         g.setFont(Ui::iceland(11.5f));
-        g.setColour(over ? Col::pick(juce::Colours::white, Col::ink(juce::Colour(0xFFFF2A2A))) : Col::textHi.withAlpha(0.92f));
+        g.setColour(Col::viv(over ? Col::pick(juce::Colours::white, Col::ink(juce::Colour(0xFFFF2A2A))) : Col::textHi.withAlpha(0.92f)));
         g.drawFittedText(fmt(tpMax, true), pill.withTrimmedTop(10.f).toNearestInt(), juce::Justification::centred, 1);
     };
 
     // barre crête : piste, dégradé de niveau, bande de clip, maintien
     auto drawBar=[&](juce::Rectangle<float> r, float peakDb, float holdDb, bool clip, bool rounded){
         juce::Path track; track.addRoundedRectangle(r, rounded ? 4.f : 1.f);
-        g.setColour(Col::pick(juce::Colour(0xFF0A1717), juce::Colour(0xFFE6EBF0))); g.fillPath(track);
+        g.setColour(Col::viv(Col::pick(juce::Colour(0xFF0A1717), juce::Colour(0xFFE6EBF0)))); g.fillPath(track);
         g.saveState(); g.reduceClipRegion(track);
         const float y=juce::jmax(yOf(peakDb), gy0);
-        g.setGradientFill(levelGrad); g.fillRect(r.withTop(y));
+        g.setGradientFill(Col::viv(levelGrad)); g.fillRect(r.withTop(y));
         if(rounded){   // galbe : reflet à gauche, ombre à droite
             juce::ColourGradient sh(juce::Colours::white.withAlpha(Col::paper ? 0.35f : 0.22f), r.getX(), 0.f,
                                     juce::Colours::black.withAlpha(Col::paper ? 0.12f : 0.35f), r.getRight(), 0.f, false);
             sh.addColour(0.4, juce::Colours::transparentWhite);
-            g.setGradientFill(sh); g.fillRect(r);
+            g.setGradientFill(Col::viv(sh)); g.fillRect(r);
         }
-        if(clip){ g.setColour(Col::ink(juce::Colour(0xFFFF1010))); g.fillRect(r.withHeight(4.f)); }
+        if(clip){ g.setColour(Col::viv(Col::ink(juce::Colour(0xFFFF1010)))); g.fillRect(r.withHeight(4.f)); }
         g.restoreState();
         if(holdDb>DB_MIN){
-            g.setColour(Col::pick(juce::Colour(0xFFE8FFF6), Col::textHi));
+            g.setColour(Col::viv(Col::pick(juce::Colour(0xFFE8FFF6), Col::textHi)));
             g.fillRect(r.getX(), juce::jmax(yOf(holdDb), gy0)-1.f, r.getWidth(), 2.f);
         }
     };
 
     // panneau creusé des afficheurs
     auto drawPanel=[&](juce::Rectangle<float> r){
-        g.setColour(Col::pick(juce::Colour(0xFF071012), Col::panel)); g.fillRoundedRectangle(r, 6.f);
-        g.setColour(Col::pick(juce::Colours::white.withAlpha(0.07f), Col::border)); g.drawRoundedRectangle(r.reduced(0.5f), 6.f, 1.f);
+        g.setColour(Col::viv(Col::pick(juce::Colour(0xFF071012), Col::panel))); g.fillRoundedRectangle(r, 6.f);
+        g.setColour(Col::viv(Col::pick(juce::Colours::white.withAlpha(0.07f), Col::border))); g.drawRoundedRectangle(r.reduced(0.5f), 6.f, 1.f);
     };
 
     const bool overL=tpLatchL || tpMaxL>0.f, overR=tpLatchR || tpMaxR>0.f;
@@ -1992,9 +2071,9 @@ void VuMeterLeak::paint(juce::Graphics& g)
         g.setFont(Ui::iceland(9.5f));
         for(int db : marks){
             const float y=yOf((float)db);
-            g.setColour(db==0 ? juce::Colour(0x73FF5050) : Col::grid);
+            g.setColour(Col::viv(db==0 ? juce::Colour(0x73FF5050) : Col::grid));
             g.drawLine(sc, y, W-sc, y, db==0 ? 1.f : 0.6f);
-            g.setColour(db>0 ? Col::ink(juce::Colour(0xFFFF6060)) : Col::light(0.75f));
+            g.setColour(Col::viv(db>0 ? Col::ink(juce::Colour(0xFFFF6060)) : Col::light(0.75f)));
             const juce::String t=db>0 ? "+"+juce::String(db) : juce::String(db);
             g.drawFittedText(t, 0, (int)y-6, (int)sc-4, 12, juce::Justification::centredRight, 1);
             g.drawFittedText(t, (int)(W-sc)+4, (int)y-6, (int)sc-4, 12, juce::Justification::centredLeft, 1);
@@ -2006,12 +2085,12 @@ void VuMeterLeak::paint(juce::Graphics& g)
             drawBar(r, c==0 ? dispPeakL : dispPeakR, c==0 ? holdL : holdR, c==0 ? clipHoldL>0.f : clipHoldR>0.f, false);
             // RMS intégré : bande centrale assombrie + repère blanc
             const float ry=juce::jmax(yOf(c==0 ? dispRmsL : dispRmsR), gy0);
-            g.setColour(Col::pick(juce::Colour(0x8C030A0A), juce::Colours::white.withAlpha(0.45f))); g.fillRect(x+bw*0.3f, ry, bw*0.4f, botY-ry);
-            g.setColour(Col::light(0.85f)); g.fillRect(x+bw*0.3f, ry-1.f, bw*0.4f, 2.f);
+            g.setColour(Col::viv(Col::pick(juce::Colour(0x8C030A0A), juce::Colours::white.withAlpha(0.45f)))); g.fillRect(x+bw*0.3f, ry, bw*0.4f, botY-ry);
+            g.setColour(Col::viv(Col::light(0.85f))); g.fillRect(x+bw*0.3f, ry-1.f, bw*0.4f, 2.f);
         }
 
         g.setFont(Ui::iceland(11.f));
-        g.setColour(Col::textMid.withAlpha(0.85f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.85f)));
         g.drawText("L", juce::Rectangle<float>(xL, botY+3.f, bw, 14.f), juce::Justification::centred);
         g.drawText("R", juce::Rectangle<float>(xR, botY+3.f, bw, 14.f), juce::Justification::centred);
 
@@ -2029,15 +2108,15 @@ void VuMeterLeak::paint(juce::Graphics& g)
         for(int i=0;i<3;++i){
             const auto row=panel.withTop(panel.getY()+rowH*(float)i).withHeight(rowH);
             g.setFont(Ui::iceland(8.5f));
-            g.setColour(Col::textHi.withAlpha(0.5f));
+            g.setColour(Col::viv(Col::textHi.withAlpha(0.5f)));
             g.drawText(rows[i].label, row.reduced(8.f, 3.f), juce::Justification::topLeft);
             g.setFont(Ui::iceland(rows[i].size));
-            g.setColour(rows[i].col);
+            g.setColour(Col::viv(rows[i].col));
             const auto valRow=row.withTrimmedTop(rowH*0.3f);
             g.drawFittedText(rows[i].l, juce::Rectangle<float>(xL-4.f, valRow.getY(), bw+8.f, valRow.getHeight()).toNearestInt(), juce::Justification::centred, 1);
             g.drawFittedText(rows[i].r, juce::Rectangle<float>(xR-4.f, valRow.getY(), bw+8.f, valRow.getHeight()).toNearestInt(), juce::Justification::centred, 1);
             if(i<2){
-                g.setColour(Col::light(Col::paper ? 0.10f : 0.06f));
+                g.setColour(Col::viv(Col::light(Col::paper ? 0.10f : 0.06f)));
                 g.fillRect(panel.getX()+6.f, row.getBottom(), panel.getWidth()-12.f, 1.f);
             }
         }
@@ -2053,10 +2132,10 @@ void VuMeterLeak::paint(juce::Graphics& g)
         g.setFont(Ui::iceland(10.f));
         for(int db : marks){
             const float y=yOf((float)db);
-            g.setColour(db>0 ? Col::ink(juce::Colour(0xFFFF6060)) : Col::light(0.8f));
+            g.setColour(Col::viv(db>0 ? Col::ink(juce::Colour(0xFFFF6060)) : Col::light(0.8f)));
             g.drawFittedText(db>0 ? "+"+juce::String(db) : juce::String(db),
                              juce::Rectangle<float>(mid-scW*0.5f+6.f, y-6.f, scW-12.f, 12.f).toNearestInt(), juce::Justification::centred, 1);
-            g.setColour(Col::light(0.25f));
+            g.setColour(Col::viv(Col::light(0.25f)));
             g.drawLine(xL+bw+2.f, y, xL+bw+7.f, y, 1.f);
             g.drawLine(xR-7.f,    y, xR-2.f,    y, 1.f);
         }
@@ -2066,7 +2145,7 @@ void VuMeterLeak::paint(juce::Graphics& g)
             const auto r=juce::Rectangle<float>(x, gy0, bw, gh);
             drawBar(r, c==0 ? dispPeakL : dispPeakR, c==0 ? holdL : holdR, c==0 ? clipHoldL>0.f : clipHoldR>0.f, true);
             const float ry=juce::jmax(yOf(c==0 ? dispRmsL : dispRmsR), gy0);   // repère RMS
-            g.setColour(Col::light(0.9f)); g.fillRect(x, ry-1.f, bw, 2.f);
+            g.setColour(Col::viv(Col::light(0.9f))); g.fillRect(x, ry-1.f, bw, 2.f);
         }
 
         // grands afficheurs LCD
@@ -2077,19 +2156,19 @@ void VuMeterLeak::paint(juce::Graphics& g)
         auto colText=[&](const juce::String& t, float cx, float y, float h){
             g.drawFittedText(t, juce::Rectangle<float>(cx-colW*0.5f, y, colW, h).toNearestInt(), juce::Justification::centred, 1); };
         const float u=panel.getHeight()/8.f;   // 8 unités : L/R, PEAK x2, RMS x2, CREST x2 + marge
-        g.setFont(Ui::iceland(10.f)); g.setColour(Col::textMid.withAlpha(0.85f));
+        g.setFont(Ui::iceland(10.f)); g.setColour(Col::viv(Col::textMid.withAlpha(0.85f)));
         colText("L", lx, panel.getY()+u*0.15f, u*0.8f); colText("R", rx, panel.getY()+u*0.15f, u*0.8f);
         auto label=[&](const juce::String& t, float y){
-            g.setFont(Ui::iceland(8.5f)); g.setColour(Col::textHi.withAlpha(0.5f));
+            g.setFont(Ui::iceland(8.5f)); g.setColour(Col::viv(Col::textHi.withAlpha(0.5f)));
             g.drawText(t, juce::Rectangle<float>(panel.getX(), y, panel.getWidth(), u*0.7f), juce::Justification::centred); };
         label("PEAK", panel.getY()+u*0.9f);
-        g.setFont(Ui::iceland(19.f)); g.setColour(Col::light(1.f));
+        g.setFont(Ui::iceland(19.f)); g.setColour(Col::viv(Col::light(1.f)));
         colText(fmt(numPeakL, false), lx, panel.getY()+u*1.5f, u*1.4f); colText(fmt(numPeakR, false), rx, panel.getY()+u*1.5f, u*1.4f);
         label("RMS", panel.getY()+u*3.0f);
-        g.setFont(Ui::iceland(16.f)); g.setColour(Col::accent);
+        g.setFont(Ui::iceland(16.f)); g.setColour(Col::viv(Col::accent));
         colText(fmt(numRmsL, false), lx, panel.getY()+u*3.6f, u*1.3f); colText(fmt(numRmsR, false), rx, panel.getY()+u*3.6f, u*1.3f);
         label(TR("CREST FACTOR"), panel.getY()+u*5.1f);
-        g.setFont(Ui::iceland(15.f)); g.setColour(Col::ink(juce::Colour(0xFFFFD200)));
+        g.setFont(Ui::iceland(15.f)); g.setColour(Col::viv(Col::ink(juce::Colour(0xFFFFD200))));
         const float crest=(crestL+crestR)*0.5f;
         g.drawFittedText(numPeakL<=-59.f ? juce::String("--") : juce::String(crest, 1)+" dB",
                          juce::Rectangle<float>(panel.getX(), panel.getY()+u*5.7f, panel.getWidth(), u*1.4f).toNearestInt(),
@@ -2146,18 +2225,18 @@ void LoudnessPanel::paint(juce::Graphics& g)
     // en-tête à l'échelle du texte : en gros texte, "EBU R128" passait sous le cadre INTEGRATED
     const float s=Ui::textScale;
     const int hdrH=juce::roundToInt(26.f*s), titleH=juce::roundToInt(13.f*s);
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
     if(Ui::titleStyle==0){
-        g.setColour(Col::panel); g.fillRect(0,0,W,hdrH);
-        g.setColour(Col::border); g.drawLine(0.f,(float)hdrH+0.5f,(float)W,(float)hdrH+0.5f,0.6f);
+        g.setColour(Col::viv(Col::panel)); g.fillRect(0,0,W,hdrH);
+        g.setColour(Col::viv(Col::border)); g.drawLine(0.f,(float)hdrH+0.5f,(float)W,(float)hdrH+0.5f,0.6f);
     } else {
         Ui::drawTitleDecor(g, (float)W, (float)hdrH);
     }
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(TR("LOUDNESS"),6,3,W-12,titleH,juce::Justification::left,1,0.7f);
     g.setFont(Ui::iceland((7.5f)).withExtraKerningFactor(0.12f));
-    g.setColour(Col::textMid.withAlpha(0.5f));
+    g.setColour(Col::viv(Col::textMid.withAlpha(0.5f)));
     g.drawText("EBU R128",6,2+titleH,W-12,hdrH-3-titleH,juce::Justification::left);
     const float bodyH=(float)(H-hdrH-4-btnZoneH);
     auto fmtVal=[](float v,int dec)->juce::String{
@@ -2178,8 +2257,8 @@ void LoudnessPanel::paint(juce::Graphics& g)
     const float bigY=(float)hdrH+4.f;
     {
         const juce::Colour ic=lufsCol(numI);
-        g.setColour(ic.withAlpha(0.06f)); g.fillRect(0.f,bigY,(float)W,bigH);
-        g.setColour(Col::border.withAlpha(0.4f));
+        g.setColour(Col::viv(ic.withAlpha(0.06f))); g.fillRect(0.f,bigY,(float)W,bigH);
+        g.setColour(Col::viv(Col::border.withAlpha(0.4f)));
         g.drawLine(0.f,bigY+bigH,(float)W,bigY+bigH,0.5f);
         // Trois rangées bien séparées — label, grand nombre, unité — pour ne
         // jamais se chevaucher, même quand le panneau est bas (bigH minimal).
@@ -2187,13 +2266,13 @@ void LoudnessPanel::paint(juce::Graphics& g)
         const float unitH=juce::jmin(11.f,bigH*0.22f);
         const float numH=juce::jmax(14.f,bigH-lblH-unitH);
         g.setFont(Ui::iceland((juce::jlimit(8.f,11.f,lblH))));
-        g.setColour(Col::textMid.withAlpha(0.55f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.55f)));
         g.drawFittedText(TR("INTEGRATED"),2,(int)bigY+2,W-4,(int)lblH,juce::Justification::left,1,0.7f);
         const float vfs=juce::jlimit(16.f,30.f,numH*0.78f);
-        g.setColour(lufsCol(numI));
+        g.setColour(Col::viv(lufsCol(numI)));
         Ui::drawFit(g, fmtVal(numI,1), juce::Rectangle<float>(0.f,bigY+lblH,(float)W-3.f,numH), juce::Justification::centredRight, Ui::iceland(vfs));
         g.setFont(Ui::iceland((juce::jlimit(7.f,9.f,unitH))));
-        g.setColour(ic.withAlpha(0.6f));
+        g.setColour(Col::viv(ic.withAlpha(0.6f)));
         g.drawText("LUFS",0,(int)(bigY+lblH+numH),W-3,(int)unitH,juce::Justification::centredRight);
     }
     float y=bigY+bigH+4.f;
@@ -2208,14 +2287,14 @@ void LoudnessPanel::paint(juce::Graphics& g)
         juce::GlyphArrangement ga; ga.addLineOfText(valFont, val, 0.f, 0.f);
         const float vw=juce::jmin((float)W*0.62f, ga.getBoundingBox(0, -1, true).getWidth()+4.f);
         g.setFont(valFont);
-        g.setColour(vc);
+        g.setColour(Col::viv(vc));
         g.drawText(val,(int)((float)W-6.f-vw),(int)y,(int)vw,(int)rowH,juce::Justification::centredRight,false);
         g.setFont(Ui::iceland((juce::jlimit(7.f,9.f,rowH*0.5f))).withExtraKerningFactor(0.03f));
-        g.setColour(Col::textMid.withAlpha(0.6f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.6f)));
         g.drawFittedText(lbl,6,(int)y,juce::jmax(1,(int)((float)W-vw-18.f)),(int)rowH,juce::Justification::centredLeft,1,0.6f);
         y+=rowH;
     };
-    auto sep=[&]{ g.setColour(Col::border.withAlpha(0.4f));
+    auto sep=[&]{ g.setColour(Col::viv(Col::border.withAlpha(0.4f)));
                   g.drawLine(4.f,y+1.f,(float)W-4.f,y+1.f,0.5f); y+=sepH; };
     row(TR("SHORT TERM"),   fmtVal(numS,1)+" LUFS", lufsCol(numS));
     row(TR("MOMENTARY"),    fmtVal(numM,1)+" LUFS", lufsCol(numM));
@@ -2245,22 +2324,22 @@ void ReleaseFader::paint(juce::Graphics& g)
         const float lw=30.f*Ui::textScale, vw=46.f*Ui::textScale, cy=(float)H*0.5f;   // gros texte : "TIME" ne mord plus sur le rail
         const float x0=lw, x1=(float)W-vw;
         g.setFont(Ui::iceland(9.f));
-        g.setColour(mid.withAlpha(0.8f));
+        g.setColour(Col::viv(mid.withAlpha(0.8f)));
         g.drawFittedText(TR(label),0,0,(int)lw-2,H,juce::Justification::centredRight,1,0.6f);
         juce::Path rail; rail.startNewSubPath(x0, cy); rail.lineTo(x1, cy);
         const juce::PathStrokeType railStroke(4.f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
-        g.setColour(acc.withAlpha(0.12f)); g.strokePath(rail, railStroke);
+        g.setColour(Col::viv(acc.withAlpha(0.12f))); g.strokePath(rail, railStroke);
         const float xv=x0+(x1-x0)*range.convertTo0to1(value);
         juce::Path fill; fill.startNewSubPath(x0, cy); fill.lineTo(xv, cy);
-        g.setColour(acc.withAlpha(dragging ? 0.35f : 0.18f));
+        g.setColour(Col::viv(acc.withAlpha(dragging ? 0.35f : 0.18f)));
         g.strokePath(fill, juce::PathStrokeType(9.f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour(acc); g.strokePath(fill, railStroke);
+        g.setColour(Col::viv(acc)); g.strokePath(fill, railStroke);
         const float tw=hovered||dragging ? 7.f : 6.f, th=hovered||dragging ? 16.f : 14.f;
         const auto thumb=juce::Rectangle<float>(tw, juce::jmin(th,(float)H)).withCentre({xv, cy});
-        g.setColour(juce::Colours::black.withAlpha(paper ? 0.22f : 0.5f)); g.fillRoundedRectangle(thumb.translated(1.f, 0.f), tw*0.5f);
-        g.setColour((paper ? juce::Colours::white : juce::Colour(0xFFE8FFF6))); g.fillRoundedRectangle(thumb, tw*0.5f);
+        g.setColour(Col::viv(juce::Colours::black.withAlpha(paper ? 0.22f : 0.5f))); g.fillRoundedRectangle(thumb.translated(1.f, 0.f), tw*0.5f);
+        g.setColour(Col::viv((paper ? juce::Colours::white : juce::Colour(0xFFE8FFF6)))); g.fillRoundedRectangle(thumb, tw*0.5f);
         g.setFont(Ui::iceland(9.5f));
-        g.setColour(acc);
+        g.setColour(Col::viv(acc));
         g.drawFittedText(valueText(),(int)x1+6,0,(int)vw-6,H,juce::Justification::centredLeft,1,0.6f);
         return;
     }
@@ -2270,32 +2349,32 @@ void ReleaseFader::paint(juce::Graphics& g)
     const float cx=(float)W*0.5f;
 
     g.setFont(Ui::iceland(9.f));
-    g.setColour(mid.withAlpha(0.8f));
+    g.setColour(Col::viv(mid.withAlpha(0.8f)));
     g.drawFittedText(TR(label),0,1,W,juce::roundToInt(11.f*s),juce::Justification::centred,1,0.45f);   // "TIME" tient dans le rail
 
     // rail
     juce::Path rail; rail.startNewSubPath(cx, trackY0); rail.lineTo(cx, trackY1);
     const juce::PathStrokeType railStroke(4.f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
-    g.setColour(acc.withAlpha(0.12f));
+    g.setColour(Col::viv(acc.withAlpha(0.12f)));
     g.strokePath(rail, railStroke);
 
     // remplissage avec lueur
     const float frac=range.convertTo0to1(value);
     const float yv=trackY1-(trackY1-trackY0)*frac;
     juce::Path fill; fill.startNewSubPath(cx, yv); fill.lineTo(cx, trackY1);
-    g.setColour(acc.withAlpha(dragging ? 0.35f : 0.18f));
+    g.setColour(Col::viv(acc.withAlpha(dragging ? 0.35f : 0.18f)));
     g.strokePath(fill, juce::PathStrokeType(9.f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    g.setColour(acc);
+    g.setColour(Col::viv(acc));
     g.strokePath(fill, railStroke);
 
     // curseur
     const float tw=hovered||dragging ? 16.f : 14.f, th=hovered||dragging ? 7.f : 6.f;
     const auto thumb=juce::Rectangle<float>(tw, th).withCentre({cx, yv});
-    g.setColour(juce::Colours::black.withAlpha(paper ? 0.22f : 0.5f)); g.fillRoundedRectangle(thumb.translated(0.f, 1.f), th*0.5f);
-    g.setColour((paper ? juce::Colours::white : juce::Colour(0xFFE8FFF6))); g.fillRoundedRectangle(thumb, th*0.5f);
+    g.setColour(Col::viv(juce::Colours::black.withAlpha(paper ? 0.22f : 0.5f))); g.fillRoundedRectangle(thumb.translated(0.f, 1.f), th*0.5f);
+    g.setColour(Col::viv((paper ? juce::Colours::white : juce::Colour(0xFFE8FFF6)))); g.fillRoundedRectangle(thumb, th*0.5f);
 
     g.setFont(Ui::iceland(9.5f));
-    g.setColour(acc);
+    g.setColour(Col::viv(acc));
     g.drawFittedText(valueText(),0,H-2-juce::roundToInt(11.f*s),W,juce::roundToInt(11.f*s),juce::Justification::centred,1,0.6f);   // resserré plutôt que "2…"
 }
 void ReleaseFader::setFromPos(juce::Point<int> p)
@@ -2452,18 +2531,18 @@ void SpectrumDisplayLeak::rebuildCache()
     gridImage=juce::Image(juce::Image::ARGB,(int)(cachedGW+cachedPadL+4.f),(int)(cachedGH+padT()+padB()),true);
     {
         juce::Graphics gi(gridImage);
-        gi.setColour(Col::bg);gi.fillAll();
+        gi.setColour(Col::viv(Col::bg));gi.fillAll();
         for(int db=-(int)dbRange;db<=0;db+=10){
             float y=std::round(dbToY((float)db))+.5f;
-            gi.setColour(db==0?Col::gridCtr:Col::grid);gi.drawLine(cachedPadL,y,cachedPadL+cachedGW,y,1.f);
+            gi.setColour(Col::viv(db==0?Col::gridCtr:Col::grid));gi.drawLine(cachedPadL,y,cachedPadL+cachedGW,y,1.f);
             float fs=juce::jlimit(8.f,12.f,cachedGH*.065f);
             gi.setFont(Ui::iceland((fs)));
-            gi.setColour(db==0?Col::textHi:Col::textMid);
+            gi.setColour(Col::viv(db==0?Col::textHi:Col::textMid));
             // (« +0 » un peu plus bas : la ligne du titre passe juste au-dessus)
             gi.drawText(db==0?"+0":juce::String(db),0,(int)y-7+(db==0 ? 4 : 0),(int)cachedPadL-4,14,juce::Justification::centredRight);
         }
         static const float vRef[]={20,50,100,200,500,1000,2000,5000,10000,20000};
-        gi.setColour(Col::grid);
+        gi.setColour(Col::viv(Col::grid));
         for(float f:vRef){float x=std::round(freqToX(f))+.5f;gi.drawLine(x,padT(),x,padT()+cachedGH,1.f);}
     }
     // Gradient images
@@ -2478,7 +2557,7 @@ void SpectrumDisplayLeak::rebuildCache()
         grad.addColour(0.28,Col::ink(juce::Colour(0xFFFFD200)).withAlpha(0.88f));
         grad.addColour(0.52,Col::ink(juce::Colour(0xFF00FF55)).withAlpha(0.82f));
         grad.addColour(0.78,Col::ink(juce::Colour(0xFF00FFB2)).withAlpha(0.75f));
-        gg.setGradientFill(grad);gg.fillRect(0,0,1,gradH);
+        gg.setGradientFill(Col::viv(grad));gg.fillRect(0,0,1,gradH);
     }
     lastHoveredBand=-1;
     cacheValid=true;gridImageValid=true;cacheGen=Col::generation;
@@ -2640,17 +2719,17 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
     const bool isMSMode=(analysisMode==LeakAudioProcessor::AnalysisMode::MS);
 
     if(gridImageValid){
-        g.setColour(Col::bg);g.fillRect(getLocalBounds());
+        g.setColour(Col::viv(Col::bg));g.fillRect(getLocalBounds());
         g.drawImageAt(gridImage,0,0);
-    } else {g.setColour(Col::bg);g.fillRect(getLocalBounds());}
+    } else {g.setColour(Col::viv(Col::bg));g.fillRect(getLocalBounds());}
 
     {using AM=LeakAudioProcessor::AnalysisMode;
      float lfs=juce::jlimit(8.f,11.f,gh*.06f);
      g.setFont(Ui::iceland((lfs)));
-     if(analysisMode==AM::Mid){g.setColour(Col::midCol.withAlpha(.75f));g.drawText("MID",(int)gx0+2,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}
-     else if(analysisMode==AM::Side){g.setColour(Col::sideCol.withAlpha(.75f));g.drawText("SIDE",(int)gx0+2,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}
-     else if(isMSMode){g.setColour(Col::midCol.withAlpha(.7f));g.drawText("MID",(int)gx0+2,(int)gy0+2,30,(int)lfs+2,juce::Justification::left);
-         g.setColour(Col::light(.8f));g.drawText("SIDE",(int)gx0+34,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}}
+     if(analysisMode==AM::Mid){g.setColour(Col::viv(Col::midCol.withAlpha(.75f)));g.drawText("MID",(int)gx0+2,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}
+     else if(analysisMode==AM::Side){g.setColour(Col::viv(Col::sideCol.withAlpha(.75f)));g.drawText("SIDE",(int)gx0+2,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}
+     else if(isMSMode){g.setColour(Col::viv(Col::midCol.withAlpha(.7f)));g.drawText("MID",(int)gx0+2,(int)gy0+2,30,(int)lfs+2,juce::Justification::left);
+         g.setColour(Col::viv(Col::light(.8f)));g.drawText("SIDE",(int)gx0+34,(int)gy0+2,36,(int)lfs+2,juce::Justification::left);}}
 
     clipOn.clear();clipOff.clear();
     bool anyClipOn=false,anyClipOff=false;
@@ -2675,7 +2754,7 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
     if(blocks3D){
         juce::ColourGradient floor(Col::accent.withAlpha(0.08f), gx0+gw*0.5f, minY,
                                    juce::Colours::transparentBlack, gx0+gw*0.5f, minY-gh*0.45f, false);
-        g.setGradientFill(floor); g.fillRect(gx0, gy0, gw, gh);
+        g.setGradientFill(Col::viv(floor)); g.fillRect(gx0, gy0, gw, gh);
         for(int i=0;i<N;++i) Spec3D::drawSocle(g, {barCache[i].x, gy0, barCache[i].bw, minY-gy0});
         const float dy=N>0 ? Spec3D::depthFor(barCache[0].bw)*0.7f : 0.f;
         front3D=Spec3D::levelGradient(gy0, minY);
@@ -2695,14 +2774,14 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
         else if(barH>0.5f){
             g.drawImage(barGradImage,(int)bx,(int)barT,(int)bw,(int)barH,0,(int)(barT-gy0),1,(int)barH);
             const juce::Colour tipCol=tipColour(db);
-            g.setColour(tipCol);
+            g.setColour(Col::viv(tipCol));
             g.fillRect(bx,barT,bw,1.5f);
             if(i!=soloBand && (multiSelectMask & LeakAudioProcessor::bandBit(i))==0ULL){
                 for(int rd=-5;rd>=-(int)dbRange;rd-=5){
                     if(levels[i]>(float)rd){
                         const float ry=std::round(dbToY((float)rd));
-                        if(rd%10==0){g.setColour(kRefMark);g.fillRect(bx,ry-1.f,bw,1.5f);}
-                        else{g.setColour(Col::pick(juce::Colour(0x44AAFFDD), Col::accent.withAlpha(0.30f)));g.fillRect(bx,ry-0.5f,bw,1.0f);}
+                        if(rd%10==0){g.setColour(Col::viv(kRefMark));g.fillRect(bx,ry-1.f,bw,1.5f);}
+                        else{g.setColour(Col::viv(Col::pick(juce::Colour(0x44AAFFDD), Col::accent.withAlpha(0.30f))));g.fillRect(bx,ry-0.5f,bw,1.0f);}
                     }
                 }
             }
@@ -2718,49 +2797,49 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
             const float sx=bx+inset, sw=juce::jmax(2.f,bw-2.f*inset);
             if(sH>0.5f){
                 const juce::Rectangle<float> glass(sx,sTop,sw,sH);
-                g.setColour(Col::bg.withAlpha(0.35f)); g.fillRect(glass);
-                g.setGradientFill(juce::ColourGradient(Col::light(0.32f),0.f,sTop,
-                                                       Col::light(0.06f),0.f,barB,false));
+                g.setColour(Col::viv(Col::bg.withAlpha(0.35f))); g.fillRect(glass);
+                g.setGradientFill(Col::viv(juce::ColourGradient(Col::light(0.32f),0.f,sTop,
+                                                       Col::light(0.06f),0.f,barB,false)));
                 g.fillRect(glass);
-                g.setColour(Col::light(0.75f)); g.drawRect(glass,1.f);
+                g.setColour(Col::viv(Col::light(0.75f))); g.drawRect(glass,1.f);
                 if(sw>4.f){
-                    g.setColour(Col::light(0.18f));
+                    g.setColour(Col::viv(Col::light(0.18f)));
                     g.fillRect(glass.reduced(1.f).withWidth(juce::jmax(1.f,(sw-2.f)*0.3f)));
                 }
-                g.setColour(Col::light(1.f)); g.fillRect(sx,sTop,sw,1.5f);
+                g.setColour(Col::viv(Col::light(1.f))); g.fillRect(sx,sTop,sw,1.5f);
             }
             if(peakOn&&sidePeaks[i]>-dbRange){
                 const float spy=juce::jmax(dbToY(sidePeaks[i]),gy0);
-                g.setColour(Col::light(0.8f)); g.fillRect(sx,spy-0.75f,sw,1.5f);
+                g.setColour(Col::viv(Col::light(0.8f))); g.fillRect(sx,spy-0.75f,sw,1.5f);
             }
         }
         if(!blocks3D && peakOn&&peaks[i]>-dbRange){   // (Blocks 3D : crête dessinée avec le bloc)
             const float py=juce::jmax(dbToY(peaks[i]),gy0);
             const juce::Colour peakCol=peakColour(peaks[i]);
-            g.setColour(peakCol.withAlpha(0.28f));g.fillRect(bx,py-3.f,bw,5.f);
-            g.setColour(peakCol);g.fillRect(bx,py-1.5f,bw,2.f);
+            g.setColour(Col::viv(peakCol.withAlpha(0.28f)));g.fillRect(bx,py-3.f,bw,5.f);
+            g.setColour(Col::viv(peakCol));g.fillRect(bx,py-1.5f,bw,2.f);
         }
         const float ledY=gy0-16.f;
         if(clipLatch[i]){clipOn.add(bx,ledY,bw,8.f);anyClipOn=true;}
         else            {clipOff.add(bx,ledY,bw,8.f);anyClipOff=true;}
     }
 
-    if(anyClipOff){g.setColour(Col::pick(juce::Colour(0xFF0A1A1A), Col::knobDim));g.fillRectList(clipOff);
-                   g.setColour(Col::border);for(auto&r:clipOff)g.drawRect(r,0.5f);}
-    if(anyClipOn) {g.setColour(Col::ink(juce::Colour(0xFFFF1010)));g.fillRectList(clipOn);
-                   g.setColour(Col::ink(juce::Colour(0xFFFF5555)));for(auto&r:clipOn)g.drawRect(r,0.5f);}
+    if(anyClipOff){g.setColour(Col::viv(Col::pick(juce::Colour(0xFF0A1A1A), Col::knobDim)));g.fillRectList(clipOff);
+                   g.setColour(Col::viv(Col::border));for(auto&r:clipOff)g.drawRect(r,0.5f);}
+    if(anyClipOn) {g.setColour(Col::viv(Col::ink(juce::Colour(0xFFFF1010))));g.fillRectList(clipOn);
+                   g.setColour(Col::viv(Col::ink(juce::Colour(0xFFFF5555))));for(auto&r:clipOn)g.drawRect(r,0.5f);}
 
     // Solo visuel : assombrit les bandes non sélectionnées, encadre les bandes actives
     // (soloBand = clic mono-bande momentané, multiSelectMask = sélection Ctrl persistante)
     if(soloBand>=0 || multiSelectMask!=0ULL){
-        g.setColour(Col::pick(juce::Colour(0xBB000000), Col::bg.withAlpha(0.73f)));
+        g.setColour(Col::viv(Col::pick(juce::Colour(0xBB000000), Col::bg.withAlpha(0.73f))));
         for(int i=0;i<N;++i){
             const bool sel = (i==soloBand) || ((multiSelectMask & LeakAudioProcessor::bandBit(i))!=0ULL);
             if(!sel) g.fillRect(barCache[i].x,gy0,barCache[i].bw,gh);
         }
         // cadre tracé À L'INTÉRIEUR de la colonne : il ne doit pas combler
         // l'écart avec les bandes voisines (sinon elles semblent se rejoindre)
-        g.setColour(Col::accent);
+        g.setColour(Col::viv(Col::accent));
         for(int i=0;i<N;++i){
             const bool sel = (i==soloBand) || ((multiSelectMask & LeakAudioProcessor::bandBit(i))!=0ULL);
             if(sel) g.drawRect(juce::Rectangle<float>(barCache[i].x,gy0,barCache[i].bw,gh),
@@ -2768,15 +2847,15 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
         }
     }
 
-    g.setColour(Col::gridCtr.brighter(.3f));g.drawLine(gx0,zeroY,gx0+gw,zeroY,1.f);
-    g.setColour(Col::border);g.drawRect(gx0,gy0,gw,gh,1.f);
-    g.setFont(labelFont);g.setColour(Col::textMid);
+    g.setColour(Col::viv(Col::gridCtr.brighter(.3f)));g.drawLine(gx0,zeroY,gx0+gw,zeroY,1.f);
+    g.setColour(Col::viv(Col::border));g.drawRect(gx0,gy0,gw,gh,1.f);
+    g.setFont(labelFont);g.setColour(Col::viv(Col::textMid));
     // étiquettes du mode avec lequel le cache a été construit (même nombre de bandes)
     const char** labels=(cacheMode==62)?BAND_LABELS_62:(cacheMode==15)?BAND_LABELS_15:BAND_LABELS_31;
     for(int i=0;i<juce::jmin(N, LeakAudioProcessor::bandTableSize(cacheMode));++i) if(barCache[i].showLabel) g.drawSingleLineText(labels[i],(int)barCache[i].labelX,(int)(barCache[i].labelY+labelFontSize));
 
     if(hoveredBand>=0){
-        g.setColour(Col::accent.withAlpha(.18f));g.drawLine(hoverPixX,gy0,hoverPixX,gy0+gh,1.f);
+        g.setColour(Col::viv(Col::accent.withAlpha(.18f)));g.drawLine(hoverPixX,gy0,hoverPixX,gy0+gh,1.f);
         if(hoveredBand!=lastHoveredBand || forceTipRefresh){
             const float* F=processor.getBandFreqs();float f=F[juce::jmin(hoveredBand, processor.getNumActiveBands()-1)];
             juce::String freqStr=(f>=1000.f)?(juce::String(f/1000.f,(std::fmod(f,1000.f)==0.f)?0:2)+" kHz"):(juce::String((int)f)+" Hz");
@@ -2792,15 +2871,15 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
         float tfs=juce::jlimit(9.f,12.f,gh*.07f);
         float th=tfs+8.f,tx=hoverPixX+10.f;
         if(tx+cachedTipW>(float)W-4.f) tx=hoverPixX-cachedTipW-10.f;
-        g.setColour(Col::panel);g.fillRoundedRectangle(tx,gy0+6.f,cachedTipW,th,3.f);
-        g.setColour(Col::border);g.drawRoundedRectangle(tx,gy0+6.f,cachedTipW,th,3.f,.8f);
+        g.setColour(Col::viv(Col::panel));g.fillRoundedRectangle(tx,gy0+6.f,cachedTipW,th,3.f);
+        g.setColour(Col::viv(Col::border));g.drawRoundedRectangle(tx,gy0+6.f,cachedTipW,th,3.f,.8f);
         g.setFont(Ui::iceland((tfs)));
-        g.setColour(Col::accent);g.drawText(cachedTipStr,(int)(tx+7.f),(int)(gy0+6.f),(int)(cachedTipW-8.f),(int)th,juce::Justification::centredLeft);
+        g.setColour(Col::viv(Col::accent));g.drawText(cachedTipStr,(int)(tx+7.f),(int)(gy0+6.f),(int)(cachedTipW-8.f),(int)th,juce::Justification::centredLeft);
     }
 
     Ui::drawTitleDecor(g, (float)getWidth());
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(TR("SPECTRUM"),8,4,juce::jmax(40,getWidth()/2),13,juce::Justification::left,1,0.7f);
 }
 
@@ -3023,21 +3102,21 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
         return juce::Point<float>(cx+std::sin(rad)*r, cy-std::cos(rad)*r);
     };
 
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
 
     // ── En-tête ──────────────────────────────────────────────────────────
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(kNeedleTitle,8,0,juce::jmax(30,modeBtn.getX()-10),headerH,juce::Justification::centredLeft,1,0.7f);
-    if(Ui::titleStyle==0){ g.setColour(Col::border.withAlpha(0.5f)); g.drawLine(0.f,(float)headerH,(float)W,(float)headerH,0.6f); }
+    if(Ui::titleStyle==0){ g.setColour(Col::viv(Col::border.withAlpha(0.5f))); g.drawLine(0.f,(float)headerH,(float)W,(float)headerH,0.6f); }
     else Ui::drawTitleDecor(g, (float)W, (float)headerH);
     // référence 0VU entre les flèches, dans un petit écran creux
     if(!calibValueArea.isEmpty()){
         const auto va=calibValueArea.toFloat().reduced(1.f, 0.f);
-        g.setColour(Col::pick(juce::Colours::black.withAlpha(0.35f), Col::panel)); g.fillRoundedRectangle(va, 4.f);
-        g.setColour(Col::border.withAlpha(0.6f));          g.drawRoundedRectangle(va.reduced(0.5f), 4.f, 0.8f);
+        g.setColour(Col::viv(Col::pick(juce::Colours::black.withAlpha(0.35f), Col::panel))); g.fillRoundedRectangle(va, 4.f);
+        g.setColour(Col::viv(Col::border.withAlpha(0.6f)));          g.drawRoundedRectangle(va.reduced(0.5f), 4.f, 0.8f);
         g.setFont(Ui::iceland(juce::jmax(8.f, (float)calibValueArea.getHeight()*0.68f)));
-        g.setColour(Col::textHi.withAlpha(0.92f));
+        g.setColour(Col::viv(Col::textHi.withAlpha(0.92f)));
         g.drawFittedText(juce::String((int)calibRef)+" dB", calibValueArea, juce::Justification::centred, 1, 0.7f);
     }
 
@@ -3045,7 +3124,7 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
     // Halo doux
     juce::ColourGradient halo(Col::accent.withAlpha(0.05f),cx,cy-radius*0.4f,
                                juce::Colours::transparentBlack,cx,cy-radius*1.1f,false);
-    g.setGradientFill(halo); g.fillRect(ga);
+    g.setGradientFill(Col::viv(halo)); g.fillRect(ga);
 
     // Graduations + étiquettes
     static const float majDbs[]={-20.f,-10.f,-7.f,-5.f,-3.f,0.f,1.f,2.f,3.f};
@@ -3057,14 +3136,14 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
         const bool hot=db>0.5f;
         const auto p0=pointOnArc(ang,radius*0.86f);
         const auto p1=pointOnArc(ang,radius*1.0f);
-        g.setColour(hot?Col::ink(juce::Colour(0xFFFF3B30)):(db>=-0.01f?Col::light(1.f):Col::accent));
+        g.setColour(Col::viv(hot?Col::ink(juce::Colour(0xFFFF3B30)):(db>=-0.01f?Col::light(1.f):Col::accent)));
         g.drawLine(p0.x,p0.y,p1.x,p1.y, db==0.f?2.2f:1.6f);
         const auto lp=pointOnArc(ang,radius*1.16f);
         juce::String lbl = (db>0.f? "+" : "") + juce::String((int)db);
         g.drawText(lbl,(int)lp.x-18,(int)lp.y-7,36,14,juce::Justification::centred);
     }
     // Petites graduations intermédiaires non chiffrées (entre -10 et 0, comme la maquette)
-    g.setColour(Col::accent.withAlpha(0.45f));
+    g.setColour(Col::viv(Col::accent.withAlpha(0.45f)));
     for(int i=1;i<10;++i){
         const float db=-10.f+(float)i;
         if(db>=-0.4f) continue;
@@ -3082,19 +3161,19 @@ void NeedleVuMeter::paintDialStatic(juce::Graphics& g, juce::Rectangle<float> ga
             const auto pt=pointOnArc(angleForDb(db),radius*1.0f);
             if(i==0) redArc.startNewSubPath(pt); else redArc.lineTo(pt);
         }
-        g.setColour(Col::ink(juce::Colour(0xFFFF3B30)).withAlpha(0.85f));
+        g.setColour(Col::viv(Col::ink(juce::Colour(0xFFFF3B30)).withAlpha(0.85f)));
         g.strokePath(redArc, juce::PathStrokeType(2.2f));
     }
 
     // Texte central "VU" / "dB" / signes — rangées bien séparées, aucun chevauchement
-    g.setColour(Col::accent.withAlpha(0.9f));
+    g.setColour(Col::viv(Col::accent.withAlpha(0.9f)));
     // (inscriptions du cadran à l'échelle du cadran, comme les graduations)
     g.setFont(Ui::icelandAbs(radius*0.30f).withExtraKerningFactor(0.1f));
     // ce que lit l'aiguille : des dBFS (0 = référence de l'en-tête) — "VU" et
     // "dB" ne sont plus affichés
     g.drawText("dBFS",juce::Rectangle<float>(cx-radius*0.6f,cy-radius*0.58f,radius*1.2f,radius*0.26f).toNearestInt(),juce::Justification::centred,false);
     g.setFont(Ui::icelandAbs(radius*0.14f));
-    g.setColour(Col::textMid.withAlpha(0.5f));
+    g.setColour(Col::viv(Col::textMid.withAlpha(0.5f)));
     g.drawText("-",juce::Rectangle<float>(cx-radius*0.44f,cy-radius*0.16f,radius*0.16f,radius*0.16f).toNearestInt(),juce::Justification::centred);
     g.drawText("+",juce::Rectangle<float>(cx+radius*0.28f,cy-radius*0.16f,radius*0.16f,radius*0.16f).toNearestInt(),juce::Justification::centred);
 
@@ -3112,7 +3191,7 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
     // Indicateur LIVE
     {
         const bool live = !holding;
-        g.setColour((live?Col::accent:Col::textMid).withAlpha(live?0.95f:0.4f));
+        g.setColour(Col::viv((live?Col::accent:Col::textMid).withAlpha(live?0.95f:0.4f)));
         g.fillEllipse(ga.getX()+10.f,ga.getY()+8.f,8.f,8.f);
         g.setFont(Ui::iceland((10.f)));
         g.drawText(live?"LIVE":"HOLD",(int)ga.getX()+22,(int)ga.getY()+3,60,16,juce::Justification::left);
@@ -3140,7 +3219,7 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
         shadow.lineTo(cx+px,cy+py);
         shadow.lineTo(tip.x,tip.y);
         shadow.closeSubPath();
-        g.setColour(juce::Colours::black.withAlpha(Col::paper ? 0.22f : 0.35f));
+        g.setColour(Col::viv(juce::Colours::black.withAlpha(Col::paper ? 0.22f : 0.35f)));
         g.fillPath(shadow, juce::AffineTransform::translation(Col::paper ? 1.2f : 0.7f, Col::paper ? 1.2f : 0.7f));
 
         // Deux facettes (gauche/droite) façon tige métallique arrondie —
@@ -3151,26 +3230,26 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
 
         juce::ColourGradient ngDark(needleCol.darker(0.55f).withAlpha(0.9f),cx,cy,
                                      needleCol.darker(0.15f),tip.x,tip.y,false);
-        g.setGradientFill(ngDark); g.fillPath(faceL);
+        g.setGradientFill(Col::viv(ngDark)); g.fillPath(faceL);
 
         juce::ColourGradient ngLight(needleCol.withAlpha(0.95f),cx,cy,
                                       needleCol.brighter(0.4f),tip.x,tip.y,false);
-        g.setGradientFill(ngLight); g.fillPath(faceR);
+        g.setGradientFill(Col::viv(ngLight)); g.fillPath(faceR);
 
         // Liseré de contour pour détacher l'aiguille du fond
         juce::Path outline;
         outline.startNewSubPath(cx-px,cy-py); outline.lineTo(tip.x,tip.y); outline.lineTo(cx+px,cy+py);
-        g.setColour(juce::Colours::black.withAlpha(0.4f));
+        g.setColour(Col::viv(juce::Colours::black.withAlpha(0.4f)));
         g.strokePath(outline, juce::PathStrokeType(0.8f));
 
         // Reflet spéculaire central — fine ligne claire le long de l'arête,
         // c'est ce qui vend vraiment l'effet 3D (tige ronde qui capte la lumière).
-        g.setColour(juce::Colours::white.withAlpha(Col::paper ? 0.45f : 0.85f));
+        g.setColour(Col::viv(juce::Colours::white.withAlpha(Col::paper ? 0.45f : 0.85f)));
         g.drawLine(cx,cy,tip.x,tip.y,0.9f);
 
-        g.setColour(Col::knobDim.darker(0.4f));
+        g.setColour(Col::viv(Col::knobDim.darker(0.4f)));
         g.fillEllipse(cx-pivotR,cy-pivotR,pivotR*2.f,pivotR*2.f);
-        g.setColour(needleCol.withAlpha(0.6f));
+        g.setColour(Col::viv(needleCol.withAlpha(0.6f)));
         g.drawEllipse(cx-pivotR,cy-pivotR,pivotR*2.f,pivotR*2.f,1.2f);
     }
 
@@ -3186,7 +3265,7 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
         // zone en virgule flottante : la version à entiers de drawImage tronquait
         // position et taille (logo décalé d'~1,5 px vers le haut-gauche du pivot)
         if(Col::paper){   // monogramme chromé illisible sur le pivot clair : en silhouette encre
-            g.setColour(Col::textHi.withAlpha(0.85f));
+            g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
             g.drawImage(skLogo, juce::Rectangle<float>(cx-imgW*0.5f, cy-imgH*0.5f, imgW, imgH), juce::RectanglePlacement::stretchToFit, true);
         } else
             g.drawImage(skLogo, juce::Rectangle<float>(cx-imgW*0.5f, cy-imgH*0.5f, imgW, imgH));
@@ -3196,7 +3275,7 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
     // partagent la place à gauche du HOLD) ───────────────────────────────
     const int statH=needleStatH(H);
     const int statY=H-statH;
-    g.setColour(Col::border.withAlpha(0.5f)); g.drawLine(0.f,(float)statY,(float)W,(float)statY,0.6f);
+    g.setColour(Col::viv(Col::border.withAlpha(0.5f))); g.drawLine(0.f,(float)statY,(float)W,(float)statY,0.6f);
     const int cardW=((W-8)-(W-8)/4)/2;
 
     auto fmtDb=[](float v)->juce::String{ return v<=-119.f?juce::String("--"):juce::String(v,1); };
@@ -3211,15 +3290,15 @@ void NeedleVuMeter::paintDialDynamic(juce::Graphics& g, juce::Rectangle<float> g
         const int valueH=juce::jmax(14, statH-labelH-unitH-2*gap-2);
         const float tw=(float)(cardW-6);
         int y=statY+2;
-        g.setColour(Col::textMid.withAlpha(0.6f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.6f)));
         Ui::drawFit(g, label, juce::Rectangle<float>((float)x+4.f,(float)y,tw,(float)labelH), juce::Justification::left,
                     Ui::iceland(8.5f).withExtraKerningFactor(0.06f));
         y+=labelH+gap;
-        g.setColour(vc);
+        g.setColour(Col::viv(vc));
         Ui::drawFit(g, val, juce::Rectangle<float>((float)x+4.f,(float)y,tw,(float)valueH), juce::Justification::left,
                     Ui::icelandAbs(juce::jlimit(13.f,19.f*Ui::textScale,(float)valueH*0.82f)));
         y+=valueH+gap;
-        g.setColour(Col::textMid.withAlpha(0.5f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.5f)));
         Ui::drawFit(g, unit, juce::Rectangle<float>((float)x+4.f,(float)y,tw,(float)unitH), juce::Justification::left, Ui::iceland(7.5f));
     };
     statCard(0,"PEAK",fmtDb(numPeak),"dBFS", numPeak>=-1.f?Col::ink(juce::Colour(0xFFFF3B30)):Col::accent);
@@ -4052,7 +4131,7 @@ AboutOverlay::AboutOverlay()
 
     column[2].setItems({
         H("Features"),
-        B("20 Modules in 4 Families: Spectrum, Spectrogram, Stereo, Level and Time"),
+        B("23 Modules in 4 Families: Spectrum, Spectrogram, Stereo, Level and Time"),
         B("5 Freely Assignable Slots plus a Fixed Master VU"),
         B("Standalone App and VST3 Plugin for Windows and macOS"),
         B("Audio Interface Loopback Capture, plus Direct System Output Capture on Windows"),
@@ -4060,10 +4139,12 @@ AboutOverlay::AboutOverlay()
         B("True Peak with 4x Oversampling (BS.1770-4 Annex 2)"),
         B("15 / 31 / 62 Band Spectrum, Stereo, Mid/Side or Side Analysis"),
         B("4096 Point Spectral Density with Welch Averaging"),
-        B("3D Spectrograms: Lines, Surface, Terrain, Neon, Crystal"),
+        B("3D Spectrograms: Lines, Surface, Terrain, Neon, Crystal, Smoothed Crystal 2"),
         B("Vectorscopes: Classic, Phosphor, Density, Multiband"),
         B("Multiband Correlator, Panorama and Dot Panorama"),
         B("Triggered Oscilloscope with Adjustable Trace Width"),
+        B("32 Bit Meter: Bits Used and Low Bits Always at Zero, per Channel"),
+        B("Tuner for Kick, Snare, Bass and Guitar: Note, Hz, Cents and Last Hits"),
         B("GPU Modules Rendered in OpenGL, with Anti-Aliasing and V-Sync Options"),
         B("Detachable Modules: Any Module in its Own Window"),
         B("Always on Top, Keyboard Left to Your DAW"),
@@ -4612,7 +4693,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
     const int W=getWidth(), H=getHeight();
     if(W<10||H<10) return;
 
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
 
     const float padL=kReleaseFaderW+juce::jlimit(18.f,32.f,W*.042f)*Ui::textScale;
     const float padR=4.f, padT=22.f, padB=8.f;
@@ -4625,7 +4706,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
     // ── Grille horizontale ────────────────────────────────────────────────
     auto hline=[&](float corrVal, bool center){
         const float y=cy-corrVal*ghalf;
-        g.setColour(center?Col::gridCtr.withAlpha(0.9f):Col::grid.withAlpha(0.45f));
+        g.setColour(Col::viv(center?Col::gridCtr.withAlpha(0.9f):Col::grid.withAlpha(0.45f)));
         g.drawLine(padL,y,padL+gw,y,center?0.8f:0.5f);
     };
     hline( 0.f,true);
@@ -4637,7 +4718,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
     for(auto [cv,lbl] : std::initializer_list<std::pair<float,const char*>>{
             {1.f,"+1"},{0.5f,"+.5"},{0.f,"0"},{-0.5f,"-.5"},{-1.f,"-1"}})
     {
-        g.setColour(Col::textMid.withAlpha(cv==0.f?0.7f:0.45f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(cv==0.f?0.7f:0.45f)));
         // (« +1 » un peu plus bas : la ligne du titre passe juste au-dessus)
         g.drawText(lbl, 0,(int)(cy-cv*ghalf)-4+(cv==1.f ? 3 : 0),(int)padL-2,9,juce::Justification::centredRight);
     }
@@ -4652,7 +4733,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
     {
         (void)lbl;
         const float fx=freqToX(f);
-        g.setColour(Col::grid.withAlpha(0.28f));
+        g.setColour(Col::viv(Col::grid.withAlpha(0.28f)));
         g.drawLine(fx,padT,fx,padT+gh,0.5f);
     }
 
@@ -4668,9 +4749,9 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
     if(multiSelectMask!=0ULL){
         for(int b=0;b<N;++b){
             if(multiSelectMask & LeakAudioProcessor::bandBit(b)){
-                g.setColour(Col::accent.withAlpha(0.16f));
+                g.setColour(Col::viv(Col::accent.withAlpha(0.16f)));
                 g.fillRect(bandX0[b]-2.f, padT, bandBW[b]+4.f, gh);
-                g.setColour(Col::accent.withAlpha(0.5f));
+                g.setColour(Col::viv(Col::accent.withAlpha(0.5f)));
                 g.drawRect(bandX0[b]-1.f, padT, bandBW[b]+2.f, gh, 1.0f);
             }
         }
@@ -4678,7 +4759,7 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
 
     // Surlignage de la bande soloée — colonne complète, sous les barres
     if(soloBand>=0 && soloBand<N){
-        g.setColour(Col::accent.withAlpha(0.10f));
+        g.setColour(Col::viv(Col::accent.withAlpha(0.10f)));
         g.fillRect(bandX0[soloBand]-2.f, padT, bandBW[soloBand]+4.f, gh);
     }
 
@@ -4691,36 +4772,36 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
         if(c >= 0.f){
             // Corrélation positive : cyan → blanc selon intensité
             const juce::Colour col=Col::hot(Col::accent,c*0.35f);
-            g.setColour(col.withAlpha(0.78f));
+            g.setColour(Col::viv(col.withAlpha(0.78f)));
             g.fillRect(x0+0.5f, cy-barH, bw, barH);
-            g.setColour(col.brighter(0.2f));
+            g.setColour(Col::viv(col.brighter(0.2f)));
             g.fillRect(x0+0.5f, cy-barH, bw, 1.5f);   // cap haut
         } else {
             // Corrélation négative : rouge-orange selon intensité
             const float nc=-c;
             const juce::Colour col=Col::ink(juce::Colour(0xFFFF2200)).interpolatedWith(Col::ink(juce::Colour(0xFFFF7700)),nc*0.5f);
-            g.setColour(col.withAlpha(0.78f));
+            g.setColour(Col::viv(col.withAlpha(0.78f)));
             g.fillRect(x0+0.5f, cy, bw, barH);
-            g.setColour(col.brighter(0.2f));
+            g.setColour(Col::viv(col.brighter(0.2f)));
             g.fillRect(x0+0.5f, cy+barH-1.5f, bw, 1.5f);  // cap bas
         }
     }
 
     // Cadre de la bande soloée (par-dessus les barres)
     if(soloBand>=0 && soloBand<N){
-        g.setColour(Col::accent.withAlpha(0.65f));
+        g.setColour(Col::viv(Col::accent.withAlpha(0.65f)));
         g.drawRect(bandX0[soloBand]-1.f, padT, bandBW[soloBand]+2.f, gh, 1.2f);
     }
 
     // Axes
-    g.setColour(Col::gridCtr.withAlpha(0.5f));
+    g.setColour(Col::viv(Col::gridCtr.withAlpha(0.5f)));
     g.drawLine(padL, padT, padL, padT+gh, 0.7f);
     g.drawLine(padL, padT+gh, padL+gw, padT+gh, 0.7f);
 
     // ── Tooltip de survol : fréquence uniquement ───────────────────────────
     if(hoveredBand>=0 && hoveredBand<N){
         const float fx=bandX0[hoveredBand]+bandBW[hoveredBand]*0.5f;   // centre de la colonne
-        g.setColour(Col::accent.withAlpha(0.16f));
+        g.setColour(Col::viv(Col::accent.withAlpha(0.16f)));
         g.drawLine(fx,padT,fx,padT+gh,1.f);
 
         const float f=processor.getBandFreqs()[hoveredBand];
@@ -4735,19 +4816,19 @@ void MultibandCorrDisplay::paint(juce::Graphics& g)
         float tx=hoverPixX+8.f;
         if(tx+tipW>(float)W-4.f) tx=hoverPixX-tipW-8.f;
         const float ty=padT+4.f;
-        g.setColour(Col::panel); g.fillRoundedRectangle(tx,ty,tipW,th,3.f);
-        g.setColour(Col::border); g.drawRoundedRectangle(tx,ty,tipW,th,3.f,0.7f);
-        g.setFont(tipFont); g.setColour(Col::accent);
+        g.setColour(Col::viv(Col::panel)); g.fillRoundedRectangle(tx,ty,tipW,th,3.f);
+        g.setColour(Col::viv(Col::border)); g.drawRoundedRectangle(tx,ty,tipW,th,3.f,0.7f);
+        g.setFont(tipFont); g.setColour(Col::viv(Col::accent));
         g.drawText(freqStr,(int)(tx+6.f),(int)ty,(int)(tipW-7.f),(int)th,juce::Justification::centredLeft);
     }
 
     Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(TR("MULTIBAND CORRELATOR"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
-    g.setColour(Col::accent.withAlpha(0.4f));
+    g.setColour(Col::viv(Col::accent.withAlpha(0.4f)));
     g.drawText("+",(int)(W-14),4,10,9,juce::Justification::centred);
-    g.setColour(Col::ink(juce::Colour(0xFFFF3300)).withAlpha(0.4f));
+    g.setColour(Col::viv(Col::ink(juce::Colour(0xFFFF3300)).withAlpha(0.4f)));
     g.drawText("-",(int)(W-14),(int)(H-14),10,9,juce::Justification::centred);
 }
 
@@ -4945,10 +5026,10 @@ void MultipanoramaDisplay::renderTrail()
             const float reach=spread*gh*0.40f;
             const float yTop=juce::jlimit(padT,padT+gh,fy-reach);
             const float yBot=juce::jlimit(padT,padT+gh,fy+reach);
-            tg.setColour(col.withAlpha(al*0.55f));
+            tg.setColour(Col::viv(col.withAlpha(al*0.55f)));
             tg.fillRoundedRectangle(fx-sz*0.32f,yTop,sz*0.64f,yBot-yTop,sz*0.3f);
         }
-        tg.setColour(col.withAlpha(al));
+        tg.setColour(Col::viv(col.withAlpha(al)));
         tg.fillEllipse(fx-sz*0.5f, fy-sz*0.5f, sz, sz);
     }
 }
@@ -4958,7 +5039,7 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
     if(W<10||H<10) return;
 
     // Fond noir — cohérent avec les autres modules
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
 
     const float padL=kReleaseFaderW+juce::jlimit(16.f,28.f,W*.038f);
     const float padR=24.f, padT=22.f, padB=6.f;
@@ -4975,20 +5056,20 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
     const float* F=processor.getBandFreqs();
 
     // ── Lignes L/C/R ─────────────────────────────────────────────────────
-    g.setColour(Col::accent.withAlpha(0.12f));
+    g.setColour(Col::viv(Col::accent.withAlpha(0.12f)));
     g.drawLine(padL, cy, padL+gw, cy, 2.4f);              // halo doux derrière le centre
-    g.setColour(Col::gridCtr.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::gridCtr.withAlpha(0.85f)));
     g.drawLine(padL, cy, padL+gw, cy, 0.8f);              // Centre
-    g.setColour(Col::grid.withAlpha(0.5f));
+    g.setColour(Col::viv(Col::grid.withAlpha(0.5f)));
     g.drawLine(padL, padT,    padL+gw, padT,    0.6f);    // L (haut)
     g.drawLine(padL, padT+gh, padL+gw, padT+gh, 0.6f);   // R (bas)
-    g.setColour(Col::grid.withAlpha(0.42f));
+    g.setColour(Col::viv(Col::grid.withAlpha(0.42f)));
     g.drawLine(padL, cy-gh*0.25f, padL+gw, cy-gh*0.25f, 0.5f);
     g.drawLine(padL, cy+gh*0.25f, padL+gw, cy+gh*0.25f, 0.5f);
 
     // Repères chiffrés de position (droite) — lecture rapide du %  panoramique
     g.setFont(Ui::iceland((7.5f)));
-    g.setColour(Col::textMid.withAlpha(0.45f));
+    g.setColour(Col::viv(Col::textMid.withAlpha(0.45f)));
     g.drawText("100",(int)(padL+gw)+2,(int)padT-1,30,9,juce::Justification::left);   // sous la ligne du titre
     g.drawText("50", (int)(padL+gw)+2,(int)(cy-gh*0.25f)-5,30,9,juce::Justification::left);
     g.drawText("0",  (int)(padL+gw)+2,(int)cy-5,30,9,juce::Justification::left);
@@ -5000,9 +5081,9 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
         for(int b=0;b<N;++b){
             if(multiSelectMask & LeakAudioProcessor::bandBit(b)){
                 const float fx=freqToX(F[b]);
-                g.setColour(Col::accent.withAlpha(0.14f));
+                g.setColour(Col::viv(Col::accent.withAlpha(0.14f)));
                 g.fillRect(fx-7.f,padT,14.f,gh);
-                g.setColour(Col::accent.withAlpha(0.45f));
+                g.setColour(Col::viv(Col::accent.withAlpha(0.45f)));
                 g.drawLine(fx,padT,fx,padT+gh,1.0f);
             }
         }
@@ -5011,19 +5092,19 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
     // ── Surlignage de la bande soloée (sous le trail) ──────────────────────
     if(soloBand>=0 && soloBand<N){
         const float fx=freqToX(F[soloBand]);
-        g.setColour(Col::accent.withAlpha(0.12f));
+        g.setColour(Col::viv(Col::accent.withAlpha(0.12f)));
         g.fillRect(fx-7.f,padT,14.f,gh);
-        g.setColour(Col::accent.withAlpha(0.55f));
+        g.setColour(Col::viv(Col::accent.withAlpha(0.55f)));
         g.drawLine(fx,padT,fx,padT+gh,1.2f);
     }
 
     // ── Labels L / C / R (gauche) ─────────────────────────────────────────
     g.setFont(Ui::iceland((8.f)));
-    g.setColour(Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.7f));
+    g.setColour(Col::viv(Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.7f)));
     g.drawText("L", 0,(int)padT-2,(int)padL,10,juce::Justification::centredRight);   // sous la ligne du titre
-    g.setColour(Col::textMid.withAlpha(0.6f));
+    g.setColour(Col::viv(Col::textMid.withAlpha(0.6f)));
     g.drawText("C", 0,(int)cy-5, (int)padL,10,juce::Justification::centredRight);
-    g.setColour(Col::sideCol.withAlpha(0.7f));
+    g.setColour(Col::viv(Col::sideCol.withAlpha(0.7f)));
     g.drawText("R", 0,(int)(padT+gh)-6,(int)padL,10,juce::Justification::centredRight);
 
     // ── Trail phosphore ───────────────────────────────────────────────────
@@ -5043,15 +5124,15 @@ void MultipanoramaDisplay::paint(juce::Graphics& g)
         float tx=hoverPixX+8.f;
         if(tx+tipW>(float)W-4.f) tx=hoverPixX-tipW-8.f;
         const float ty=padT+4.f;
-        g.setColour(Col::panel); g.fillRoundedRectangle(tx,ty,tipW,th,3.f);
-        g.setColour(Col::border); g.drawRoundedRectangle(tx,ty,tipW,th,3.f,0.7f);
-        g.setFont(tipFont); g.setColour(Col::accent);
+        g.setColour(Col::viv(Col::panel)); g.fillRoundedRectangle(tx,ty,tipW,th,3.f);
+        g.setColour(Col::viv(Col::border)); g.drawRoundedRectangle(tx,ty,tipW,th,3.f,0.7f);
+        g.setFont(tipFont); g.setColour(Col::viv(Col::accent));
         g.drawText(freqStr,(int)(tx+6.f),(int)ty,(int)(tipW-7.f),(int)th,juce::Justification::centredLeft);
     }
 
     Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(TR("PANORAMA"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
 }
 
@@ -5123,7 +5204,7 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
 {
     const int W=getWidth(), H=getHeight();
     if(W<10||H<10) return;
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
 
     // ── cadre identique au Panorama ─────────────────────────────────────
     const float padL=kReleaseFaderW+juce::jlimit(16.f,28.f,W*.038f);
@@ -5134,23 +5215,23 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
     const BandAxis axis(processor.getBandFreqs(), juce::jmax(1, N), padL, gw);
 
     g.setFont(Ui::iceland((7.5f)));
-    g.setColour(Col::textMid.withAlpha(0.45f));
+    g.setColour(Col::viv(Col::textMid.withAlpha(0.45f)));
     g.drawText("100",(int)(padL+gw)+2,(int)padT-1,30,9,juce::Justification::left);   // sous la ligne du titre
     g.drawText("50", (int)(padL+gw)+2,(int)(cy-gh*0.25f)-5,30,9,juce::Justification::left);
     g.drawText("0",  (int)(padL+gw)+2,(int)cy-5,30,9,juce::Justification::left);
     g.drawText("50", (int)(padL+gw)+2,(int)(cy+gh*0.25f)-5,30,9,juce::Justification::left);
     g.drawText("100",(int)(padL+gw)+2,(int)(padT+gh)-5,30,9,juce::Justification::left);
     g.setFont(Ui::iceland((8.f)));
-    g.setColour(Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.7f));
+    g.setColour(Col::viv(Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.7f)));
     g.drawText("L", 0,(int)padT-2,(int)padL,10,juce::Justification::centredRight);   // sous la ligne du titre
-    g.setColour(Col::textMid.withAlpha(0.6f));
+    g.setColour(Col::viv(Col::textMid.withAlpha(0.6f)));
     g.drawText("C", 0,(int)cy-5, (int)padL,10,juce::Justification::centredRight);
-    g.setColour(Col::sideCol.withAlpha(0.7f));
+    g.setColour(Col::viv(Col::sideCol.withAlpha(0.7f)));
     g.drawText("R", 0,(int)(padT+gh)-6,(int)padL,10,juce::Justification::centredRight);
 
     Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(TR("PANORAMA LED"),6,5,W-12,13,juce::Justification::left,1,0.7f);
 
     if(N<=0 || gw<10.f || gh<10.f) return;
@@ -5174,11 +5255,11 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
         offGrid=juce::Image(juce::Image::ARGB, juce::jmax(1,juce::roundToInt((float)W*scale)), juce::jmax(1,juce::roundToInt((float)H*scale)), true);
         juce::Graphics og(offGrid);
         og.addTransform(juce::AffineTransform::scale(scale));
-        og.setColour(Col::light(Col::paper ? 0.07f : 0.05f));
+        og.setColour(Col::viv(Col::light(Col::paper ? 0.07f : 0.05f)));
         for(int b=0;b<N;++b)
             for(int k=0;k<L;++k) og.fillRoundedRectangle(ledRect(b,k), 1.5f);
         // repère du centre
-        og.setColour(Col::accent.withAlpha(0.10f));
+        og.setColour(Col::viv(Col::accent.withAlpha(0.10f)));
         og.fillRect(padL, cy-0.5f, gw, 1.f);
     }
     g.drawImage(offGrid, getLocalBounds().toFloat());
@@ -5196,10 +5277,10 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
             const auto col=ledColour((float)k/(float)(L-1)*2.f-1.f);
             const auto r=ledRect(b,k);
             if(on>0.55f){   // halo des LED franchement allumées
-                g.setColour(col.withAlpha(0.22f*on));
+                g.setColour(Col::viv(col.withAlpha(0.22f*on)));
                 g.fillRoundedRectangle(r.expanded(2.f, 1.5f), 3.f);
             }
-            g.setColour(col.withAlpha(0.2f+0.8f*on));
+            g.setColour(Col::viv(col.withAlpha(0.2f+0.8f*on)));
             g.fillRoundedRectangle(r, 1.5f);
         }
     }
@@ -5211,7 +5292,7 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
         if(b>=0 && b<N && F!=nullptr){
             const float bx=axis.colX(b)+axis.colW(b)*0.5f;
             const float by=padT+(panS[b]+1.f)*0.5f*gh;
-            g.setColour(Col::accent.withAlpha(0.35f));
+            g.setColour(Col::viv(Col::accent.withAlpha(0.35f)));
             g.drawVerticalLine((int)bx, padT, padT+gh);
             const float p=panS[b];
             const juce::String panTxt = std::abs(p)<0.03f ? juce::String("C")
@@ -5219,6 +5300,546 @@ void PanoramaLedDisplay::paint(juce::Graphics& g)
             SpectroReadout::drawLines(g, getLocalBounds().toFloat(), { bx, by }, SpectroReadout::formatHz(F[b]), panTxt,
                                       dbS[b]<=-119.f ? juce::String("--") : juce::String(dbS[b],1)+" dB");
         }
+    }
+}
+
+//==============================================================================
+// BitMeterDisplay (v1.81.50) : témoin allumé = ce bit de |x| a valu 1 pendant
+// la fenêtre (S : un échantillon négatif)
+//==============================================================================
+BitMeterDisplay::BitMeterDisplay(LeakAudioProcessor& p) : processor(p)
+{
+    for(int ch=0;ch<2;++ch)
+        for(int b=0;b<NB;++b){ ageToggle[ch][b]=kNever; ageOne[ch][b]=kNever; }
+    holdBtn.setClickingTogglesState(true);
+    holdBtn.setTooltip(TR("Garde allumés tous les bits qui ont bougé depuis l'activation"));
+    holdBtn.onClick=[this]{
+        holding=holdBtn.getToggleState();
+        if(holding) for(int ch=0;ch<2;++ch){ heldToggle[ch]=litMask(ch); heldOne[ch]=oneMask(ch); }
+        repaint();
+    };
+    resetBtn.setTooltip(TR("Remet les témoins et le compteur à zéro"));
+    resetBtn.onClick=[this]{ resetCounts(); };
+    addAndMakeVisible(holdBtn);
+    addAndMakeVisible(resetBtn);
+    // fenêtre du plugin rouverte : HOLD et bits retenus retrouvés (comme v1.81.46)
+    if(auto* sn=processor.heldSnapshot((int)LeakAudioProcessor::ModuleID::BitMeter)){
+        if(sn->rows.size()==4){
+            juce::uint32 m[4] {};
+            std::memcpy(m, sn->rows.data(), sizeof(m));
+            heldToggle[0]=m[0]; heldToggle[1]=m[1]; heldOne[0]=m[2]; heldOne[1]=m[3];
+        }
+        overCount=(juce::uint64)juce::jmax(0.f, sn->value);
+        holding=true;
+        holdBtn.setToggleState(true, juce::dontSendNotification);
+    }
+}
+
+BitMeterDisplay::~BitMeterDisplay()
+{
+    stopTimer();
+    processor.bitMeterWanted.store(false, std::memory_order_relaxed);
+    auto& sn=processor.moduleSnapshots[(int)LeakAudioProcessor::ModuleID::BitMeter];
+    sn.hold=holding;
+    const juce::uint32 m[4] { heldToggle[0], heldToggle[1], heldOne[0], heldOne[1] };
+    sn.rows.resize(4);
+    std::memcpy(sn.rows.data(), m, sizeof(m));
+    sn.value=(float)overCount;
+}
+
+void BitMeterDisplay::resetCounts()
+{
+    for(int ch=0;ch<2;++ch){
+        heldToggle[ch]=heldOne[ch]=0u;
+        for(int b=0;b<NB;++b){ ageToggle[ch][b]=kNever; ageOne[ch][b]=kNever; }
+    }
+    overCount=0;
+    processor.bitOverCount.store(0, std::memory_order_relaxed);
+    shownKey=-1;
+    repaint();
+}
+
+void BitMeterDisplay::resized()
+{
+    const int hh=juce::jlimit(16, 22, juce::roundToInt(19.f*Ui::textScale));
+    const bool narrow=getWidth()<300;
+    const int hw=juce::roundToInt((narrow ? 38.f : 46.f)*Ui::textScale), rw=juce::roundToInt((narrow ? 42.f : 50.f)*Ui::textScale);
+    resetBtn.setBounds(getWidth()-4-rw, 2, rw, hh);
+    holdBtn .setBounds(getWidth()-4-rw-4-hw, 2, hw, hh);
+}
+
+juce::uint32 BitMeterDisplay::litMask(int ch) const
+{
+    return oneMask(ch);   // signe + valeur absolue : un bit utilisé est un bit qui a valu 1
+}
+
+juce::uint32 BitMeterDisplay::oneMask(int ch) const
+{
+    if(holding) return heldOne[ch];
+    const int win=juce::jmax(1, juce::roundToInt(0.4f*(float)currentHz));
+    juce::uint32 m=0u;
+    for(int b=0;b<NB;++b) if(ageOne[ch][b]<win) m|=1u<<(31-b);
+    return m;
+}
+
+void BitMeterDisplay::timerCallback()
+{
+    std::atomic<juce::uint32>* const ors[2]  { &processor.bitOrL,  &processor.bitOrR  };
+    std::atomic<juce::uint32>* const ands[2] { &processor.bitAndL, &processor.bitAndR };
+    for(int ch=0;ch<2;++ch){
+        const juce::uint32 o=ors[ch]->exchange(0u, std::memory_order_relaxed);
+        const juce::uint32 a=ands[ch]->exchange(0xFFFFFFFFu, std::memory_order_relaxed);
+        const bool got=!(o==0u && a==0xFFFFFFFFu);   // aucun bloc audio depuis l'image précédente
+        const juce::uint32 tog=got ? (o & ~a) : 0u;
+        const juce::uint32 one=got ? o : 0u;
+        for(int b=0;b<NB;++b){
+            const juce::uint32 bit=1u<<(31-b);
+            ageToggle[ch][b]=(tog & bit) ? 0 : juce::jmin(kNever, ageToggle[ch][b]+1);
+            ageOne[ch][b]   =(one & bit) ? 0 : juce::jmin(kNever, ageOne[ch][b]+1);
+        }
+        if(holding){ heldToggle[ch]|=tog; heldOne[ch]|=one; }
+    }
+    overCount+=processor.bitOverCount.exchange(0, std::memory_order_relaxed);
+    // ne repeindre que si un témoin ou une lecture change
+    const juce::int64 key=((juce::int64)litMask(0)<<32 ^ (juce::int64)litMask(1)*2654435761LL)
+                         ^ ((juce::int64)oneMask(0)*40503LL) ^ ((juce::int64)oneMask(1)*97LL) ^ (juce::int64)overCount*1000003LL;
+    if(key!=shownKey){ shownKey=key; repaint(); }
+}
+
+void BitMeterDisplay::paint(juce::Graphics& g)
+{
+    const int W=getWidth(), H=getHeight();
+    if(W<10||H<10) return;
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
+    Ui::drawTitleDecor(g, (float)W);
+    g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
+    g.drawFittedText(TR("BIT METER"), 6, 5, juce::jmax(10, holdBtn.getX()-10), 13, juce::Justification::left, 1, 0.5f);
+
+    const float s=Ui::textScale;
+    const float padL=18.f*s, padR=8.f, padT=28.f;
+    const bool narrow=(float)W<420.f*s;
+    const float readH=narrow ? juce::jlimit(36.f*s, 48.f*s, (float)H*0.30f) : juce::jlimit(30.f*s, 46.f*s, (float)H*0.26f);
+    const float gw=(float)W-padL-padR;
+    const float numH=12.f*s;
+    const float rowsTop=padT+numH, rowsBot=(float)H-readH-6.f;
+    if(gw<40.f || rowsBot-rowsTop<12.f) return;
+
+    // colonnes : petit écart supplémentaire après 8, 16 et 24 (repères)
+    const float extra=juce::jmin(6.f, gw*0.012f);
+    const float cw=(gw-extra*3.f)/(float)NB;
+    auto colX=[&](int b){ return padL+(float)b*cw+extra*(float)(b/8); };
+    const float gapRows=juce::jmax(4.f, (rowsBot-rowsTop)*0.14f);
+    const float rowH=juce::jmin(46.f*s, ((rowsBot-rowsTop)-gapRows)*0.5f);
+    const float rowsY0=rowsTop+((rowsBot-rowsTop)-(rowH*2.f+gapRows))*0.5f;
+
+    // numéros : S, puis tous les 4 (tous si la place le permet)
+    g.setFont(Ui::iceland(9.f*s));
+    for(int b=0;b<NB;++b){
+        const int n=b+1;
+        const bool show = b==0 || (cw<9.f*s ? n%8==0 : (n%4==0 || cw>=16.f*s));
+        if(!show) continue;
+        const bool mark = n==16 || n==24 || n==32;
+        g.setColour(Col::viv(mark ? Col::textHi.withAlpha(0.8f) : Col::textMid.withAlpha(0.55f)));
+        g.drawText(b==0 ? juce::String("S") : juce::String(n), juce::Rectangle<float>(colX(b)+cw*0.5f-14.f, padT, 28.f, numH),
+                   juce::Justification::centred, false);
+    }
+
+    const juce::Colour signCol=Col::ink(juce::Colour(0xFFFFB03A));
+    const juce::Colour offCol=Col::light(Col::paper ? 0.07f : 0.05f);
+    for(int ch=0;ch<2;++ch){
+        const float y=rowsY0+(float)ch*(rowH+gapRows);
+        g.setFont(Ui::iceland(10.f*s));
+        g.setColour(Col::viv(ch==0 ? Col::ink(juce::Colour(0xFF3090FF)).withAlpha(0.8f) : Col::sideCol.withAlpha(0.8f)));
+        g.drawText(ch==0 ? "L" : "R", juce::Rectangle<float>(0.f, y, padL-3.f, rowH), juce::Justification::centredRight, false);
+        const juce::uint32 lit=litMask(ch);
+        for(int b=0;b<NB;++b){
+            const auto r=juce::Rectangle<float>(colX(b)+1.f, y, juce::jmax(2.f, cw-2.f), rowH);
+            const bool on=(lit>>(31-b))&1u;
+            if(on){
+                const auto col=b==0 ? signCol : Col::accent;
+                g.setColour(Col::viv(col.withAlpha(0.22f)));
+                g.fillRoundedRectangle(r.expanded(1.5f, 1.5f), 3.f);
+                g.setColour(Col::viv(col));
+            } else {
+                g.setColour(Col::viv(offCol));
+            }
+            g.fillRoundedRectangle(r, 2.f);
+        }
+    }
+
+    // lectures
+    auto usedBits=[&](int ch){ const juce::uint32 m=litMask(ch); for(int b=NB-1;b>=0;--b) if((m>>(31-b))&1u) return b+1; return 0; };
+    auto lowZeros=[&](int ch){ const juce::uint32 m=oneMask(ch); if(m==0u) return -1; int n=0; while(((m>>n)&1u)==0u) ++n; return n; };
+    const auto rd=juce::Rectangle<float>(narrow ? 6.f : padL, (float)H-readH-2.f, narrow ? (float)W-12.f : gw, readH);
+    const float colW=rd.getWidth()/3.f;
+    auto cell=[&](int i, const juce::String& label, const juce::String& value, juce::Colour vc){
+        if(narrow){   // une ligne par lecture : libellé à gauche, valeur à droite
+            const float lh=rd.getHeight()/3.f;
+            const auto row=juce::Rectangle<float>(rd.getX(), rd.getY()+lh*(float)i, rd.getWidth(), lh);
+            const auto vf=Ui::iceland(juce::jmin(12.f*s, lh*0.95f));
+            const float vw=juce::GlyphArrangement::getStringWidth(vf, value)+8.f;
+            g.setFont(Ui::iceland(juce::jmin(9.5f*s, lh*0.8f)).withExtraKerningFactor(0.04f));
+            g.setColour(Col::viv(Col::textMid.withAlpha(0.7f)));
+            g.drawFittedText(label, row.withTrimmedRight(vw).toNearestInt(), juce::Justification::centredLeft, 1, 0.5f);
+            g.setFont(vf);
+            g.setColour(Col::viv(vc));
+            g.drawFittedText(value, row.toNearestInt(), juce::Justification::centredRight, 1, 0.6f);
+            return;
+        }
+        auto c=juce::Rectangle<float>(rd.getX()+colW*(float)i, rd.getY(), colW-6.f, rd.getHeight());
+        g.setFont(Ui::iceland(9.5f*s).withExtraKerningFactor(0.05f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.7f)));
+        g.drawFittedText(label, c.removeFromTop(c.getHeight()*0.42f).toNearestInt(), juce::Justification::bottomLeft, 1, 0.7f);
+        g.setFont(Ui::iceland(juce::jmin(18.f*s, c.getHeight()*0.95f)));
+        g.setColour(Col::viv(vc));
+        g.drawFittedText(value, c.toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+    };
+    const int uL=usedBits(0), uR=usedBits(1);
+    cell(0, TR("BITS UTILISÉS"), "L "+juce::String(uL)+"  R "+juce::String(uR)+(narrow ? "" : "  / 32"), Col::textHi);
+    const int zL=lowZeros(0), zR=lowZeros(1);
+    const bool silent=zL<0 && zR<0;
+    const juce::Colour warn=Col::ink(juce::Colour(0xFFFFB03A));
+    cell(1, TR("BITS BAS TOUJOURS À 0"),
+         silent ? TR("SILENCE") : "L "+(zL<0 ? juce::String("--") : juce::String(zL))+"  R "+(zR<0 ? juce::String("--") : juce::String(zR)),
+         (!silent && (zL>0 || zR>0)) ? warn : Col::textHi);
+    cell(2, "> 0 dBFS", juce::String((juce::int64)overCount), overCount>0 ? Col::ink(juce::Colour(0xFFFF4D4D)) : Col::textHi);
+}
+
+//==============================================================================
+// TunerDisplay (v1.81.51)
+//==============================================================================
+TunerDisplay::TunerDisplay(LeakAudioProcessor& p) : processor(p)
+{
+    modeBtn.setTooltip(TR("Aiguille ou tracé + derniers coups"));
+    modeBtn.onClick=[this]{ processor.tunerMode=processor.tunerMode==0 ? 1 : 0; updateTexts(); repaint(); };
+    a4Up.setArrow(1); a4Down.setArrow(-1);
+    a4Down.setTooltip(TR("Référence du la 4 : plus bas"));
+    a4Up  .setTooltip(TR("Référence du la 4 : plus haut"));
+    a4Down.onClick=[this]{ processor.tunerA4=juce::jlimit(415.f, 466.f, processor.tunerA4-1.f); repaint(); };
+    a4Up  .onClick=[this]{ processor.tunerA4=juce::jlimit(415.f, 466.f, processor.tunerA4+1.f); repaint(); };
+    resetBtn.setTooltip(TR("Efface la mesure, le tracé et les coups"));
+    resetBtn.onClick=[this]{
+        shownHz=0.f; liveValid=false; inHit=false; hitEst.clear();
+        std::fill(std::begin(hits), std::end(hits), 0.f);
+        std::fill(trace.begin(), trace.end(), 0.f);
+        repaint();
+    };
+    for(auto* b : { &modeBtn, &a4Down, &a4Up, &resetBtn }) addAndMakeVisible(*b);
+    updateTexts();
+    startTimerHz(60);
+}
+
+void TunerDisplay::updateTexts()
+{
+    // le bouton montre la vue où il mène
+    modeBtn.setButtonText(processor.tunerMode==0 ? TR("TRACÉ") : TR("AIGUILLE"));
+}
+
+void TunerDisplay::resized()
+{
+    const float s=Ui::textScale;
+    const int hh=juce::jlimit(16, 22, juce::roundToInt(19.f*s));
+    const int rw=juce::roundToInt(46.f*s), aw=juce::roundToInt(18.f*s), vw=juce::roundToInt(50.f*s), mw=juce::roundToInt(64.f*s);
+    // module étroit : vue et A4 sur une deuxième rangée, RESET seul à côté du titre
+    const bool twoRows=getWidth() < 4+rw+4+aw+vw+aw+4+mw+4+70;
+    resetBtn.setBounds(getWidth()-4-rw, 2, rw, hh);
+    if(twoRows){
+        // rangée pleine largeur : vue à gauche, ▼ A4 ▲ à droite
+        const int y=hh+6;
+        const int mw2=juce::jmin(mw, getWidth()-12-2*aw-juce::roundToInt(34.f*s)-6);
+        modeBtn.setBounds(6, y, juce::jmax(30, mw2), hh);
+        int x=getWidth()-6;
+        x-=aw; a4Up.setBounds(x, y, aw, hh);
+        const int vw2=juce::jmax(20, x-(modeBtn.getRight()+6+aw));
+        x-=vw2; a4Area={ x, y, vw2, hh };
+        x-=aw; a4Down.setBounds(x, y, aw, hh);
+        contentTop=y+hh+4;
+    } else {
+        int x=getWidth()-4-rw-4;
+        x-=aw; a4Up.setBounds(x, 2, aw, hh);
+        x-=vw; a4Area={ x, 2, vw, hh };
+        x-=aw; a4Down.setBounds(x, 2, aw, hh);
+        x-=4+mw; modeBtn.setBounds(x, 2, mw, hh);
+        contentTop=26;
+    }
+}
+
+TunerDisplay::NoteInfo TunerDisplay::noteOf(float hz) const
+{
+    static const char* const names[12]={ "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" };
+    NoteInfo n;
+    const float a4=juce::jmax(1.f, processor.tunerA4);
+    n.midi=69.f+12.f*std::log2(juce::jmax(1.f, hz)/a4);
+    const int k=juce::roundToInt(n.midi);
+    n.name=names[((k%12)+12)%12];
+    n.octave=(int)std::floor((float)k/12.f)-1;
+    n.cents=(n.midi-(float)k)*100.f;
+    n.refHz=a4*std::pow(2.f, (float)(k-69)/12.f);
+    return n;
+}
+
+juce::Colour TunerDisplay::centsColour(float cents)
+{
+    const float a=std::abs(cents);
+    return a<3.f ? Col::ink(juce::Colour(0xFF4DFF8A)) : a<15.f ? Col::accent : Col::ink(juce::Colour(0xFFFFB03A));
+}
+
+// YIN : d'abord sur le signal moyenné par paquets de D (environ 12 kHz), puis
+// affiné à pleine résolution autour de la période trouvée
+float TunerDisplay::detectPitch(int nFull, int D, double sr)
+{
+    const double fsD=sr/(double)D;
+    const int Wd=512;
+    const int tauMin=juce::jmax(2, (int)std::floor(fsD/1000.0));
+    const int tauMax=(int)std::ceil(fsD/30.0);
+    const int Nd=nFull/D;
+    if(Nd<Wd+tauMax+2) return 0.f;
+    dec.resize((size_t)Nd); cmnd.resize((size_t)tauMax+2);
+    for(int k=0;k<Nd;++k){
+        float a=0.f; for(int i=0;i<D;++i) a+=mono[(size_t)(k*D+i)];
+        dec[(size_t)k]=a/(float)D;
+    }
+    // fenêtre = les échantillons les plus récents
+    const int off=Nd-Wd-tauMax-1;
+    double run=0.0; cmnd[0]=1.f;
+    for(int tau=1;tau<=tauMax;++tau){
+        double d=0.0;
+        const float* a=dec.data()+off; const float* b=a+tau;
+        for(int j=0;j<Wd;++j){ const float v=a[j]-b[j]; d+=(double)v*v; }
+        run+=d;
+        cmnd[(size_t)tau]=run>0.0 ? (float)(d*(double)tau/run) : 1.f;
+    }
+    int best=-1;
+    for(int tau=tauMin;tau<tauMax;++tau)
+        if(cmnd[(size_t)tau]<0.15f){
+            while(tau+1<tauMax && cmnd[(size_t)tau+1]<cmnd[(size_t)tau]) ++tau;
+            best=tau; break;
+        }
+    if(best<0){
+        float mn=1.f;
+        for(int tau=tauMin;tau<tauMax;++tau) if(cmnd[(size_t)tau]<mn){ mn=cmnd[(size_t)tau]; best=tau; }
+        if(mn>0.3f) return 0.f;
+    }
+    // affinage pleine résolution
+    const int Wf=Wd*D;
+    const int offF=nFull-Wf-(tauMax+1)*D-1;
+    if(offF<0) return 0.f;
+    const int t0=juce::jmax(2, best*D-D-1), t1=best*D+D+1;
+    double bestD=1e300; int bt=t0;
+    std::vector<double> dd((size_t)(t1-t0+3), 0.0);
+    for(int t=t0-1;t<=t1+1;++t){
+        double d=0.0;
+        const float* a=mono.data()+offF; const float* b=a+t;
+        for(int j=0;j<Wf;++j){ const float v=a[j]-b[j]; d+=(double)v*v; }
+        dd[(size_t)(t-t0+1)]=d;
+        if(t>=t0 && t<=t1 && d<bestD){ bestD=d; bt=t; }
+    }
+    const double y0=dd[(size_t)(bt-t0)], y1=dd[(size_t)(bt-t0+1)], y2=dd[(size_t)(bt-t0+2)];
+    const double den=y0-2.0*y1+y2;
+    const double frac=(std::abs(den)>1e-20) ? juce::jlimit(-0.5, 0.5, 0.5*(y0-y2)/den) : 0.0;
+    const double period=(double)bt+frac;
+    return period>1.0 ? (float)(sr/period) : 0.f;
+}
+
+void TunerDisplay::timerCallback()
+{
+    const double sr=processor.getCurrentSampleRate();
+    if(sr<=0.0) return;
+    const int D=juce::jmax(1, (int)std::round(sr/12000.0));
+    const int tauMax=(int)std::ceil(sr/(double)D/30.0);
+    const int nFull=juce::jmin(LeakAudioProcessor::SCOPE_MAX_READ, (512+tauMax+3)*D);
+    bufL.resize((size_t)nFull); bufR.resize((size_t)nFull); mono.resize((size_t)nFull);
+    const juce::uint64 total=processor.getScopeData(bufL.data(), bufR.data(), nFull);
+    const int fresh=(int)juce::jmin((juce::uint64)nFull, total-juce::jmin(total, lastTotal));
+    lastTotal=total;
+    for(int i=0;i<nFull;++i) mono[(size_t)i]=0.5f*(bufL[(size_t)i]+bufR[(size_t)i]);
+
+    const int framesTrace=juce::jmax(10, 4*currentHz);
+    if((int)trace.size()!=framesTrace){ trace.assign((size_t)framesTrace, 0.f); traceHead=0; }
+    if(fresh<=0) return;   // pas d'audio nouveau (mesures arrêtées, transport à l'arrêt)
+
+    double acc=0.0;
+    for(int i=nFull-fresh;i<nFull;++i) acc+=(double)mono[(size_t)i]*mono[(size_t)i];
+    const float db=juce::Decibels::gainToDecibels((float)std::sqrt(acc/(double)fresh), -120.f);
+    const float dt=1.f/(float)currentHz;
+
+    // attaque : niveau nettement au-dessus de la moyenne lente
+    if(db>slowDb+9.f && db>-50.f && !(inHit && hitAge<0.08f)){
+        inHit=true; hitAge=0.f; hitPeakDb=db; hitEst.clear();
+    }
+    slowDb+=(db-slowDb)*(db>slowDb ? 0.08f : 0.25f);
+
+    const float f=db>-60.f ? detectPitch(nFull, D, sr) : 0.f;
+    liveValid=f>0.f;
+    if(liveValid){
+        const bool jump=liveHz<=0.f || std::abs(12.f*std::log2(f/liveHz))>0.5f;
+        liveHz=jump ? f : liveHz+(f-liveHz)*0.35f;
+    }
+
+    if(inHit){
+        hitAge+=dt;
+        hitPeakDb=juce::jmax(hitPeakDb, db);
+        if(hitAge>=0.06f && liveValid) hitEst.push_back(f);
+        if(hitAge>0.5f || (hitAge>0.06f && db<hitPeakDb-35.f)){
+            inHit=false;
+            if(hitEst.size()>=2){
+                std::sort(hitEst.begin(), hitEst.end());
+                const float med=hitEst[hitEst.size()/2];
+                for(int i=3;i>0;--i) hits[i]=hits[i-1];
+                hits[0]=med;
+                shownHz=med;
+            }
+        }
+    }
+    // son tenu (basse, guitare) : l'aiguille suit la mesure ; pendant un coup
+    // elle garde la mesure précédente jusqu'à celle du coup
+    if(liveValid && !inHit) shownHz=liveHz;
+
+    trace[(size_t)traceHead]=liveValid ? f : 0.f;
+    traceHead=(traceHead+1)%framesTrace;
+    repaint();
+}
+
+void TunerDisplay::paint(juce::Graphics& g)
+{
+    const int W=getWidth(), H=getHeight();
+    if(W<10||H<10) return;
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
+    Ui::drawTitleDecor(g, (float)W);
+    g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
+    const int titleEnd=modeBtn.getY()>4 ? resetBtn.getX() : modeBtn.getX();
+    g.drawFittedText(TR("TUNER"), 6, 5, juce::jmax(10, titleEnd-10), 13, juce::Justification::left, 1, 0.5f);
+    g.setFont(Ui::iceland(10.f*Ui::textScale));
+    g.setColour(Col::viv(Col::textMid));
+    g.drawFittedText((a4Area.getWidth()>=juce::roundToInt(46.f*Ui::textScale) ? "A " : "")+juce::String(juce::roundToInt(processor.tunerA4))
+                     +(a4Area.getWidth()>=juce::roundToInt(60.f*Ui::textScale) ? " Hz" : ""), a4Area, juce::Justification::centred, 1, 0.6f);
+
+    const auto area=juce::Rectangle<float>(6.f, (float)contentTop, (float)W-12.f, (float)(H-contentTop-4));
+    if(processor.tunerMode==0) paintNeedle(g, area); else paintTrace(g, area);
+}
+
+void TunerDisplay::paintNeedle(juce::Graphics& g, juce::Rectangle<float> r)
+{
+    const float s=Ui::textScale;
+    if(shownHz<=0.f){
+        g.setFont(Ui::iceland(juce::jmin(r.getHeight()*0.3f, 60.f)));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.5f)));
+        g.drawText("--", r, juce::Justification::centred, false);
+        return;
+    }
+    const auto n=noteOf(shownHz);
+    const auto col=centsColour(n.cents);
+    // note en grand
+    const float noteH=juce::jmin(r.getHeight()*0.36f, r.getWidth()*0.22f);
+    auto top=r.removeFromTop(noteH);
+    const auto nf=Ui::iceland(noteH*1.05f);
+    const float nw=juce::GlyphArrangement::getStringWidth(nf, n.name);
+    const auto of=Ui::iceland(noteH*0.42f);
+    const float ow=juce::GlyphArrangement::getStringWidth(of, juce::String(n.octave));
+    const float nx=top.getCentreX()-(nw+ow)*0.5f;
+    g.setColour(Col::viv(col));
+    g.setFont(nf); g.drawText(n.name, juce::Rectangle<float>(nx, top.getY(), nw+2.f, top.getHeight()), juce::Justification::centredLeft, false);
+    g.setFont(of); g.drawText(juce::String(n.octave), juce::Rectangle<float>(nx+nw+2.f, top.getY(), ow+4.f, top.getHeight()*0.92f), juce::Justification::bottomLeft, false);
+
+    // Hz à gauche, cents à droite
+    auto row=r.removeFromTop(juce::jmax(28.f*s, r.getHeight()*0.18f));
+    const auto big=Ui::iceland(juce::jmin(17.f*s, row.getHeight()*0.6f, r.getWidth()*0.075f)), small=Ui::iceland(juce::jmin(9.5f*s, r.getWidth()*0.05f));
+    auto left=row.withWidth(row.getWidth()*0.5f), right=row.withTrimmedLeft(row.getWidth()*0.5f);
+    g.setFont(big); g.setColour(Col::viv(Col::textHi));
+    g.drawFittedText(juce::String(shownHz, shownHz<100.f ? 2 : 1)+" Hz", left.removeFromTop(left.getHeight()*0.6f).toNearestInt(), juce::Justification::bottomLeft, 1, 0.6f);
+    g.setFont(small); g.setColour(Col::viv(Col::textMid.withAlpha(0.7f)));
+    g.drawFittedText(TR("CIBLE")+" "+juce::String(n.refHz, n.refHz<100.f ? 2 : 1)+" Hz", left.toNearestInt(), juce::Justification::topLeft, 1, 0.6f);
+    g.setFont(big); g.setColour(Col::viv(col));
+    g.drawFittedText(juce::String(n.cents>=0.f ? "+" : "")+juce::String(n.cents, 1)+" ct", right.removeFromTop(right.getHeight()*0.6f).toNearestInt(), juce::Justification::bottomRight, 1, 0.6f);
+
+    // cadran ±50 cents
+    const float R=juce::jmin(r.getWidth()*0.42f, r.getHeight()*0.95f);
+    if(R<20.f) return;
+    const float cx=r.getCentreX(), cy=r.getBottom()-2.f;
+    const float span=juce::MathConstants<float>::pi*0.3f;
+    auto at=[&](float c, float rad){ const float an=-juce::MathConstants<float>::halfPi+c/50.f*span;
+                                     return juce::Point<float>(cx+std::cos(an)*rad, cy+std::sin(an)*rad); };
+    juce::Path arc;
+    arc.addCentredArc(cx, cy, R, R, 0.f, -span, span, true);
+    g.setColour(Col::viv(Col::light(Col::paper ? 0.25f : 0.18f)));
+    g.strokePath(arc, juce::PathStrokeType(2.f));
+    g.setFont(Ui::iceland(9.f*s));
+    for(int c=-50;c<=50;c+=10){
+        const bool major=c%50==0 || c==0;
+        g.setColour(Col::viv(c==0 ? Col::ink(juce::Colour(0xFF4DFF8A)) : Col::textMid.withAlpha(0.6f)));
+        g.drawLine(juce::Line<float>(at((float)c, R-(major ? 12.f : 7.f)), at((float)c, R)), c==0 ? 2.5f : 1.2f);
+        if(c%25==0){
+            const auto pt=at((float)c, R+11.f);
+            g.setColour(Col::viv(Col::textMid.withAlpha(0.6f)));
+            g.drawText(juce::String(c>0 ? "+" : "")+juce::String(c), juce::Rectangle<float>(pt.x-14.f, pt.y-6.f, 28.f, 12.f), juce::Justification::centred, false);
+        }
+    }
+    g.setColour(Col::viv(col));
+    g.drawLine(juce::Line<float>({ cx, cy }, at(juce::jlimit(-50.f, 50.f, n.cents), R-4.f)), 3.f);
+    g.fillEllipse(cx-4.f, cy-4.f, 8.f, 8.f);
+}
+
+void TunerDisplay::paintTrace(juce::Graphics& g, juce::Rectangle<float> r)
+{
+    const float s=Ui::textScale;
+    auto cards=r.removeFromBottom(juce::jlimit(40.f*s, 70.f*s, r.getHeight()*0.32f));
+    r.removeFromBottom(14.f*s);
+    const float labW=30.f*s;
+    auto plot=r.withTrimmedLeft(labW);
+    const int N=(int)trace.size();
+    // grille : 13 demi-tons centrés sur la dernière note mesurée
+    const float ref=shownHz>0.f ? shownHz : 110.f;
+    const int mc=juce::roundToInt(noteOf(ref).midi);
+    const int mLo=mc-6, mHi=mc+6;
+    auto yOf=[&](float m){ return plot.getBottom()-(m-(float)mLo)/(float)(mHi-mLo)*plot.getHeight(); };
+    static const char* const names[12]={ "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" };
+    g.setFont(Ui::iceland(juce::jmin(9.f*s, plot.getHeight()/13.f)));
+    for(int m=mLo;m<=mHi;++m){
+        const float y=yOf((float)m);
+        g.setColour(Col::viv(m==mc ? Col::accent.withAlpha(0.35f) : Col::light(Col::paper ? 0.10f : 0.07f)));
+        g.fillRect(plot.getX(), y-0.5f, plot.getWidth(), 1.f);
+        g.setColour(Col::viv(m==mc ? Col::textHi : Col::textMid.withAlpha(0.6f)));
+        g.drawText(juce::String(names[((m%12)+12)%12])+juce::String((int)std::floor((float)m/12.f)-1),
+                   juce::Rectangle<float>(r.getX(), y-6.f, labW-4.f, 12.f), juce::Justification::centredRight, false);
+    }
+    // tracé (le plus ancien à gauche), coupé là où il n'y a pas de hauteur nette
+    if(N>1){
+        juce::Path p; bool pen=false;
+        for(int i=0;i<N;++i){
+            const float hz=trace[(size_t)((traceHead+i)%N)];
+            const float x=plot.getX()+plot.getWidth()*(float)i/(float)(N-1);
+            if(hz<=0.f){ pen=false; continue; }
+            const float m=noteOf(hz).midi;
+            if(m<(float)mLo-0.5f || m>(float)mHi+0.5f){ pen=false; continue; }
+            const float y=yOf(m);
+            if(!pen){ p.startNewSubPath(x, y); pen=true; } else p.lineTo(x, y);
+        }
+        g.setColour(Col::viv(Col::accent));
+        g.strokePath(p, juce::PathStrokeType(2.f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+    g.setFont(Ui::iceland(8.5f*s)); g.setColour(Col::viv(Col::textMid.withAlpha(0.6f)));
+    g.drawText("-4 s", juce::Rectangle<float>(plot.getX(), plot.getBottom()+1.f, 60.f, 12.f*s), juce::Justification::centredLeft, false);
+    g.drawText(TR("DERNIERS COUPS"), juce::Rectangle<float>(plot.getRight()-160.f, plot.getBottom()+1.f, 160.f, 12.f*s), juce::Justification::centredRight, false);
+
+    // les 4 derniers coups, le plus récent à gauche
+    const float cw=cards.getWidth()/4.f;
+    for(int i=0;i<4;++i){
+        auto c=juce::Rectangle<float>(cards.getX()+cw*(float)i+2.f, cards.getY(), cw-4.f, cards.getHeight());
+        g.setColour(Col::viv(Col::light(i==0 ? (Col::paper ? 0.10f : 0.07f) : (Col::paper ? 0.06f : 0.04f))));
+        g.fillRoundedRectangle(c, 4.f);
+        if(hits[i]<=0.f) continue;
+        const auto n=noteOf(hits[i]);
+        const auto col=centsColour(n.cents);
+        auto top=c.removeFromTop(c.getHeight()*0.5f);
+        g.setFont(Ui::iceland(juce::jmin(20.f*s, top.getHeight()*0.85f))); g.setColour(Col::viv(col));
+        g.drawFittedText(n.name+juce::String(n.octave), top.toNearestInt(), juce::Justification::centredBottom, 1, 0.7f);
+        g.setFont(Ui::iceland(juce::jmin(10.f*s, c.getHeight()*0.45f)));
+        g.setColour(Col::viv(Col::textHi));
+        g.drawFittedText(juce::String(hits[i], 1)+" Hz", c.removeFromTop(c.getHeight()*0.5f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+        g.setColour(Col::viv(col));
+        g.drawFittedText(juce::String(n.cents>=0.f ? "+" : "")+juce::String(juce::roundToInt(n.cents))+" ct", c.toNearestInt(), juce::Justification::centredTop, 1, 0.6f);
     }
 }
 
@@ -5285,7 +5906,7 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
 {
     const int W=getWidth(), H=getHeight();
     if(W<10||H<10) return;
-    g.setColour(Col::bg); g.fillRect(getLocalBounds());
+    g.setColour(Col::viv(Col::bg)); g.fillRect(getLocalBounds());
 
     const float padL=juce::jlimit(18.f,32.f,W*.042f)*Ui::textScale, padR=4.f, padT=22.f, padB=16.f;
     const float gw=(float)W-padL-padR;
@@ -5294,16 +5915,16 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
     // Grille verticale fréquence
     for(auto f : {50.f,100.f,200.f,500.f,1000.f,2000.f,5000.f,10000.f,20000.f}){
         const float fx=freqToX(f);
-        g.setColour(Col::grid.withAlpha(0.28f));
+        g.setColour(Col::viv(Col::grid.withAlpha(0.28f)));
         g.drawLine(fx,padT,fx,padT+gh,0.5f);
     }
     // Grille horizontale dB
     g.setFont(Ui::iceland((7.f)));
     for(float db : {0.f,-20.f,-40.f,-60.f,-80.f,-100.f,-120.f}){
         const float y=dbToY(db);
-        g.setColour(db==0.f?Col::gridCtr.withAlpha(0.7f):Col::grid.withAlpha(0.35f));
+        g.setColour(Col::viv(db==0.f?Col::gridCtr.withAlpha(0.7f):Col::grid.withAlpha(0.35f)));
         g.drawLine(padL,y,padL+gw,y,0.5f);
-        g.setColour(Col::textMid.withAlpha(0.5f));
+        g.setColour(Col::viv(Col::textMid.withAlpha(0.5f)));
         const float lh=9.f*Ui::textScale;   // "-120" entier, même en gros texte (plus de "-1…")
         Ui::drawFit(g, juce::String((int)db), { 0.f, y-lh*0.5f, padL-2.f, lh }, juce::Justification::centredRight, Ui::iceland(7.f));
     }
@@ -5326,9 +5947,9 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
     if(started){
         fillPath.lineTo(freqToX((float)binHi*binHz),padT+gh);
         fillPath.closeSubPath();
-        g.setColour(Col::accent.withAlpha(0.16f));
+        g.setColour(Col::viv(Col::accent.withAlpha(0.16f)));
         g.fillPath(fillPath);
-        g.setColour(Col::accent.withAlpha(0.85f));
+        g.setColour(Col::viv(Col::accent.withAlpha(0.85f)));
         g.strokePath(linePath, juce::PathStrokeType(1.3f));
     }
 
@@ -5340,12 +5961,12 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
         if(!pStarted){ peakPath.startNewSubPath(x,y); pStarted=true; } else peakPath.lineTo(x,y);
     }
     if(pStarted){
-        g.setColour(Col::ink(juce::Colour(0xFFFFD200)).withAlpha(0.45f));
+        g.setColour(Col::viv(Col::ink(juce::Colour(0xFFFFD200)).withAlpha(0.45f)));
         g.strokePath(peakPath, juce::PathStrokeType(0.9f));
     }
 
     if(hovering){
-        g.setColour(Col::accent.withAlpha(0.18f));
+        g.setColour(Col::viv(Col::accent.withAlpha(0.18f)));
         g.drawLine(hoverPixX,padT,hoverPixX,padT+gh,1.f);
         const juce::String tip = (hoverFreq>=1000.f
             ? juce::String(hoverFreq/1000.f,1)+" kHz"
@@ -5358,15 +5979,15 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
         const float th=tfs+8.f;
         float tx=hoverPixX+8.f; if(tx+tipW>(float)W-4.f) tx=hoverPixX-tipW-8.f;
         const float ty=padT+4.f;
-        g.setColour(Col::panel); g.fillRoundedRectangle(tx,ty,tipW,th,3.f);
-        g.setColour(Col::border); g.drawRoundedRectangle(tx,ty,tipW,th,3.f,0.7f);
-        g.setFont(tipFont); g.setColour(Col::accent);
+        g.setColour(Col::viv(Col::panel)); g.fillRoundedRectangle(tx,ty,tipW,th,3.f);
+        g.setColour(Col::viv(Col::border)); g.drawRoundedRectangle(tx,ty,tipW,th,3.f,0.7f);
+        g.setFont(tipFont); g.setColour(Col::viv(Col::accent));
         g.drawText(tip,(int)(tx+6.f),(int)ty,(int)(tipW-7.f),(int)th,juce::Justification::centredLeft);
     }
 
     Ui::drawTitleDecor(g, (float)W);
     g.setFont(Ui::iceland((10.5f)).withExtraKerningFactor(0.08f));
-    g.setColour(Col::textHi.withAlpha(0.85f));
+    g.setColour(Col::viv(Col::textHi.withAlpha(0.85f)));
     g.drawFittedText(TR("SPECTRAL DENSITY (PSD)"), 6,5,W-12,13,juce::Justification::left,1,0.7f);
 }
 
@@ -5377,13 +5998,14 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p),
       vectorscope(p), oscilloscope(p),
       loudnessPanel(p), vuMeter(p),
-      spectrum(p), corrDisplay(p), panoDisplay(p), panoLed(p),
+      spectrum(p), corrDisplay(p), panoDisplay(p), panoLed(p), bitMeter(p), tuner(p),
       spectralDensity(p), needleVu(p), mbVectorscope(p),
       spectro3dPeaks(p, p.spectro3dPeaksReverse, p.spectro3dPeaksTilt, p.spectro3dPeaksSkew, p.spectro3dPeaksTimeSec),
       spectro3dSurface(p, p.spectro3dSurfaceReverse, p.spectro3dSurfaceTilt, p.spectro3dSurfaceSkew, p.spectro3dSurfaceTimeSec),
       gpuTerrain(p, GpuSpectrogramDisplay::Style::Terrain),
       gpuNeon(p, GpuSpectrogramDisplay::Style::Neon),
       gpuCrystal(p, GpuSpectrogramDisplay::Style::Crystal),
+      gpuCrystal2(p, GpuSpectrogramDisplay::Style::Crystal2),
       gpuSurface(p),
       gpuBars(p, GpuSpectroFxDisplay::Style::Bars),
       gpuLed(p, GpuSpectroFxDisplay::Style::Led),
@@ -5406,6 +6028,7 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     Ui::titleStyle = audioProcessor.titleStyle; Ui::logoColour = audioProcessor.logoColour;
     Ui::corrStyle  = audioProcessor.corrStyle;
     applyColours();
+    Col::vivid=juce::jlimit(0, 2, audioProcessor.colorVivid);
 
     addAndMakeVisible(topBar);
     addAndMakeVisible(controls);
@@ -5415,10 +6038,10 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     juce::Component* const allModules[] = {
         &vectorscope, &oscilloscope,
         &loudnessPanel, &vuMeter, &spectrum,
-        &corrDisplay, &panoDisplay, &panoLed,
+        &corrDisplay, &panoDisplay, &panoLed, &bitMeter, &tuner,
         &spectralDensity, &needleVu, &mbVectorscope,
         &spectro3dPeaks, &spectro3dSurface,
-        &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano,
+        &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano,
         &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash,
         &gpuVecPhosphor, &gpuVecDensity
     };
@@ -5431,6 +6054,7 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
         // Écouter les clics droits pour afficher le menu de slot
         c->addMouseListener(this, true);
     }
+    applyVivid();   // intensité des couleurs mémorisée
     addAndMakeVisible(masterStyleToggle);   // sous le VU master (posé sur la plaque)
     // calque décor + bords des écrans : au-dessus des modules, sous les panneaux
     overlayLayer.painter = [this](juce::Graphics& g){ paintChassisOverlay(g); };
@@ -5605,6 +6229,7 @@ OptionsOverlay::State LeakEditor::optionsState() const
     s.uiScale = audioProcessor.uiScale;
     s.plateTint = audioProcessor.plateTint;
     s.lightScreens = audioProcessor.lightScreens;
+    s.colorVivid   = audioProcessor.colorVivid;
     s.titleStyle = audioProcessor.titleStyle;
     s.logoColour = audioProcessor.logoColour;
     s.corrStyle = audioProcessor.corrStyle;
@@ -5757,6 +6382,7 @@ void LeakEditor::setupOptions()
     o.onUiScaleSelected      = [this](int pct){ audioProcessor.uiScale=pct; appliedUiScale=0.f; applyUiScale(); };
     o.onPlateTintSelected    = [this](int i){ audioProcessor.plateTint=i; applyLook(); };
     o.onLightScreensSelected = [this](bool on){ audioProcessor.lightScreens=on ? 1 : 0; applyLook(); };
+    o.onColorVividSelected   = [this](int v){ audioProcessor.colorVivid=juce::jlimit(0, 2, v); applyVivid(); };
     o.onTitleStyleSelected   = [this](int i){ audioProcessor.titleStyle=i; applyLook(); };
     o.onLogoColourSelected   = [this](int i){ audioProcessor.logoColour=i; applyLook(); };
     o.onCorrStyleSelected    = [this](int i){ audioProcessor.corrStyle=i; applyLook(); };
@@ -5830,7 +6456,7 @@ void LeakEditor::reloadFromProcessor()
     oscilloscope.syncFromProcessor();
     spectro3dPeaks.syncFromProcessor();
     spectro3dSurface.syncFromProcessor();
-    for(auto* g : { &gpuTerrain, &gpuNeon, &gpuCrystal }) g->syncFromProcessor();
+    for(auto* g : { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2 }) g->syncFromProcessor();
     for(auto* g : { &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash }) g->syncFromProcessor();
     gpuSurface.syncFromProcessor();
     for(auto* d : { &gpuDotChroma, &gpuDotNebula }) d->syncFromProcessor();
@@ -5871,8 +6497,8 @@ void LeakEditor::askDeletePreset(const juce::String& name)
                                      .withIconType(juce::MessageBoxIconType::QuestionIcon)
                                      .withTitle(TR("Supprimer le preset"))
                                      .withMessage(TR("Supprimer « {0} » ?").replace("{0}", name))
-                                     .withButton(TR("Supprimer"))
-                                     .withButton(TR("Annuler"))
+                                     .withButton(TR("Supprimer"), 1)   // JUCE 9.0.5 : code de résultat explicite
+                                     .withButton(TR("Annuler"), 0)
                                      .withAssociatedComponent(this),
                                  [sp, name](int result){
                                      if(result!=1 || sp==nullptr) return;
@@ -5925,6 +6551,8 @@ juce::Component* LeakEditor::getComponentForModule(int id)
         case M::MultibandCorr: return &corrDisplay;
         case M::Multipanorama: return &panoDisplay;
         case M::PanoramaLed:   return &panoLed;
+        case M::BitMeter:      return &bitMeter;
+        case M::Tuner:         return &tuner;
         case M::SpectralDensity: return &spectralDensity;
         case M::NeedleVU:      return &needleVu;
         case M::MultibandVectorscope: return &mbVectorscope;
@@ -5933,6 +6561,7 @@ juce::Component* LeakEditor::getComponentForModule(int id)
         case M::GpuSpectroTerrain:    return &gpuTerrain;
         case M::GpuSpectroNeon:       return &gpuNeon;
         case M::GpuSpectroCrystal:    return &gpuCrystal;
+        case M::GpuSpectroCrystal2:   return &gpuCrystal2;
         case M::GpuSpectroSurface:    return &gpuSurface;
         case M::GpuSpectroBars:       return &gpuBars;
         case M::GpuSpectroLed:        return &gpuLed;
@@ -6391,6 +7020,7 @@ namespace
         { "Spectre", {
             { 6,  "Spectrum",             ""    },
             { 10, "Spectral Density",     ""    },
+            { 32, "Tuner",                ""    },
             // Dot Spectrum Chroma (19) et Nebula (20) retirés pour la bêta (v1.81.42)
             } },
         { "Spectrogramme", {
@@ -6398,6 +7028,7 @@ namespace
             { 25, "Spectrogram Surface GPU", "GPU" },
             { 16, "Spectrogram Terrain",  "GPU" },
             { 18, "Spectrogram Crystal",  "GPU" },
+            { 33, "Spectrogram Crystal 2", "GPU" },
             { 26, "Spectrogram Bars",     "GPU" },
             { 27, "Spectrogram Cyberpunk LED", "GPU" },
             { 29, "Spectrogram Matrix",   "GPU" } } },
@@ -6416,7 +7047,8 @@ namespace
         { "Niveau & temps", {
             { 4,  "Loudness",             ""    },
             { 12, "Needle VU Meter",      ""    },
-            { 2,  "Oscilloscope",         ""    } } },   // Transient retiré (demande du user)
+            { 2,  "Oscilloscope",         ""    },
+            { 31, "Bit Meter",            ""    } } },   // Transient retiré (demande du user)
     };
 
     juce::String slotModuleName(int id)
@@ -6625,6 +7257,21 @@ static std::unique_ptr<juce::Drawable> makeModuleIcon(int moduleId)
             p.quadraticTo(S*0.5f,-S*0.15f, S,S*0.8f);
             break;
 
+        case M::BitMeter:   // deux rangées de témoins, les bits bas éteints
+            for(int r=0;r<2;++r)
+                for(int k=0;k<5;++k){
+                    const juce::Rectangle<float> q((float)k*S*0.21f, S*0.2f+(float)r*S*0.38f, S*0.15f, S*0.24f);
+                    if(k<3) p.addRectangle(q); else p.addRectangle(q.reduced(S*0.04f));
+                }
+            break;
+
+        case M::Tuner:      // diapason
+            p.startNewSubPath(S*0.3f, S*0.05f); p.lineTo(S*0.3f, S*0.55f);
+            p.quadraticTo(S*0.3f, S*0.75f, S*0.5f, S*0.75f);
+            p.quadraticTo(S*0.7f, S*0.75f, S*0.7f, S*0.55f); p.lineTo(S*0.7f, S*0.05f);
+            p.startNewSubPath(S*0.5f, S*0.75f); p.lineTo(S*0.5f, S);
+            break;
+
         case M::NeedleVU:
             p.addCentredArc(S*0.5f,S*0.62f,S*0.46f,S*0.46f,0.f,
                              juce::degreesToRadians(200.f),juce::degreesToRadians(340.f),true);
@@ -6681,6 +7328,7 @@ static std::unique_ptr<juce::Drawable> makeModuleIcon(int moduleId)
             break;
 
         case M::GpuSpectroCrystal:
+        case M::GpuSpectroCrystal2:
             p.startNewSubPath(0.f,S*0.75f);
             p.lineTo(S*0.3f,S*0.25f); p.lineTo(S*0.5f,S*0.55f);
             p.lineTo(S*0.72f,S*0.1f); p.lineTo(S,S*0.75f);
@@ -6969,10 +7617,10 @@ void LeakEditor::updateLayout()
     // Masquer tous les modules configurables
     juce::Component* const allModules[] = {
         &vectorscope, &oscilloscope,
-        &spectrum, &corrDisplay, &panoDisplay, &panoLed,
+        &spectrum, &corrDisplay, &panoDisplay, &panoLed, &bitMeter, &tuner,
         &spectralDensity, &needleVu, &mbVectorscope,
         &spectro3dPeaks, &spectro3dSurface,
-        &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano,
+        &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano,
         &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash,
         &gpuVecPhosphor, &gpuVecDensity, &loudnessPanel
     };
@@ -7056,7 +7704,7 @@ void LeakEditor::applyFrameRate(int hz)
         m.setFrameRateHz(want);
     };
     rate(vectorscope);   // oscilloscope : GPU, cadence via applyGraphics
-    rate(spectrum);     rate(corrDisplay);  rate(panoDisplay);  rate(panoLed);
+    rate(spectrum);     rate(corrDisplay);  rate(panoDisplay);  rate(panoLed);  rate(bitMeter);  rate(tuner);
     rate(spectralDensity); rate(needleVu);  rate(mbVectorscope);
     rate(spectro3dPeaks);  rate(spectro3dSurface);
 }
@@ -7340,6 +7988,22 @@ void LeakEditor::resetLayout()
     for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s) audioProcessor.slotModule[s]=def[s];
     updateLayout();
     repaint();
+}
+
+void LeakEditor::applyVivid()
+{
+    // modules 2D : couleurs intensifiées à la source (Col::viv), caches refaits ;
+    // modules GPU : passe hors écran (GpuModuleBase::renderOpenGL)
+    Col::vivid=juce::jlimit(0, 2, audioProcessor.colorVivid);
+    ++Col::generation;
+    juce::Component* const all[] = {
+        &vectorscope, &oscilloscope, &loudnessPanel, &vuMeter, &spectrum,
+        &corrDisplay, &panoDisplay, &panoLed, &bitMeter, &tuner,
+        &spectralDensity, &needleVu, &mbVectorscope,
+        &spectro3dPeaks, &spectro3dSurface
+    };
+    for(auto* c : all) c->repaint();
+    for(auto* gm : gpuModules()) gm->repaint();
 }
 
 void LeakEditor::applyLook()

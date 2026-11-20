@@ -18,7 +18,7 @@ class NeuAnimButton;  // PluginEditor.h
 class GpuSpectrogramDisplay : public GpuModuleBase
 {
 public:
-    enum class Style { Terrain, Neon, Crystal };
+    enum class Style { Terrain, Neon, Crystal, Crystal2 };   // Crystal2 : Crystal lissé (v1.81.52)
 
     GpuSpectrogramDisplay(LeakAudioProcessor&, Style);
     ~GpuSpectrogramDisplay() override;
@@ -35,19 +35,36 @@ public:
 
 private:
     static constexpr int    NX = 160;          // fréquences
-    static constexpr int    NZ = 64;           // instants (~2 s)
+    static constexpr int    NZMAX = 192;       // instants : 64 (Crystal 2 : 192, v1.81.52 « plus de lignes »)
     // TIME : durée de défilement fond -> avant (fader à gauche, 1–20 s)
-    double captureMs() const { return juce::jmax(1.0, (double)timeSecA.load())*1000.0/(double)(NZ-3); }
+    double captureMs() const { return juce::jmax(1.0, (double)timeSecA.load())*1000.0/(double)(nz-3); }
     float& timeRef();   // valeur sauvegardée (processeur) selon le style
 
     // ── OpenGLRenderer (thread GL) ──
     void newOpenGLContextCreated() override;
-    void renderOpenGL() override;
-    void openGLContextClosing() override;
+    void renderGL() override;
+    void closingGL() override;
 
     void captureLive();         // thread GL : spectre courant -> ligne live
+    void captureAt(float* row, double tMs);   // thread GL : spectre à l'instant tMs (< 0 : dernier) -> ligne
     const char* title() const;
     void uiTick() override;   // rafraîchissement de la lecture au survol
+    // Bulle de lecture au survol (v1.81.57) : préparée en image sur le thread de
+    // l'interface, collée par le thread de rendu. Avant, chaque changement
+    // repeignait le calque 2D : le thread de rendu de JUCE (partagé par tous les
+    // modules GPU) attendait alors le thread de l'interface, d'où des images en
+    // retard (micro-saccades), surtout en plein écran.
+    void updateBubble();
+    void drawBubble(float scale);
+    juce::SpinLock bubbleLock;
+    juce::Image bubbleImg;                       // sous bubbleLock
+    juce::Rectangle<float> bubbleBox;            // sous bubbleLock (points, repère du composant)
+    int bubbleCompW { 1 }, bubbleCompH { 1 };    // sous bubbleLock
+    std::atomic<int> bubbleVersion { 0 };
+    std::atomic<bool> bubbleShown { false };
+    int bubbleUploaded { -1 };                   // thread GL
+    unsigned int bubbleTex { 0 };                // thread GL
+    std::unique_ptr<juce::OpenGLShaderProgram> bubbleShader;   // thread GL
     float sampleH(float u, float age) const;                   // thread GL, 0..1
 
     // caméra : partagée entre le thread GL et l'interface
@@ -67,6 +84,7 @@ private:
     void pick(const Camera&, float frac, int w, int h);   // thread GL : rayon souris -> relief
 
     const Style style;
+    const int   nz;   // lignes d'historique : 64, Crystal 2 : 192
     std::unique_ptr<ReleaseFader> timeFader;
     std::atomic<float> timeSecA { 2.1f };
     // HOLD : image figée (plus de capture ni de défilement ; le survol reste actif)
@@ -100,19 +118,36 @@ private:
 
     // données (thread GL) : anneau de captures, rows[head] = la plus récente,
     // rows[head+1] = ligne live mise à jour à chaque image
-    float  rows[NZ][NX] {};
+    float  rows[NZMAX][NX] {};   // seules les nz premières servent
     int    head { 0 };
     juce::uint32 captureCount { 0 };
+    int rowsAdvanced { 0 };   // lignes validées depuis le dernier envoi à la texture (thread GL)
     double lastCaptureMs { 0.0 };
     PsdLogMap logMap;
     int seenAxisVersion { 0 };
     float  liveDb[NX] {};
+    float  prevRow[NX] {}, curRow[NX] {};   // spectre de l'image d'avant / courant (lignes datées)
+    double prevRowMs { 0.0 };
 
     // objets GL
     std::unique_ptr<juce::OpenGLShaderProgram> meshShader;
-    float  ageSpan() const { return (float)(NZ-3); }
+    float  ageSpan() const { return (float)(nz-3); }
     unsigned int vao { 0 }, vboGrid { 0 }, iboTris { 0 }, heightTex { 0 };
     int numTriIndices { 0 };
+    // HD (Crystal 2, v1.81.54, aperçu merlin_crystal_hd_preview.html « HD 2 ») :
+    // ombres portées (carte d'ombre depuis la lumière de contre-jour), occlusion
+    // d'horizon, reflet d'environnement, lueur HDR des crêtes fortes
+    std::unique_ptr<NeuAnimButton> hdBtn;
+    std::atomic<bool> hdOn { false };
+    std::unique_ptr<juce::OpenGLShaderProgram> depthShader, brightShader, blurShader, compShader;
+    unsigned int shadowFbo { 0 }, shadowTex { 0 }, vaoQuad { 0 };
+    unsigned int msFbo { 0 }, msColor { 0 }, msDepth { 0 }, sceneFbo { 0 }, sceneTex { 0 };
+    unsigned int blurFbo[4] {}, blurTex[4] {};
+    int targetW { 0 }, targetH { 0 };
+    static constexpr int kShadowSize = 2048;
+    bool ensureTargets(int pw, int ph);   // thread GL : tampons de la scène HDR et des flous
+    void releaseTargets();
+    void lightMvp(const Camera&, float* out) const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GpuSpectrogramDisplay)
 };

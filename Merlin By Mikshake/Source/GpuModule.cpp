@@ -1,6 +1,7 @@
 #include "GpuModule.h"
 #include "PluginEditor.h"     // Col::, Neu::, Ui::
 #include "SystemLoopback.h"   // WindowsDisplay::waitForNextFrame
+#include <map>
 
 using namespace juce::gl;
 
@@ -13,33 +14,60 @@ namespace { juce::SpinLock rendererLock; juce::String rendererInfo; }
 // thread de messages : quand l'interface était chargée il arrivait en retard
 // et une image sautait (saccades de l'oscilloscope).
 //==============================================================================
+// v1.81.57 : un fil par écran, calé sur SON rafraîchissement (WaitForVBlank) ;
+// chaque module suit l'écran de sa fenêtre (voir followMonitor()).
 struct GpuFramePacer : private juce::Thread
 {
-    GpuFramePacer() : juce::Thread("Merlin GPU frame pacer") { startThread(juce::Thread::Priority::high); }
+    explicit GpuFramePacer(void* mon) : juce::Thread("Merlin GPU frame pacer"), monitor(mon) { startThread(juce::Thread::Priority::high); }
     ~GpuFramePacer() override { stopThread(2000); }
 
     void add(GpuModuleBase* m)    { const juce::ScopedLock sl(lock); modules.addIfNotAlreadyThere(m); }
     void remove(GpuModuleBase* m) { const juce::ScopedLock sl(lock); modules.removeFirstMatchingValue(m); }
     void barrier()                { const juce::ScopedLock sl(lock); }   // attend la fin d'un passage en cours
 
-    static std::shared_ptr<GpuFramePacer> acquire()
+    static std::shared_ptr<GpuFramePacer> acquire(void* mon)
     {
         static std::mutex m;
-        static std::weak_ptr<GpuFramePacer> shared;
+        static std::map<void*, std::weak_ptr<GpuFramePacer>> shared;
         const std::lock_guard<std::mutex> g(m);
-        auto p=shared.lock();
-        if(p==nullptr){ p=std::make_shared<GpuFramePacer>(); shared=p; }
+        auto p=shared[mon].lock();
+        if(p==nullptr){ p=std::make_shared<GpuFramePacer>(mon); shared[mon]=p; }
         return p;
     }
+    void* const monitor;
 
 private:
     void run() override
     {
+        // Grille des rafraîchissements de l'écran (v1.81.57) : chaque signal est
+        // rattaché à SON rafraîchissement. Avec deux écrans sur deux cartes,
+        // WaitForVBlank / DwmFlush rendaient parfois la main deux fois par période
+        // (doublon : ignoré) ; un réveil en retard compte quand même pour son
+        // rafraîchissement (avant : image sautée, trou de 33 ms).
+        double hz=WindowsDisplay::refreshHz(monitor), anchor=0.0, pMeas=0.0, prevTs=0.0;
+        juce::int64 lastIdx=-1;
+        juce::uint32 hzReadMs=juce::Time::getMillisecondCounter();
         while(!threadShouldExit()){
-            if(!WindowsDisplay::waitForNextFrame()) juce::Thread::sleep(16);   // pas de composition : ~60 Hz
+            if(!WindowsDisplay::waitForVBlank(monitor) && !WindowsDisplay::waitForNextFrame())
+                juce::Thread::sleep(16);   // ni écran ni composition : ~60 Hz
             const double ts=juce::Time::getMillisecondCounterHiRes()*0.001;
+            if(juce::Time::getMillisecondCounter()-hzReadMs>2000){ hz=WindowsDisplay::refreshHz(monitor); hzReadMs=juce::Time::getMillisecondCounter(); }
+            const double pNom=hz>1.0 ? 1.0/hz : 1.0/60.0;
+            // période réelle mesurée (Windows annonce 60 Hz pour un écran à 59,94...)
+            if(prevTs>0.0){ const double dt=ts-prevTs; if(dt>0.8*pNom && dt<1.2*pNom) pMeas=pMeas>0.0 ? pMeas+(dt-pMeas)*0.01 : dt; }
+            prevTs=ts;
+            if(pMeas>0.0 && std::abs(pMeas-pNom)>0.1*pNom) pMeas=pNom;   // fréquence changée
+            const double p=pMeas>0.0 ? pMeas : pNom;
+            if(anchor<=0.0 || ts-anchor>(double)(lastIdx+4)*p+1.0){ anchor=ts; lastIdx=-1; }   // départ, ou longue pause
+            const juce::int64 idx=(juce::int64)std::floor((ts-anchor)/p+0.25);
+            const double off=ts-(anchor+(double)idx*p);   // retard sur le rafraîchissement supposé
+            if(off<0.0)        anchor+=off;        // rafraîchissement plus tôt que prévu : la grille recule
+            else if(off<0.5*p) anchor+=off*0.02;   // suit lentement (les réveils en retard ne pèsent presque pas)
+            if(idx<=lastIdx) continue;              // doublon dans la même période
+            lastIdx=idx;
+            const double vblank=anchor+(double)idx*p;   // heure du rafraîchissement : horloge régulière des images
             const juce::ScopedLock sl(lock);
-            for(auto* m : modules) m->onFrameTick(ts);
+            for(auto* m : modules) m->onFrameTick(vblank);
         }
     }
 
@@ -60,7 +88,7 @@ GpuModuleBase::GpuModuleBase(LeakAudioProcessor& p) : processor(p)
     // est coupée, et SwapBuffers ne bloque plus.
     context.setContinuousRepainting(false);
     context.setRenderer(this);
-    pacer=GpuFramePacer::acquire();
+    pacer=GpuFramePacer::acquire(nullptr);   // écran inconnu tant que la fenêtre n'existe pas
     pacer->add(this);
     // l'attache se fait à l'arrivée dans l'éditeur (parentHierarchyChanged),
     // une fois la classe dérivée entièrement construite ; le timer démarre
@@ -162,6 +190,7 @@ void GpuModuleBase::timerCallback()
     if(!renderActive.load() && isVisible() && !suspended && context.isAttached()){
         updateRenderActive();
     }
+    followMonitor();
     const bool vs=vsyncWanted.load();
     if(!vs && context.isAttached()) context.triggerRepaint();
     if(vs || ++uiTickDiv>=juce::jmax(1, frameHz/30)){
@@ -186,15 +215,161 @@ void GpuModuleBase::onFrameTick(double ts)
     lastTickTs=ts;
     if(!vsyncWanted.load() || !renderActive.load()) return;
     const double period=1.0/(double)juce::jmax(1, frameHzA.load());
+    // cadence >= écran : une image à chaque rafraîchissement. Avant la v1.81.57,
+    // le pas fixe (16,667 ms) dérivait face à un écran à 60,0x Hz et sautait un
+    // rafraîchissement toutes les ~10 s (micro-freeze).
+    if(period<=framePeriod*1.04){ nextFrameTs=ts; frameTickMs=ts*1000.0; context.triggerRepaint(); return; }
     if(ts+framePeriod*0.5 < nextFrameTs) return;   // pas encore l'heure de la prochaine image
     // pas fixe ; recalage seulement après un vrai retard
     nextFrameTs = (ts-nextFrameTs > period*2.0 || nextFrameTs<=0.0) ? ts+period : nextFrameTs+period;
+    frameTickMs=ts*1000.0;
     context.triggerRepaint();
+}
+
+// fenêtre passée sur un autre écran : le module change de fil de cadence
+void GpuModuleBase::followMonitor()
+{
+    auto* peer=getPeer();
+    void* mon=peer!=nullptr ? WindowsDisplay::monitorOf(peer->getNativeHandle()) : nullptr;
+    if(mon==nullptr || (pacer!=nullptr && pacer->monitor==mon)) return;
+    auto next=GpuFramePacer::acquire(mon);
+    if(pacer!=nullptr) pacer->remove(this);   // attend la fin d'un passage en cours (verrou)
+    lastTickTs=0.0; nextFrameTs=0.0;          // horloge de l'autre écran
+    pacer=next;
+    pacer->add(this);
 }
 
 //==============================================================================
 // Thread GL
 //==============================================================================
+
+// Intensité des couleurs : saturation + contraste des seules couleurs (même
+// formule que VividEffect, PluginEditor.cpp). Gris, noir et blanc intacts.
+static const char* kVividVS = R"(#version 150
+out vec2 uv;
+void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); uv=p; gl_Position=vec4(p*2.0-1.0,0.0,1.0); }
+)";
+static const char* kVividFS = R"(#version 150
+in vec2 uv; uniform sampler2D tex; uniform float sat, con; out vec4 o;
+void main(){
+    vec3 c=texture(tex,uv).rgb;
+    float mx=max(c.r,max(c.g,c.b)), mn=min(c.r,min(c.g,c.b));
+    float L=dot(c, vec3(0.2126,0.7152,0.0722));
+    vec3 s=L+(c-L)*sat;
+    float w=clamp((mx-mn)*4.0, 0.0, 1.0);
+    vec3 k=(s-0.5)*con+0.5;
+    o=vec4(clamp(mix(s,k,w), 0.0, 1.0), 1.0);
+}
+)";
+
+// Intensité des couleurs : le module dessine dans une image hors écran, puis la
+// passe la recopie dans la fenêtre. (1re version : relecture de la fenêtre
+// après coup -> attente du pilote à chaque module, cadence tombée vers 24 i/s.)
+void GpuModuleBase::renderOpenGL()
+{
+    GLint vp[4]={0,0,0,0};
+    glGetIntegerv(GL_VIEWPORT, vp);   // tout le composant (posé par JUCE)
+    const int w=vp[2], h=vp[3];
+    const bool viv=Col::vivid.load()>0 && w>0 && h>0 && ensureVividTargets(w, h);
+    GLint target=0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &target);
+    if(!viv){ renderGL(); return; }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, vividMsFbo);
+    glViewport(0, 0, w, h);
+    renderGL();   // le module voit cette image comme sa cible (il lit GL_FRAMEBUFFER_BINDING)
+
+    float sat=1.f, con=1.f;
+    Col::vividParams(Col::vivid.load(), sat, con);
+    GLint prevVao=0;
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
+    glDisable(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, vividMsFbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, vividFbo);
+    glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)target);
+    glViewport(vp[0], vp[1], w, h);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    vividProg->use();
+    vividProg->setUniform("tex", 0);
+    vividProg->setUniform("sat", sat);
+    vividProg->setUniform("con", con);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, vividTex);
+    glBindVertexArray(vividVao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    // état rendu à JUCE (composition du calque 2D)
+    glBindVertexArray((GLuint)prevVao);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glUseProgram(0);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+void GpuModuleBase::openGLContextClosing()
+{
+    closingGL();
+    releaseVivid();
+    vividProg.reset();
+    if(vividVao){ glDeleteVertexArrays(1, &vividVao); vividVao=0; }
+}
+
+void GpuModuleBase::releaseVivid()
+{
+    if(vividMsFbo)  { glDeleteFramebuffers(1, &vividMsFbo); vividMsFbo=0; }
+    if(vividMsColor){ glDeleteRenderbuffers(1, &vividMsColor); vividMsColor=0; }
+    if(vividMsDepth){ glDeleteRenderbuffers(1, &vividMsDepth); vividMsDepth=0; }
+    if(vividFbo)    { glDeleteFramebuffers(1, &vividFbo); vividFbo=0; }
+    if(vividTex)    { glDeleteTextures(1, &vividTex); vividTex=0; }
+    vividW=vividH=0;
+}
+
+// cible hors écran à la taille du composant, même anticrénelage que la fenêtre
+bool GpuModuleBase::ensureVividTargets(int w, int h)
+{
+    if(vividProg==nullptr){ vividProg=compileProgram(kVividVS, kVividFS); if(vividProg==nullptr) return false; }
+    if(vividVao==0) glGenVertexArrays(1, &vividVao);
+    GLint samples=0;
+    {
+        GLint cur=0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &cur);
+        if(cur!=(GLint)vividMsFbo) glGetIntegerv(GL_SAMPLES, &samples);   // celui de la cible de JUCE
+        else samples=vividSamples;
+    }
+    GLint maxSamples=0; glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+    samples=juce::jlimit(0, juce::jmax(0, (int)maxSamples), (int)samples);
+    if(vividMsFbo!=0 && w==vividW && h==vividH && samples==vividSamples) return true;
+    releaseVivid();
+    GLint prevFbo=0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+    glGenRenderbuffers(1, &vividMsColor);
+    glBindRenderbuffer(GL_RENDERBUFFER, vividMsColor);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, w, h);
+    glGenRenderbuffers(1, &vividMsDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, vividMsDepth);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, w, h);
+    glGenFramebuffers(1, &vividMsFbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, vividMsFbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, vividMsColor);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, vividMsDepth);
+    const bool okMs=glCheckFramebufferStatus(GL_FRAMEBUFFER)==GL_FRAMEBUFFER_COMPLETE;
+    glGenTextures(1, &vividTex);
+    glBindTexture(GL_TEXTURE_2D, vividTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glGenFramebuffers(1, &vividFbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, vividFbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, vividTex, 0);
+    const bool ok=okMs && glCheckFramebufferStatus(GL_FRAMEBUFFER)==GL_FRAMEBUFFER_COMPLETE;
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    if(!ok){ releaseVivid(); return false; }
+    vividW=w; vividH=h; vividSamples=samples;
+    return true;
+}
 std::unique_ptr<juce::OpenGLShaderProgram> GpuModuleBase::compileProgram(const char* vs, const char* fs, const char* gs)
 {
     auto prog=std::make_unique<juce::OpenGLShaderProgram>(context);
@@ -301,6 +476,24 @@ bool PsdLogMap::read(LeakAudioProcessor& proc, float* outDb)
     if(sr>0.0 && sr!=mappedSampleRate) rebuild(sr);
     if(mappedSampleRate<=0.0) return false;
     proc.getPSDData(psd, LeakAudioProcessor::PSD_NUM_BINS);
+    for(int p=0;p<N;++p){
+        if(binFrac[p]<0.f){
+            float db=-120.f;
+            for(int b=binLo[p];b<binHi[p];++b) db=juce::jmax(db,psd[b]);
+            outDb[p]=db;
+        } else {
+            outDb[p]=psd[binLo[p]]+(psd[binHi[p]]-psd[binLo[p]])*binFrac[p];
+        }
+    }
+    return true;
+}
+
+bool PsdLogMap::readAt(LeakAudioProcessor& proc, double timeMs, float* outDb)
+{
+    const double sr=proc.getCurrentSampleRate();
+    if(sr>0.0 && sr!=mappedSampleRate) rebuild(sr);
+    if(mappedSampleRate<=0.0) return false;
+    if(!proc.getPSDAt(timeMs, psd, LeakAudioProcessor::PSD_NUM_BINS)) proc.getPSDData(psd, LeakAudioProcessor::PSD_NUM_BINS);
     for(int p=0;p<N;++p){
         if(binFrac[p]<0.f){
             float db=-120.f;

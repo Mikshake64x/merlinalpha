@@ -23,8 +23,48 @@ in vec2 grid;                 // x : frequence 0..1, y : rang dans l'historique 
 uniform mat4  mvp;
 uniform sampler2D heights;
 uniform float headT, invNZ, ageSpan, frac, sScale, sOff, halfX, halfZ;
+uniform int   style;
+uniform mat4  lmvp;          // HD : caméra de la lumière (carte d'ombre)
+uniform int   depthPass;     // 1 : passe d'ombre, vue depuis la lumière
 out vec3  vPos;
 out float vAge, vU, vD, vH;
+out vec4  vLs;
+
+// Crystal 2 (style 3) : hauteur interpolée en Catmull-Rom entre les points
+// mesurés (16 lectures de texel), lignes de l'anneau bornées à l'historique,
+// puis haut de l'échelle tassé en douceur (plus d'écrêtage net à -10 dB :
+// 0.933 = -16 dB, 1.0 = 0 dBFS).
+uniform float nxF;
+float crw(float a, float b, float c, float d, float t)
+{
+    return 0.5*(2.0*b + (-a + c)*t + (2.0*a - 5.0*b + 4.0*c - d)*t*t + (-a + 3.0*b - 3.0*c + d)*t*t*t);
+}
+float smoothH(sampler2D tex, float u, float age, float headT, float invNZ, float ageSpan)
+{
+    float nzF  = 1.0/invNZ;
+    float head = headT*nzF - 0.5;
+    float rf   = head - clamp(age, -1.0, ageSpan);
+    float r1   = floor(rf), fr = rf - r1;
+    float px   = clamp(u, 0.0, 1.0)*(nxF - 1.0);
+    float x1   = floor(px), fx = px - x1;
+    float rowV[4];
+    for(int j=0;j<4;++j){
+        float ri = clamp(r1 + float(j - 1), head - ageSpan, head + 1.0);
+        float t  = (ri + 0.5)*invNZ;
+        float v[4];
+        for(int i=0;i<4;++i){
+            float xi = clamp(x1 + float(i - 1), 0.0, nxF - 1.0);
+            v[i] = texture(tex, vec2((xi + 0.5)/nxF, t)).r;
+        }
+        rowV[j] = crw(v[0], v[1], v[2], v[3], fx);
+    }
+    return max(0.0, crw(rowV[0], rowV[1], rowV[2], rowV[3], fr));
+}
+float softTop(float x)
+{
+    const float k = 0.9333, r = 1.1111 - 0.9333;
+    return x < k ? x : k + r*(1.0 - exp(-(x - k)/r))*0.6;
+}
 
 void main()
 {
@@ -35,26 +75,67 @@ void main()
     float P   = a + frac;
     float Pc  = clamp(P, 0.0, ageSpan);
     float age = (P == Pc) ? a : Pc - frac;
-    float h   = texture(heights, vec2(grid.x*sScale + sOff, headT - age*invNZ)).r;
+    float h   = style == 3 ? softTop(smoothH(heights, grid.x, age, headT, invNZ, ageSpan))
+                           : texture(heights, vec2(grid.x*sScale + sOff, headT - age*invNZ)).r;
     float d   = Pc/ageSpan;
     // temps : la ligne la plus recente nait au fond (z = -halfZ) et
     // l'historique avance vers la camera (z = +halfZ)
     vec3  p   = vec3((grid.x*2.0 - 1.0)*halfX, h*2.2, (d*2.0 - 1.0)*halfZ);
     vPos = p; vAge = age; vU = grid.x; vD = d; vH = h;
-    gl_Position = mvp*vec4(p, 1.0);
+    vLs = lmvp*vec4(p, 1.0);
+    gl_Position = depthPass == 1 ? vLs : mvp*vec4(p, 1.0);
 }
 )";
 
 static const char* kMeshFS = R"(#version 150
 in vec3  vPos;
 in float vAge, vU, vD, vH;
+in vec4  vLs;
 out vec4 fragColour;
+uniform int hd;                      // 1 : rendu HD du Crystal 2
+uniform sampler2DShadow shadowMap;   // HD : profondeur vue depuis la lumière
 uniform sampler2D heights;
 uniform float headT, invNZ, ageSpan, sScale, sOff, parity, gridPhase, halfX, halfZ;
 uniform int   style;          // 0 terrain, 1 neon, 2 cristal
 uniform vec3  eye, viewDir, bg, accent;
 uniform vec3  hover;         // survol : u, age, actif (0/1)
 uniform float paper;         // 1 : ecran Papier (theme clair), encre sur fond clair
+
+// Crystal 2 (style 3) : hauteur interpolée en Catmull-Rom entre les points
+// mesurés (16 lectures de texel), lignes de l'anneau bornées à l'historique,
+// puis haut de l'échelle tassé en douceur (plus d'écrêtage net à -10 dB :
+// 0.933 = -16 dB, 1.0 = 0 dBFS).
+uniform float nxF;
+float crw(float a, float b, float c, float d, float t)
+{
+    return 0.5*(2.0*b + (-a + c)*t + (2.0*a - 5.0*b + 4.0*c - d)*t*t + (-a + 3.0*b - 3.0*c + d)*t*t*t);
+}
+float smoothH(sampler2D tex, float u, float age, float headT, float invNZ, float ageSpan)
+{
+    float nzF  = 1.0/invNZ;
+    float head = headT*nzF - 0.5;
+    float rf   = head - clamp(age, -1.0, ageSpan);
+    float r1   = floor(rf), fr = rf - r1;
+    float px   = clamp(u, 0.0, 1.0)*(nxF - 1.0);
+    float x1   = floor(px), fx = px - x1;
+    float rowV[4];
+    for(int j=0;j<4;++j){
+        float ri = clamp(r1 + float(j - 1), head - ageSpan, head + 1.0);
+        float t  = (ri + 0.5)*invNZ;
+        float v[4];
+        for(int i=0;i<4;++i){
+            float xi = clamp(x1 + float(i - 1), 0.0, nxF - 1.0);
+            v[i] = texture(tex, vec2((xi + 0.5)/nxF, t)).r;
+        }
+        rowV[j] = crw(v[0], v[1], v[2], v[3], fx);
+    }
+    return max(0.0, crw(rowV[0], rowV[1], rowV[2], rowV[3], fr));
+}
+float softTop(float x)
+{
+    const float k = 0.9333, r = 1.1111 - 0.9333;
+    return x < k ? x : k + r*(1.0 - exp(-(x - k)/r))*0.6;
+}
 
 const vec3 pstops[8] = vec3[8](vec3(236.,241.,245.)/255., vec3(170.,222.,205.)/255., vec3(45.,179.,138.)/255.,
                                vec3(140.,198.,63.)/255.,  vec3(241.,194.,50.)/255.,  vec3(240.,138.,44.)/255.,
@@ -73,7 +154,44 @@ vec3 inferno(float t)
 // anciennete : vers le noir sur ecran sombre, vers le fond sur papier
 // (sur papier, a peine : vers le blanc, l'anciennete faisait un voile)
 vec3 aged(vec3 c, float fade) { return paper > 0.5 ? mix(bg, c, 0.7 + 0.3*fade) : c*fade; }
-float H(float u, float age) { return texture(heights, vec2(u*sScale + sOff, headT - age*invNZ)).r; }
+float H(float u, float age)
+{
+    if(style == 3) return softTop(smoothH(heights, u, age, headT, invNZ, ageSpan));
+    return texture(heights, vec2(u*sScale + sOff, headT - age*invNZ)).r;
+}
+// HD : ombre douce (3 x 3 lectures comparées) ; 1 = éclairé
+float shadowK()
+{
+    vec3 p = vLs.xyz/vLs.w*0.5 + 0.5;
+    if(p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) return 1.0;
+    float s = 0.0;
+    for(int y = -1; y <= 1; ++y)
+        for(int x = -1; x <= 1; ++x)
+            s += texture(shadowMap, vec3(p.xy + vec2(float(x), float(y))*(1.5/2048.0), p.z - 0.0025));
+    return s/9.0;
+}
+// HD : occlusion d'horizon (8 directions, 3 pas) : 1 = à découvert, 0 = au fond d'un creux
+float horizonAO()
+{
+    float occ = 0.0;
+    for(int k = 0; k < 8; ++k){
+        float an = float(k)*0.7853982;
+        vec2  dr = vec2(cos(an), sin(an));
+        float mx = 0.0;
+        for(int st = 1; st <= 3; ++st){
+            float stp = float(st)*2.5;
+            float u = vU + dr.x*stp/159.0;
+            float a = vAge + dr.y*stp*ageSpan/64.0;
+            if(u < 0.0 || u > 1.0 || a < -1.0 || a > ageSpan) break;
+            float hh = softTop(texture(heights, vec2(u*sScale + sOff, headT - a*invNZ)).r);
+            float dh = (hh - vH)*2.2;
+            vec3  dv = vec3(dr.x*stp/159.0*2.0*halfX, dh, dr.y*stp*2.0*halfZ/64.0);
+            mx = max(mx, dh/length(dv));
+        }
+        occ += mx;
+    }
+    return clamp(1.0 - occ/8.0*1.6, 0.0, 1.0);
+}
 
 // Cristal : vert (niveau le plus faible) -> jaune -> orange -> rouge, violet
 // seulement tout en haut (-10 dB = 1.0)
@@ -109,9 +227,10 @@ void main()
     float fogK = clamp((dot(vPos - eye, viewDir) - 7.0)/8.0, 0.0, 1.0);   // brouillard en profondeur de vue
 
     // normale au pixel (differences finies dans la texture)
-    float du = 1.0/159.0;
+    float du = style == 3 ? 0.75/159.0 : 1.0/159.0;
+    float da = style == 3 ? 0.5 : 1.0;
     float hx = (H(vU + du, vAge) - H(vU - du, vAge))*2.2/(4.0*halfX*du);
-    float hz = (H(vU, vAge + 1.0) - H(vU, vAge - 1.0))*2.2/(2.0*(2.0*halfZ/ageSpan));
+    float hz = (H(vU, vAge + da) - H(vU, vAge - da))*2.2/(2.0*da*(2.0*halfZ/ageSpan));
     vec3  n  = normalize(vec3(-hx, 1.0, -hz));
     vec3  V  = normalize(eye - vPos);
     if(dot(n, V) < 0.0) n = -n;
@@ -164,8 +283,25 @@ void main()
         float d1 = max(dot(n, L1), 0.0), d2 = max(dot(n, Lp), 0.0);
         float s1 = pow(max(dot(n, normalize(L1 + V)), 0.0), 90.0);
         float s2 = pow(max(dot(n, normalize(Lp + V)), 0.0), 90.0)*att;
-        col = base*(0.4 + d1) + base*accent*0.8*att*d2
-            + vec3(0.60, 1.0, 0.93)*(s1*0.75 + s2*0.6);
+        if(hd == 1){
+            // HD : ombres portées, creux assombris, reflet d'environnement
+            // selon l'angle (Fresnel), cœur lumineux des crêtes fortes (> 1 :
+            // il nourrit la lueur HDR)
+            float sh = shadowK();
+            float ao = mix(0.25, 1.0, horizonAO());
+            col = base*(0.30*ao + 1.15*d1*sh) + base*accent*0.8*att*d2*ao
+                + vec3(0.60, 1.0, 0.93)*(s1*0.9*sh + s2*0.6);
+            float fres = pow(1.0 - max(dot(n, V), 0.0), 3.0);
+            vec3  R    = reflect(-V, n);
+            vec3  env  = mix(vec3(0.02, 0.03, 0.06), vec3(0.25, 0.55, 0.70), clamp(R.y*0.6 + 0.4, 0.0, 1.0))
+                       + vec3(1.0)*pow(max(dot(R, normalize(vec3(-0.4, 0.85, -0.35))), 0.0), 60.0)*1.2;
+            col += env*(0.03 + 0.45*fres)*ao;
+            col += base*smoothstep(0.78, 1.0, vH)*1.6;
+            col += vec3(0.60, 1.0, 0.93)*s1*2.0*sh;
+        } else {
+            col = base*(0.4 + d1) + base*accent*0.8*att*d2
+                + vec3(0.60, 1.0, 0.93)*(s1*0.75 + s2*0.6);
+        }
         float hu, hr;
         float g = max(lineMask(vU*79.0, hu), lineMask(vAge - parity, hr));
         col *= 1.0 - 0.22*g;
@@ -182,6 +318,7 @@ void main()
         vec3 plc = paper > 0.5 ? mix(vec3(0.89, 0.91, 0.94), vec3(0.80, 0.84, 0.89), vD)
                                : mix(vec3(0.18, 0.17, 0.40), vec3(0.42, 0.44, 0.80), vD);
         plc = mix(plc, paper > 0.5 ? vec3(0.42, 0.49, 0.59) : vec3(0.78, 0.82, 1.0), gp*0.35);
+        if(hd == 1) plc *= mix(0.5, 1.0, shadowK());   // ombre portée sur le sol
         col = mix(col, plc, pl);
     }
 
@@ -196,6 +333,50 @@ void main()
     // brouillard : vers le noir sur ecran sombre ; sur papier il voilait tout de
     // blanc, il ne reste qu'un leger fondu au loin
     fragColour = vec4(mix(col, bg, paper > 0.5 ? fogK*0.25 : fogK), 1.0);
+}
+)";
+
+// HD : passe d'ombre (profondeur seule) et lueur HDR
+static const char* kDepthFS = R"(#version 150
+out vec4 o;
+void main(){ o=vec4(1.0); }
+)";
+static const char* kBubbleVS = R"(#version 150
+uniform vec4 rect; out vec2 uv;
+void main(){ vec2 c=vec2(float(gl_VertexID&1), float(gl_VertexID>>1)); uv=vec2(c.x, 1.0-c.y); gl_Position=vec4(mix(rect.xy, rect.zw, c), 0.0, 1.0); }
+)";
+static const char* kBubbleFS = R"(#version 150
+in vec2 uv; uniform sampler2D tex; out vec4 o;
+void main(){ o=texture(tex, uv); }
+)";
+static const char* kHdQuadVS = R"(#version 150
+out vec2 uv;
+void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); uv=p; gl_Position=vec4(p*2.0-1.0,0.0,1.0); }
+)";
+static const char* kHdBrightFS = R"(#version 150
+in vec2 uv; uniform sampler2D src; out vec4 o;
+void main(){ vec3 c=texture(src,uv).rgb; float l=max(c.r,max(c.g,c.b)); o=vec4(c*smoothstep(1.15,2.05,l),1.0); }
+)";
+static const char* kHdBlurFS = R"(#version 150
+in vec2 uv; uniform sampler2D src; uniform vec2 dir; out vec4 o;
+void main(){
+    vec3 c=texture(src,uv).rgb*0.227027;
+    c+=(texture(src,uv+dir).rgb+texture(src,uv-dir).rgb)*0.1945946;
+    c+=(texture(src,uv+2.0*dir).rgb+texture(src,uv-2.0*dir).rgb)*0.1216216;
+    c+=(texture(src,uv+3.0*dir).rgb+texture(src,uv-3.0*dir).rgb)*0.054054;
+    c+=(texture(src,uv+4.0*dir).rgb+texture(src,uv-4.0*dir).rgb)*0.016216;
+    o=vec4(c,1.0);
+}
+)";
+// composition : scène + lueur, épaule douce au-dessus de 0.8 (pas d'ACES : les
+// couleurs de mesure du Crystal restent celles du rendu normal)
+static const char* kHdCompFS = R"(#version 150
+in vec2 uv; uniform sampler2D scene, bloomH, bloomQ; uniform float paper; out vec4 o;
+vec3 shoulder(vec3 c){ return mix(c, 0.8+0.2*(1.0-exp(-(c-0.8)/0.2)), step(vec3(0.8), c)); }
+void main(){
+    vec3 b=texture(bloomH,uv).rgb*0.8+texture(bloomQ,uv).rgb*0.9;
+    vec3 c=texture(scene,uv).rgb+0.29*b;
+    o=vec4(paper>0.5 ? min(c, vec3(1.0)) : shoulder(c), 1.0);   // Papier : le fond clair ne doit pas etre tasse
 }
 )";
 
@@ -220,8 +401,27 @@ namespace
             }
     }
 
-    constexpr int kGX = 319;   // sommets : 2 par colonne de données
+    constexpr int kGXBase = 319;   // sommets : 2 par colonne de données (Crystal 2 : 3)
     constexpr float kReliefH = 2.2f;   // hauteur du relief à pleine échelle
+}
+
+void GpuSpectrogramDisplay::lightMvp(const Camera& cam, float* out) const
+{
+    const V3 L=norm({ 3.f, 7.f, -6.f });   // même direction que L1 dans le shader
+    const V3 c { 0.f, 1.f, 0.f }, up { 0.f, 1.f, 0.f };
+    const V3 e { c.x+L.x*14.f, c.y+L.y*14.f, c.z+L.z*14.f };
+    const V3 f=norm(sub(c, e)), sx=norm(cross(f, up)), u=cross(sx, f);
+    const float view[16] = {  sx.x,  u.x, -f.x, 0.f,
+                              sx.y,  u.y, -f.y, 0.f,
+                              sx.z,  u.z, -f.z, 0.f,
+                             -dot(sx,e), -dot(u,e), dot(f,e), 1.f };
+    const float R=std::sqrt(cam.halfX*cam.halfX+cam.halfZ*cam.halfZ)+0.6f;
+    const float n=1.f, fa=30.f;
+    const float proj[16] = { 1.f/R, 0.f, 0.f, 0.f,
+                             0.f, 1.f/R, 0.f, 0.f,
+                             0.f, 0.f, -2.f/(fa-n), 0.f,
+                             0.f, 0.f, -(fa+n)/(fa-n), 1.f };
+    mul(proj, view, out);
 }
 
 GpuSpectrogramDisplay::Camera GpuSpectrogramDisplay::makeCamera(float yawRad, float pitchRad, float aspect, float zoomAmount, float topLimit)
@@ -337,11 +537,12 @@ static constexpr float kSnapAtLoad=juce::degreesToRadians(5.f), kSnapDrag=juce::
 static int snapshotIdFor(GpuSpectrogramDisplay::Style s)
 {
     using M=LeakAudioProcessor::ModuleID;
-    return (int)(s==GpuSpectrogramDisplay::Style::Terrain ? M::GpuSpectroTerrain : s==GpuSpectrogramDisplay::Style::Neon ? M::GpuSpectroNeon : M::GpuSpectroCrystal);
+    return (int)(s==GpuSpectrogramDisplay::Style::Terrain ? M::GpuSpectroTerrain : s==GpuSpectrogramDisplay::Style::Neon ? M::GpuSpectroNeon
+               : s==GpuSpectrogramDisplay::Style::Crystal2 ? M::GpuSpectroCrystal2 : M::GpuSpectroCrystal);
 }
 
 GpuSpectrogramDisplay::GpuSpectrogramDisplay(LeakAudioProcessor& p, Style s)
-    : GpuModuleBase(p), style(s)
+    : GpuModuleBase(p), style(s), nz(s==Style::Crystal2 ? NZMAX : 64)
 {
     // fader TIME : 1 à 20 s (milieu de course 4 s), 2.1 s par défaut
     timeFader=std::make_unique<ReleaseFader>();
@@ -354,12 +555,19 @@ GpuSpectrogramDisplay::GpuSpectrogramDisplay(LeakAudioProcessor& p, Style s)
     holdBtn->setClickingTogglesState(true);
     holdBtn->onClick=[this]{ frozen=holdBtn->getToggleState(); };
     addAndMakeVisible(*holdBtn);
+    if(style==Style::Crystal2){
+        hdBtn=std::make_unique<NeuAnimButton>("HD");
+        hdBtn->setClickingTogglesState(true);
+        hdBtn->setTooltip(TR("Ombres, occlusion, reflets et halo HDR (plus gourmand pour la carte graphique)"));
+        hdBtn->onClick=[this]{ hdOn=hdBtn->getToggleState(); processor.gpuCrystal2Hd=hdOn.load(); };
+        addAndMakeVisible(*hdBtn);
+    }
     setMouseCursor(juce::MouseCursor::DraggingHandCursor);
     lastCaptureMs=juce::Time::getMillisecondCounterHiRes();
     logMap.setExtendedAxis(true);   // axe jusqu'à Nyquist au-delà de 48 kHz
     syncFromProcessor();            // vue mémorisée (ramenée pile sur une vue droite si elle en est tout près)
     // fenêtre du plugin rouverte : HOLD et image figée retrouvés (v1.81.46)
-    if(auto* sn=processor.heldSnapshot(snapshotIdFor(style)); sn!=nullptr && sn->rows.size()==(size_t)(NZ*NX)){
+    if(auto* sn=processor.heldSnapshot(snapshotIdFor(style)); sn!=nullptr && sn->rows.size()==(size_t)(nz*NX)){
         std::copy(sn->rows.begin(), sn->rows.end(), &rows[0][0]);
         head=sn->head; heldFrac=sn->frac;
         frozen=true;
@@ -373,12 +581,13 @@ GpuSpectrogramDisplay::~GpuSpectrogramDisplay()
     // fenêtre du plugin fermée : HOLD et image figée gardés pour la réouverture
     auto& sn=processor.moduleSnapshots[snapshotIdFor(style)];
     sn.hold=frozen.load();
-    if(sn.hold){ sn.rows.assign(&rows[0][0], &rows[0][0]+NZ*NX); sn.head=head; sn.frac=heldFrac; }
+    if(sn.hold){ sn.rows.assign(&rows[0][0], &rows[0][0]+nz*NX); sn.head=head; sn.frac=heldFrac; }
     else sn.rows.clear();
 }
 
 void GpuSpectrogramDisplay::syncFromProcessor()
 {
+    if(hdBtn){ hdOn=processor.gpuCrystal2Hd; hdBtn->setToggleState(processor.gpuCrystal2Hd, juce::dontSendNotification); }
     timeSecA=timeRef();
     timeFader->setValue(timeRef(), juce::dontSendNotification);
     yawRef()=snapYaw(yawRef(), kSnapAtLoad);
@@ -395,8 +604,74 @@ void GpuSpectrogramDisplay::uiTick()
     const float u=hitU.load(), a=hitAge.load(), h=hitH.load();
     if(v!=shownValid || (v && (std::abs(u-shownU)>1e-4f || std::abs(a-shownAge)>0.05f || std::abs(h-shownH)>1e-3f))){
         shownValid=v; shownU=u; shownAge=a; shownH=h;
-        repaint();
+        updateBubble();
     }
+}
+
+void GpuSpectrogramDisplay::updateBubble()
+{
+    if(!shownValid){ bubbleShown=false; return; }
+    float scale=(float)getApproximateScaleFactorForComponent(this);
+    if(auto* d=juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds())) scale*=(float)d->scale;
+    juce::Rectangle<float> box;
+    auto img=SpectroReadout::renderBubble(getLocalBounds().toFloat(), { hoverX.load(), hoverY.load() },
+                                          20.f*std::pow(PsdLogMap::topHz(processor.getCurrentSampleRate())/20.f, shownU),
+                                          shownH*90.f-100.f, shownAge*(float)captureMs()*0.001f, juce::jmax(1.f, scale), box);
+    {
+        const juce::SpinLock::ScopedLockType sl(bubbleLock);
+        bubbleImg=img; bubbleBox=box; bubbleCompW=juce::jmax(1, getWidth()); bubbleCompH=juce::jmax(1, getHeight());
+    }
+    ++bubbleVersion;
+    bubbleShown=true;
+}
+
+// thread GL : bulle collée par-dessus le relief (repère du composant entier)
+void GpuSpectrogramDisplay::drawBubble(float scale)
+{
+    if(!bubbleShown.load() || vao==0) return;
+    if(bubbleShader==nullptr){
+        bubbleShader=compileProgram(kBubbleVS, kBubbleFS);
+        if(bubbleShader==nullptr) return;
+    }
+    juce::Image img; juce::Rectangle<float> box; int cw=1, ch=1;
+    {
+        const juce::SpinLock::ScopedLockType sl(bubbleLock);
+        img=bubbleImg; box=bubbleBox; cw=bubbleCompW; ch=bubbleCompH;
+    }
+    if(!img.isValid()) return;
+    if(bubbleTex==0){
+        glGenTextures(1, &bubbleTex);
+        glBindTexture(GL_TEXTURE_2D, bubbleTex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, bubbleTex);
+    const int ver=bubbleVersion.load();
+    if(ver!=bubbleUploaded){
+        bubbleUploaded=ver;
+        const int iw=img.getWidth(), ih=img.getHeight();
+        std::vector<juce::uint8> px((size_t)iw*(size_t)ih*4);
+        {
+            const juce::Image::BitmapData bd(img, juce::Image::BitmapData::readOnly);
+            for(int y=0;y<ih;++y) std::memcpy(px.data()+(size_t)y*(size_t)iw*4, bd.getLinePointer(y), (size_t)iw*4);   // BGRA prémultiplié
+        }
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, iw, ih, 0, GL_BGRA, GL_UNSIGNED_BYTE, px.data());
+    }
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_DEPTH_TEST);
+    glViewport(0, 0, juce::roundToInt(scale*(float)cw), juce::roundToInt(scale*(float)ch));
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    bubbleShader->use();
+    bubbleShader->setUniform("tex", 0);
+    bubbleShader->setUniform("rect", box.getX()/(float)cw*2.f-1.f, 1.f-box.getBottom()/(float)ch*2.f,
+                                      box.getRight()/(float)cw*2.f-1.f, 1.f-box.getY()/(float)ch*2.f);
+    glBindVertexArray(vao);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 void GpuSpectrogramDisplay::mouseMove(const juce::MouseEvent& e)
@@ -411,11 +686,13 @@ void GpuSpectrogramDisplay::mouseExit(const juce::MouseEvent&)
 
 float& GpuSpectrogramDisplay::yawRef()
 {
-    return style==Style::Terrain ? processor.gpuTerrainYaw : style==Style::Neon ? processor.gpuNeonYaw : processor.gpuCrystalYaw;
+    return style==Style::Terrain ? processor.gpuTerrainYaw : style==Style::Neon ? processor.gpuNeonYaw
+         : style==Style::Crystal2 ? processor.gpuCrystal2Yaw : processor.gpuCrystalYaw;
 }
 float& GpuSpectrogramDisplay::pitchRef()
 {
-    return style==Style::Terrain ? processor.gpuTerrainPitch : style==Style::Neon ? processor.gpuNeonPitch : processor.gpuCrystalPitch;
+    return style==Style::Terrain ? processor.gpuTerrainPitch : style==Style::Neon ? processor.gpuNeonPitch
+         : style==Style::Crystal2 ? processor.gpuCrystal2Pitch : processor.gpuCrystalPitch;
 }
 
 float GpuSpectrogramDisplay::topLimit(int h) const
@@ -425,7 +702,8 @@ float GpuSpectrogramDisplay::topLimit(int h) const
 
 float& GpuSpectrogramDisplay::zoomRef()
 {
-    return style==Style::Terrain ? processor.gpuTerrainZoom : style==Style::Neon ? processor.gpuNeonZoom : processor.gpuCrystalZoom;
+    return style==Style::Terrain ? processor.gpuTerrainZoom : style==Style::Neon ? processor.gpuNeonZoom
+         : style==Style::Crystal2 ? processor.gpuCrystal2Zoom : processor.gpuCrystalZoom;
 }
 
 float& GpuSpectrogramDisplay::timeRef()
@@ -434,6 +712,7 @@ float& GpuSpectrogramDisplay::timeRef()
         case Style::Terrain: return processor.gpuTerrainTimeSec;
         case Style::Neon:    return processor.gpuNeonTimeSec;
         case Style::Crystal: break;
+        case Style::Crystal2: return processor.gpuCrystal2TimeSec;
     }
     return processor.gpuCrystalTimeSec;
 }
@@ -444,6 +723,7 @@ const char* GpuSpectrogramDisplay::title() const
         case Style::Terrain: return "SPECTROGRAM GPU - TERRAIN";
         case Style::Neon:    return "SPECTROGRAM GPU - NEON";
         case Style::Crystal: return "SPECTROGRAM GPU - CRYSTAL";
+        case Style::Crystal2: return "SPECTROGRAM GPU - CRYSTAL 2";
     }
     return "";
 }
@@ -459,6 +739,7 @@ void GpuSpectrogramDisplay::resized()
     const int hh=juce::jlimit(16, 22, juce::roundToInt(19.f*Ui::textScale));
     const int hw=juce::roundToInt(46.f*Ui::textScale);
     holdBtn->setBounds(getWidth()-hw-8, 2, hw, hh);
+    if(hdBtn){ const int dw=juce::roundToInt(34.f*Ui::textScale); hdBtn->setBounds(holdBtn->getX()-6-dw, 2, dw, hh); }
     titleBottom=holdBtn->getBottom()+3;
 }
 
@@ -547,17 +828,14 @@ void GpuSpectrogramDisplay::paint(juce::Graphics& g)
     const int zoomW=juce::roundToInt(juce::GlyphArrangement::getStringWidth(zoomFont, zoomText))+2;
     g.setFont(zoomFont);
     g.setColour(Col::textMid.withAlpha(0.8f));
-    g.drawText(zoomText, holdBtn->getX()-zoomW-8, 5, zoomW, 13, juce::Justification::centredRight, false);
+    const int btnX=hdBtn ? hdBtn->getX() : holdBtn->getX();
+    g.drawText(zoomText, btnX-zoomW-8, 5, zoomW, 13, juce::Justification::centredRight, false);
 
     g.setFont(Ui::iceland(10.5f).withExtraKerningFactor(0.08f));
     g.setColour(Col::textHi.withAlpha(0.85f));
-    Ui::drawTitleFit(g, TR(title()), { 6.f, 5.f, (float)juce::jmax(20, holdBtn->getX()-zoomW-20), 13.f }, g.getCurrentFont());   // plutôt que "…"
+    Ui::drawTitleFit(g, TR(title()), { 6.f, 5.f, (float)juce::jmax(20, btnX-zoomW-20), 13.f }, g.getCurrentFont());   // plutôt que "…"
 
-    // lecture au survol (le point est marqué en 3D par le shader)
-    if(gl && shownValid)
-        SpectroReadout::draw(g, getLocalBounds().toFloat(), { hoverX.load(), hoverY.load() },
-                             20.f*std::pow(PsdLogMap::topHz(processor.getCurrentSampleRate())/20.f, shownU), shownH*90.f-100.f,
-                             shownAge*(float)captureMs()*0.001f);
+    // lecture au survol : bulle collée par le thread de rendu (drawBubble), le point est marqué en 3D par le shader
 
     paintGlFailure(g);
     paintScreenFrame(g);
@@ -574,7 +852,9 @@ void GpuSpectrogramDisplay::newOpenGLContextCreated()
 
     // grille statique (u, rang dans l'historique) : 2 rangées par capture, de
     // la ligne live (âge -1) à la plus ancienne affichée (âge NZ-3)
-    const int kGZ=2*(NZ-2)+1;
+    const bool fine=style==Style::Crystal2;
+    const int kGX=fine ? 3*(NX-1)+1 : kGXBase;
+    const int kGZ=2*(nz-2)+1;   // 2 rangées par capture (Crystal 2 : 3x plus de captures)
     std::vector<float> verts; verts.reserve((size_t)kGX*kGZ*2);
     for(int z=0;z<kGZ;++z)
         for(int x=0;x<kGX;++x){ verts.push_back((float)x/(float)(kGX-1)); verts.push_back((float)z/(float)(kGZ-1)); }
@@ -607,31 +887,133 @@ void GpuSpectrogramDisplay::newOpenGLContextCreated()
     glGenTextures(1, &heightTex);
     glBindTexture(GL_TEXTURE_2D, heightTex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, NX, NZ, 0, GL_RED, GL_FLOAT, rows);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, NX, nz, 0, GL_RED, GL_FLOAT, rows);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    // HD (Crystal 2) : carte d'ombre, programmes de post-traitement
+    if(style==Style::Crystal2){
+        depthShader =compileProgram(kMeshVS, kDepthFS);
+        brightShader=compileProgram(kHdQuadVS, kHdBrightFS);
+        blurShader  =compileProgram(kHdQuadVS, kHdBlurFS);
+        compShader  =compileProgram(kHdQuadVS, kHdCompFS);
+        GLint prevFbo=0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+        glGenTextures(1, &shadowTex);
+        glBindTexture(GL_TEXTURE_2D, shadowTex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kShadowSize, kShadowSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+        glGenFramebuffers(1, &shadowFbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowTex, 0);
+        glDrawBuffer(GL_NONE); glReadBuffer(GL_NONE);
+        if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){ glDeleteFramebuffers(1, &shadowFbo); shadowFbo=0; }
+        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glGenVertexArrays(1, &vaoQuad);
+    }
+
     onContextCreated();
 }
 
-void GpuSpectrogramDisplay::openGLContextClosing()
+void GpuSpectrogramDisplay::releaseTargets()
+{
+    for(auto* f : { &msFbo, &sceneFbo }) if(*f){ glDeleteFramebuffers(1, f); *f=0; }
+    for(auto* r : { &msColor, &msDepth }) if(*r){ glDeleteRenderbuffers(1, r); *r=0; }
+    if(sceneTex){ glDeleteTextures(1, &sceneTex); sceneTex=0; }
+    for(int i=0;i<4;++i){
+        if(blurFbo[i]){ glDeleteFramebuffers(1, &blurFbo[i]); blurFbo[i]=0; }
+        if(blurTex[i]){ glDeleteTextures(1, &blurTex[i]); blurTex[i]=0; }
+    }
+    targetW=targetH=0;
+}
+
+// mêmes tampons que les spectrogrammes FX : scène HDR multi-échantillonnée,
+// résolue dans une texture, flous à demi puis quart de résolution
+bool GpuSpectrogramDisplay::ensureTargets(int pw, int ph)
+{
+    if(sceneFbo!=0 && pw==targetW && ph==targetH) return true;
+    releaseTargets();
+    GLint prevFbo=0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+    auto colorTex=[](unsigned int& tex, unsigned int& fbo, int w, int h){
+        glGenTextures(1, &tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+        return glCheckFramebufferStatus(GL_FRAMEBUFFER)==GL_FRAMEBUFFER_COMPLETE;
+    };
+    GLint maxSamples=0; glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+    bool ok=false;
+    for(int samples : { juce::jmin(4, (int)maxSamples), 0 }){
+        if(msFbo){ glDeleteFramebuffers(1, &msFbo); msFbo=0; }
+        for(auto* r : { &msColor, &msDepth }) if(*r){ glDeleteRenderbuffers(1, r); *r=0; }
+        glGenRenderbuffers(1, &msColor);
+        glBindRenderbuffer(GL_RENDERBUFFER, msColor);
+        glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA16F, pw, ph);
+        glGenRenderbuffers(1, &msDepth);
+        glBindRenderbuffer(GL_RENDERBUFFER, msDepth);
+        glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT24, pw, ph);
+        glGenFramebuffers(1, &msFbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, msFbo);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, msColor);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, msDepth);
+        ok=glCheckFramebufferStatus(GL_FRAMEBUFFER)==GL_FRAMEBUFFER_COMPLETE;
+        if(ok) break;
+    }
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    ok=ok && colorTex(sceneTex, sceneFbo, pw, ph);
+    const int hw=juce::jmax(1, pw/2), hh=juce::jmax(1, ph/2), qw=juce::jmax(1, pw/4), qh=juce::jmax(1, ph/4);
+    ok=ok && colorTex(blurTex[0], blurFbo[0], hw, hh) && colorTex(blurTex[1], blurFbo[1], hw, hh)
+          && colorTex(blurTex[2], blurFbo[2], qw, qh) && colorTex(blurTex[3], blurFbo[3], qw, qh);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+    if(!ok){ releaseTargets(); return false; }
+    targetW=pw; targetH=ph;
+    return true;
+}
+
+void GpuSpectrogramDisplay::closingGL()
 {
     if(vboGrid)  { glDeleteBuffers(1, &vboGrid);  vboGrid=0; }
     if(iboTris)  { glDeleteBuffers(1, &iboTris);  iboTris=0; }
     if(vao)      { glDeleteVertexArrays(1, &vao); vao=0; }
     if(heightTex){ glDeleteTextures(1, &heightTex); heightTex=0; }
     meshShader.reset();
+    releaseTargets();
+    if(shadowFbo){ glDeleteFramebuffers(1, &shadowFbo); shadowFbo=0; }
+    if(shadowTex){ glDeleteTextures(1, &shadowTex); shadowTex=0; }
+    if(vaoQuad)  { glDeleteVertexArrays(1, &vaoQuad); vaoQuad=0; }
+    depthShader.reset(); brightShader.reset(); blurShader.reset(); compShader.reset();
+    if(bubbleTex){ glDeleteTextures(1, &bubbleTex); bubbleTex=0; }
+    bubbleShader.reset();
+    bubbleUploaded=-1;
 }
 
 void GpuSpectrogramDisplay::captureLive()
 {
-    if(!logMap.read(processor, liveDb)) return;
-    float* r=rows[(head+1)%NZ];   // ligne "live", validée à la prochaine capture
+    captureAt(rows[(head+1)%nz], -1.0);
+}
+
+// spectre à l'instant tMs (< 0 : la dernière trame) -> une ligne 0..1(.2)
+void GpuSpectrogramDisplay::captureAt(float* r, double tMs)
+{
+    if(!(tMs>=0.0 ? logMap.readAt(processor, tMs, liveDb) : logMap.read(processor, liveDb))) return;
+    const float top=style==Style::Crystal2 ? 1.2f : 1.f;   // Crystal 2 : jusqu'à +8 dB, tassé dans le shader
     for(int p=0;p<NX;++p)
-        r[p]=juce::jlimit(0.f,1.f,(liveDb[p]+100.f)/90.f);   // -100 dB -> 0, -10 dB -> 1
+        r[p]=juce::jlimit(0.f,top,(liveDb[p]+100.f)/90.f);   // -100 dB -> 0, -10 dB -> 1
 }
 
 // Même échantillonnage que le shader (texture filtrée en bilinéaire, anneau
@@ -644,7 +1026,7 @@ float GpuSpectrogramDisplay::sampleH(float u, float age) const
     const float rp=(float)head-juce::jlimit(-1.f, ageSpan(), age);
     const int   r0=(int)std::floor(rp);
     const float fr=rp-(float)r0;
-    const int   i0=((r0%NZ)+NZ)%NZ, i1=(i0+1)%NZ;
+    const int   i0=((r0%nz)+nz)%nz, i1=(i0+1)%nz;
     const float a=rows[i0][x0]+(rows[i0][x1]-rows[i0][x0])*fx;
     const float b=rows[i1][x0]+(rows[i1][x1]-rows[i1][x0])*fx;
     return a+(b-a)*fr;
@@ -669,7 +1051,10 @@ void GpuSpectrogramDisplay::pick(const Camera& cam, float frac, int w, int h)
         if(std::abs(x)>cam.halfX || std::abs(z)>cam.halfZ) return -1.f;
         u=(x/cam.halfX+1.f)*0.5f;
         age=(z+cam.halfZ)/(2.f*cam.halfZ)*ageSpan()-frac;   // la plus récente au fond (z = -halfZ)
-        return sampleH(u, age)*2.2f;
+        const float hv=sampleH(u, age);
+        if(style!=Style::Crystal2) return hv*2.2f;
+        const float k=0.9333f, rr=1.1111f-0.9333f;   // même tassement que softTop() du shader
+        return (hv<k ? hv : k+rr*(1.f-std::exp(-(hv-k)/rr))*0.6f)*2.2f;
     };
     float u=0.f, age=0.f;
     const float step=0.03f;
@@ -695,7 +1080,7 @@ void GpuSpectrogramDisplay::pick(const Camera& cam, float frac, int w, int h)
     hitValid=false;
 }
 
-void GpuSpectrogramDisplay::renderOpenGL()
+void GpuSpectrogramDisplay::renderGL()
 {
     const auto bg=Col::bg;
     glClearColor(bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue(), 1.f);
@@ -706,19 +1091,36 @@ void GpuSpectrogramDisplay::renderOpenGL()
 
     // capture : la ligne live devient la plus récente, une nouvelle ligne live
     // prend la place de la plus ancienne
-    const double now=juce::Time::getMillisecondCounterHiRes();
+    const double now=frameClockMs();
     const double capMs=captureMs();
     const bool hold=frozen.load();
     if(hold){
         // HOLD : rien ne bouge ; le défilement reprendra au même point
         lastCaptureMs=now-(double)heldFrac*capMs;
     } else {
-        if(now-lastCaptureMs>=capMs){
-            lastCaptureMs = now-lastCaptureMs > 4.0*capMs ? now : lastCaptureMs+capMs;
-            head=(head+1)%NZ;
+        // Plusieurs lignes par image si TIME est court (Crystal 2, 192 lignes :
+        // 127 lignes/s à 1,5 s, plus que les 60 images/s). Avant la v1.81.56,
+        // une seule ligne par image : le relief prenait du retard puis sautait.
+        if(now-lastCaptureMs > 8.0*capMs+50.0) lastCaptureMs=now-capMs;   // vrai retard (fenêtre déplacée...) : recalage
+        // Chaque ligne validée reçoit le spectre de SON instant (lastCaptureMs+capMs),
+        // interpolé entre le spectre de l'image d'avant (prevRow, à prevRowMs) et
+        // le spectre courant. Avant la v1.81.57, elle recevait celui de l'image
+        // en cours : avec 1 ou 2 lignes par image selon les images (TIME > 1 s),
+        // les crêtes étaient inégalement espacées -> petits à-coups au défilement.
+        // (v1.81.57, suite) les spectres sont lus à l'heure de chaque ligne,
+        // dans l'historique daté du processeur, avec un léger retard fixe
+        // (PSD_DISPLAY_DELAY_MS) : le contenu avance aussi régulièrement que l'image.
+        const int due=juce::jmin(nz/2, (int)std::floor((now-lastCaptureMs)/capMs));
+        const double delay=LeakAudioProcessor::PSD_DISPLAY_DELAY_MS;
+        for(int k=0;k<due;++k){
+            const double tRow=lastCaptureMs+capMs;
+            captureAt(rows[(head+1)%nz], tRow-delay);
+            lastCaptureMs=tRow;
+            head=(head+1)%nz;
             ++captureCount;
+            ++rowsAdvanced;
         }
-        captureLive();
+        captureAt(rows[(head+1)%nz], now-delay);   // ligne live
     }
     const float frac=(float)juce::jlimit(0.0, 1.0, (now-lastCaptureMs)/capMs);
     if(!hold) heldFrac=frac;
@@ -729,9 +1131,17 @@ void GpuSpectrogramDisplay::renderOpenGL()
     if(logMap.axisVersion()!=seenAxisVersion){
         seenAxisVersion=logMap.axisVersion();
         std::memset(rows, 0, sizeof(rows));
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, NX, NZ, GL_RED, GL_FLOAT, rows);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, NX, nz, GL_RED, GL_FLOAT, rows);
     }
-    const int liveRow=(head+1)%NZ;
+    // lignes validées à cette image (la dernière était déjà envoyée comme live,
+    // les autres non quand plusieurs captures tombent dans la même image)
+    for(int k=1;k<rowsAdvanced;++k){
+        const int r=((head-k)%nz+nz)%nz;
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, r, NX, 1, GL_RED, GL_FLOAT, rows[r]);
+    }
+    if(rowsAdvanced>0){ glTexSubImage2D(GL_TEXTURE_2D, 0, 0, head, NX, 1, GL_RED, GL_FLOAT, rows[head]); }
+    rowsAdvanced=0;
+    const int liveRow=(head+1)%nz;
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, liveRow, NX, 1, GL_RED, GL_FLOAT, rows[liveRow]);
 
     const float scale=(float)context.getRenderingScale();
@@ -746,26 +1156,37 @@ void GpuSpectrogramDisplay::renderOpenGL()
     pick(cam, frac, w, h);
     const bool showHover=hoverOn.load() && hitValid.load();
 
+    float lm[16]; lightMvp(cam, lm);
+    const bool hdNow=style==Style::Crystal2 && hdOn.load() && depthShader!=nullptr && compShader!=nullptr
+                     && brightShader!=nullptr && blurShader!=nullptr && shadowFbo!=0 && vaoQuad!=0;
+    auto setMeshUniforms=[&](juce::OpenGLShaderProgram& sp){
+        sp.setUniform("heights", 0);
+        sp.setUniform("headT", ((float)head+0.5f)/(float)nz);
+        sp.setUniform("invNZ", 1.f/(float)nz);
+        sp.setUniform("ageSpan", (float)(nz-3));
+        sp.setUniform("frac", frac);
+        sp.setUniform("sScale", (float)(NX-1)/(float)NX);
+        sp.setUniform("sOff", 0.5f/(float)NX);
+        sp.setUniform("parity", (float)(captureCount & 1));
+        sp.setUniform("gridPhase", (float)(captureCount & 3));   // lignes du plateau liées aux captures
+        sp.setUniform("halfX", cam.halfX);
+        sp.setUniform("halfZ", cam.halfZ);
+        sp.setUniform("style", (GLint)style);
+        sp.setUniform("nxF", (float)NX);
+        sp.setUniform("eye", cam.eye[0], cam.eye[1], cam.eye[2]);
+        sp.setUniform("viewDir", cam.dir[0], cam.dir[1], cam.dir[2]);
+        sp.setUniform("bg", bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue());
+        sp.setUniform("accent", acc.getFloatRed(), acc.getFloatGreen(), acc.getFloatBlue());
+        sp.setUniform("paper", Col::paper ? 1.f : 0.f);
+        sp.setUniformMat4("mvp", cam.mvp, 1, GL_FALSE);
+        sp.setUniform("hover", hitU.load(), hitAge.load(), showHover ? 1.f : 0.f);
+        sp.setUniformMat4("lmvp", lm, 1, GL_FALSE);
+        sp.setUniform("hd", hdNow ? 1 : 0);
+        sp.setUniform("shadowMap", 1);
+    };
     meshShader->use();
-    meshShader->setUniform("heights", 0);
-    meshShader->setUniform("headT", ((float)head+0.5f)/(float)NZ);
-    meshShader->setUniform("invNZ", 1.f/(float)NZ);
-    meshShader->setUniform("ageSpan", (float)(NZ-3));
-    meshShader->setUniform("frac", frac);
-    meshShader->setUniform("sScale", (float)(NX-1)/(float)NX);
-    meshShader->setUniform("sOff", 0.5f/(float)NX);
-    meshShader->setUniform("parity", (float)(captureCount & 1));
-    meshShader->setUniform("gridPhase", (float)(captureCount & 3));   // lignes du plateau liées aux captures
-    meshShader->setUniform("halfX", cam.halfX);
-    meshShader->setUniform("halfZ", cam.halfZ);
-    meshShader->setUniform("style", (GLint)style);
-    meshShader->setUniform("eye", cam.eye[0], cam.eye[1], cam.eye[2]);
-    meshShader->setUniform("viewDir", cam.dir[0], cam.dir[1], cam.dir[2]);
-    meshShader->setUniform("bg", bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue());
-    meshShader->setUniform("accent", acc.getFloatRed(), acc.getFloatGreen(), acc.getFloatBlue());
-    meshShader->setUniform("paper", Col::paper ? 1.f : 0.f);
-    meshShader->setUniformMat4("mvp", cam.mvp, 1, GL_FALSE);
-    meshShader->setUniform("hover", hitU.load(), hitAge.load(), showHover ? 1.f : 0.f);
+    setMeshUniforms(*meshShader);
+    meshShader->setUniform("depthPass", 0);
 
     GLint prevVao=0; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
     glBindVertexArray(vao);
@@ -776,9 +1197,78 @@ void GpuSpectrogramDisplay::renderOpenGL()
     // (plus de reflet au sol sous le Cristal : ce relief inversé pouvait se
     // lire comme un second spectre)
     glDisable(GL_BLEND);
-    beginSampleShading();
-    glDrawElements(GL_TRIANGLES, numTriIndices, GL_UNSIGNED_INT, nullptr);
-    endSampleShading();
+    GLint prevFbo=0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+    const int pw=juce::jmax(1, juce::roundToInt(scale*(float)w)), ph=juce::jmax(1, juce::roundToInt(scale*(float)h));
+    if(hdNow && ensureTargets(pw, ph)){
+        // 1) ombre : profondeur vue depuis la lumière
+        glDisable(GL_SCISSOR_TEST);
+        depthShader->use();
+        setMeshUniforms(*depthShader);
+        depthShader->setUniform("depthPass", 1);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo);
+        glViewport(0, 0, kShadowSize, kShadowSize);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glDrawElements(GL_TRIANGLES, numTriIndices, GL_UNSIGNED_INT, nullptr);
+        // 2) scène HDR multi-échantillonnée
+        glBindFramebuffer(GL_FRAMEBUFFER, msFbo);
+        glViewport(0, 0, pw, ph);
+        glClearColor(bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue(), 1.f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        meshShader->use();
+        glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, shadowTex);
+        glActiveTexture(GL_TEXTURE0);
+        beginSampleShading();
+        glDrawElements(GL_TRIANGLES, numTriIndices, GL_UNSIGNED_INT, nullptr);
+        endSampleShading();
+        glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE0);
+        glDisable(GL_DEPTH_TEST);
+        // 3) résolution, passe claire, flous
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, msFbo);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sceneFbo);
+        glBlitFramebuffer(0, 0, pw, ph, 0, 0, pw, ph, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBindVertexArray(vaoQuad);
+        const int hw=juce::jmax(1, pw/2), hh=juce::jmax(1, ph/2), qw=juce::jmax(1, pw/4), qh=juce::jmax(1, ph/4);
+        auto pass=[&](unsigned int fbo, int pwx, int phx, unsigned int srcTex){
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glViewport(0, 0, pwx, phx);
+            glBindTexture(GL_TEXTURE_2D, srcTex);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        };
+        brightShader->use();
+        brightShader->setUniform("src", 0);
+        pass(blurFbo[0], hw, hh, sceneTex);
+        blurShader->use();
+        blurShader->setUniform("src", 0);
+        blurShader->setUniform("dir", 1.f/(float)hw, 0.f);  pass(blurFbo[1], hw, hh, blurTex[0]);
+        blurShader->setUniform("dir", 0.f, 1.f/(float)hh);  pass(blurFbo[0], hw, hh, blurTex[1]);
+        for(int it=0; it<2; ++it){
+            blurShader->setUniform("dir", 1.f/(float)hw, 0.f);  pass(blurFbo[2], qw, qh, it==0 ? blurTex[0] : blurTex[3]);
+            blurShader->setUniform("dir", 0.f, 1.f/(float)qh);  pass(blurFbo[3], qw, qh, blurTex[2]);
+        }
+        // 4) composition dans la vue de JUCE, sous la ligne du titre
+        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+        glViewport(juce::roundToInt(scale*kReleaseFaderW), 0, pw, ph);
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(0, 0, juce::roundToInt(scale*(kReleaseFaderW+(float)w)), juce::roundToInt(scale*(float)(h-titleBottom.load())));
+        compShader->use();
+        compShader->setUniform("scene", 0);
+        compShader->setUniform("bloomH", 1);
+        compShader->setUniform("bloomQ", 2);
+        compShader->setUniform("paper", Col::paper ? 1.f : 0.f);   // HD aussi en thème clair (v1.81.59)
+        glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, sceneTex);
+        glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, blurTex[0]);
+        glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, blurTex[3]);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        for(int u : { 2, 1, 0 }){ glActiveTexture(GL_TEXTURE0+(GLenum)u); glBindTexture(GL_TEXTURE_2D, 0); }
+    } else {
+        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+        beginSampleShading();
+        glDrawElements(GL_TRIANGLES, numTriIndices, GL_UNSIGNED_INT, nullptr);
+        endSampleShading();
+    }
+
+    drawBubble(scale);
 
     // état rendu à JUCE (composition du calque 2D)
     glBindVertexArray((GLuint)prevVao);

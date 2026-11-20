@@ -39,8 +39,8 @@ private:
 
     // ── thread GL ──
     void newOpenGLContextCreated() override;
-    void renderOpenGL() override;
-    void openGLContextClosing() override;
+    void renderGL() override;
+    void closingGL() override;
     void uiTick() override;
 
     void updateLevels(float dt);
@@ -107,8 +107,8 @@ private:
     static constexpr float kDbMin = -66.f;   // niveau de bande -> 0..1 sur kDbMin..0 dB
 
     void newOpenGLContextCreated() override;
-    void renderOpenGL() override;
-    void openGLContextClosing() override;
+    void renderGL() override;
+    void closingGL() override;
     void uiTick() override;
 
     void updateBands(float dt);

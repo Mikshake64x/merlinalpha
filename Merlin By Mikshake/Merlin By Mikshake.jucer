@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="MrlnBM" name="Merlin Alpha" projectType="guiapp" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" companyName="Side Key System"
-              companyEmail="https://sidekey.fr" version="1.81.48" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
+              companyEmail="https://sidekey.fr" version="1.81.63" bundleIdentifier="com.SideKeySystem.MerlinAlpha"
               displaySplashScreen="0">
   <MAINGROUP id="MbmGrp" name="Merlin Alpha">
     <GROUP id="{6B1F2C7A-3D4E-4F50-9A61-7C8D9E0F1A2B}" name="Source">
@@ -103,21 +103,21 @@
         <CONFIGURATION isDebug="0" name="Release" targetName="Merlin Alpha"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
-        <MODULEPATH id="juce_audio_basics" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_opengl" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_devices" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_formats" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_processors" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_processors_headless" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_utils" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_cryptography" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_core" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_data_structures" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_dsp" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_events" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_graphics" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_gui_basics" path="D:/JUCE/modules"/>
-        <MODULEPATH id="juce_gui_extra" path="D:/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="D:/JUCE 9.0.5/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="D:/JUCE 9.0.5/JUCE/modules"/>
       </MODULEPATHS>
     </VS2026>
     <XCODE_MAC targetFolder="Builds/MacOSX" xcodeValidArchs="x86_64,arm64" bigIcon="MaIcoB"

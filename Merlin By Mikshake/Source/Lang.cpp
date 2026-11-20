@@ -50,7 +50,7 @@ void set (int id)    { currentId = juce::jlimit (0, Count - 1, id); }
 int fromSystem()
 {
     const auto l = juce::SystemStats::getUserLanguage().toLowerCase().substring (0, 2);
-    static const char* const codes[Count] = { "fr", "en", "de", "it", "es", "pt", "ru", "ja", "zh", "ko" };
+    static const char* const codes[Count] = { "fr", "en", "de", "it", "es", "pt", "ru", "ja", "zh", "ko", "ar" };
     for (int i = 0; i < Count; ++i)
         if (l == codes[i])
             return i;
@@ -65,14 +65,15 @@ juce::String nativeName (int id)
         "\xd0\xa0\xd1\x83\xd1\x81\xd1\x81\xd0\xba\xd0\xb8\xd0\xb9",                 // Русский
         "\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e",                                     // 日本語
         "\xe4\xb8\xad\xe6\x96\x87\xef\xbc\x88\xe7\xae\x80\xe4\xbd\x93\xef\xbc\x89", // 中文（简体）
-        "\xed\x95\x9c\xea\xb5\xad\xec\x96\xb4"                                      // 한국어
+        "\xed\x95\x9c\xea\xb5\xad\xec\x96\xb4",                                     // 한국어
+        "\xd8\xa7\xd9\x84\xd8\xb9\xd8\xb1\xd8\xa8\xd9\x8a\xd8\xa9"                  // العربية
     };
     return juce::String (juce::CharPointer_UTF8 (names[juce::jlimit (0, Count - 1, id)]));
 }
 
 juce::String code (int id)
 {
-    static const char* const codes[Count] = { "FR", "EN", "DE", "IT", "ES", "PT", "RU", "JA", "ZH", "KO" };
+    static const char* const codes[Count] = { "FR", "EN", "DE", "IT", "ES", "PT", "RU", "JA", "ZH", "KO", "AR" };
     return codes[juce::jlimit (0, Count - 1, id)];
 }
 
@@ -122,7 +123,8 @@ juce::FontOptions withScriptFallback (juce::FontOptions o)
         case Japanese: return o.withFallbacks ({ "Yu Gothic UI", "Meiryo UI", "MS UI Gothic" });
         case Chinese:  return o.withFallbacks ({ "Microsoft YaHei UI", "Microsoft YaHei", "SimHei" });
         case Korean:   return o.withFallbacks ({ "Malgun Gothic" });
-        case Russian:  return o.withFallbacks ({ "Segoe UI" });
+        case Russian:
+        case Arabic:   return o.withFallbacks ({ "Segoe UI" });
         default:       break;
     }
    #endif

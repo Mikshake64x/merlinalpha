@@ -49,8 +49,8 @@ private:
 
     // ── thread GL ──
     void newOpenGLContextCreated() override;
-    void renderOpenGL() override;
-    void openGLContextClosing() override;
+    void renderGL() override;
+    void closingGL() override;
     void uiTick() override;
     void drawDirectionButton(juce::Graphics&);
 

@@ -17,9 +17,13 @@
  #include <functiondiscoverykeys_devpkey.h>
  #include <dbghelp.h>
  #include <dwmapi.h>
+ #include <dxgi.h>
+ #include <mutex>
+ #include <vector>
  #pragma comment(lib, "ole32.lib")
  #pragma comment(lib, "dbghelp.lib")
  #pragma comment(lib, "dwmapi.lib")
+ #pragma comment(lib, "dxgi.lib")
 #endif
 
 #if JUCE_WINDOWS
@@ -261,6 +265,75 @@ bool WindowsDisplay::waitForNextFrame()
     return SUCCEEDED(DwmFlush());
 }
 
+void* WindowsDisplay::monitorOf(void* nativeHandle)
+{
+    auto hwnd=static_cast<HWND>(nativeHandle);
+    return hwnd!=nullptr ? (void*)MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) : nullptr;
+}
+
+namespace
+{
+    // sorties DXGI (une par écran), relues quand un écran n'est pas trouvé
+    struct VBlankOutputs
+    {
+        std::mutex m;
+        std::vector<std::pair<HMONITOR, IDXGIOutput*>> outs;
+        juce::uint32 lastScanMs { 0 };
+
+        void rescan()
+        {
+            for(auto& o : outs) o.second->Release();
+            outs.clear();
+            lastScanMs=juce::Time::getMillisecondCounter();
+            IDXGIFactory1* f=nullptr;
+            if(FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&f)) || f==nullptr) return;
+            IDXGIAdapter1* a=nullptr;
+            for(UINT i=0; f->EnumAdapters1(i, &a)!=DXGI_ERROR_NOT_FOUND; ++i){
+                IDXGIOutput* o=nullptr;
+                for(UINT j=0; a->EnumOutputs(j, &o)!=DXGI_ERROR_NOT_FOUND; ++j){
+                    DXGI_OUTPUT_DESC d{};
+                    if(SUCCEEDED(o->GetDesc(&d)) && d.AttachedToDesktop) outs.push_back({ d.Monitor, o });
+                    else o->Release();
+                }
+                a->Release();
+            }
+            f->Release();
+        }
+        // sortie de l'écran, avec une référence en plus (nullptr : introuvable)
+        IDXGIOutput* find(HMONITOR mon)
+        {
+            const std::lock_guard<std::mutex> g(m);
+            for(int pass=0; pass<2; ++pass){
+                for(auto& o : outs) if(o.first==mon){ o.second->AddRef(); return o.second; }
+                if(pass==0 && juce::Time::getMillisecondCounter()-lastScanMs>2000) rescan();   // écran branché, déplacé...
+                else break;
+            }
+            return nullptr;
+        }
+    };
+    VBlankOutputs& vblankOutputs() { static VBlankOutputs v; return v; }
+}
+
+double WindowsDisplay::refreshHz(void* monitor)
+{
+    if(monitor==nullptr) return 0.0;
+    MONITORINFOEXW mi{}; mi.cbSize=sizeof(mi);
+    if(!GetMonitorInfoW((HMONITOR)monitor, &mi)) return 0.0;
+    DEVMODEW dm{}; dm.dmSize=sizeof(dm);
+    if(!EnumDisplaySettingsW(mi.szDevice, ENUM_CURRENT_SETTINGS, &dm)) return 0.0;
+    return dm.dmDisplayFrequency>1 ? (double)dm.dmDisplayFrequency : 0.0;
+}
+
+bool WindowsDisplay::waitForVBlank(void* monitor)
+{
+    if(monitor==nullptr) return false;
+    IDXGIOutput* o=vblankOutputs().find((HMONITOR)monitor);
+    if(o==nullptr) return false;
+    const bool ok=SUCCEEDED(o->WaitForVBlank());
+    o->Release();
+    return ok;
+}
+
 void WindowsDisplay::setNoActivate(void* nativeHandle, bool noActivate)
 {
     auto hwnd=static_cast<HWND>(nativeHandle);
@@ -380,6 +453,9 @@ bool  WindowsVolume::set(float) { return false; }
 #endif
 juce::String CrashReport::describe(void*) { return {}; }
 bool WindowsDisplay::waitForNextFrame() { return false; }
+void* WindowsDisplay::monitorOf(void*) { return nullptr; }
+double WindowsDisplay::refreshHz(void*) { return 0.0; }
+bool WindowsDisplay::waitForVBlank(void*) { return false; }
 void WindowsDisplay::setNoActivate(void*, bool) {}
 void* WindowsDisplay::foregroundWindow() { return nullptr; }
 void WindowsDisplay::activate(void*) {}

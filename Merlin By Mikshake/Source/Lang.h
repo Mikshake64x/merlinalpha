@@ -21,7 +21,7 @@
 */
 namespace Lang
 {
-    enum Id { French, English, German, Italian, Spanish, Portuguese, Russian, Japanese, Chinese, Korean, Count };
+    enum Id { French, English, German, Italian, Spanish, Portuguese, Russian, Japanese, Chinese, Korean, Arabic, Count };
 
     int  current();
     void set (int id);

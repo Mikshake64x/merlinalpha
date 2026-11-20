@@ -94,6 +94,16 @@ namespace WindowsVolume
 namespace WindowsDisplay
 {
     bool waitForNextFrame();   // false : pas de composition (attendre ~16 ms soi-même)
+    // Écran (HMONITOR) qui contient la plus grande part de la fenêtre ; nullptr hors Windows
+    void* monitorOf(void* nativeHandle);
+    // Attend le prochain rafraîchissement de CET écran (DXGI WaitForVBlank).
+    // DwmFlush suit les compositions de tous les écrans : avec deux écrans
+    // non synchronisés (ici sur deux cartes), deux signaux décalés par période,
+    // d'où des images tantôt à l'heure, tantôt entre deux rafraîchissements
+    // (v1.81.57). false : écran introuvable (l'appelant se rabat sur DwmFlush).
+    bool waitForVBlank(void* monitor);
+    // fréquence de rafraîchissement de l'écran (Hz), 0 si inconnue
+    double refreshHz(void* monitor);
     // Fenêtre qui ne s'active pas au clic (noActivate) : le clavier reste à
     // l'appli active (ex. Ableton joué au clavier du PC). Idempotent.
     void setNoActivate(void* nativeHandle, bool noActivate);

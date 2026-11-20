@@ -16,8 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: JUCE 9.0.1
-        run: git clone --depth 1 --branch 9.0.1 https://github.com/juce-framework/JUCE.git JUCE
+      - name: JUCE 9.0.5
+        run: git clone --depth 1 --branch 9.0.5 https://github.com/juce-framework/JUCE.git JUCE
 
       - name: Version
         run: |

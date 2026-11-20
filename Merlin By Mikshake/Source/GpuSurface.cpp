@@ -308,14 +308,14 @@ void GpuSurfaceDisplay::newOpenGLContextCreated()
     onContextCreated();
 }
 
-void GpuSurfaceDisplay::openGLContextClosing()
+void GpuSurfaceDisplay::closingGL()
 {
     if(vbo){ glDeleteBuffers(1, &vbo); vbo=0; }
     if(vao){ glDeleteVertexArrays(1, &vao); vao=0; }
     shader.reset();
 }
 
-void GpuSurfaceDisplay::renderOpenGL()
+void GpuSurfaceDisplay::renderGL()
 {
     const auto bg=Col::bg;
     glClearColor(bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue(), 1.f);
@@ -325,7 +325,7 @@ void GpuSurfaceDisplay::renderOpenGL()
 
     // Captures à pas fixe (une courbe toutes les TIME/95 s) ; entre deux, les
     // courbes glissent en continu vers l'avant, à chaque image.
-    const double now=juce::Time::getMillisecondCounterHiRes();
+    const double now=frameClockMs();
     const double cap=captureMs();
     if(frozen.load()){
         lastCaptureMs=now-(double)glideFrac*cap;   // HOLD : rien ne bouge, reprise au même point

@@ -30,8 +30,8 @@ private:
     static constexpr int NG = 192;   // grille de densité
 
     void newOpenGLContextCreated() override;
-    void renderOpenGL() override;
-    void openGLContextClosing() override;
+    void renderGL() override;
+    void closingGL() override;
     // corrélation + gain : calque repeint seulement si l'affichage change
     void uiTick() override
     {

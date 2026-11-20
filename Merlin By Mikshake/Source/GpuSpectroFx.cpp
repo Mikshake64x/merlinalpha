@@ -729,7 +729,7 @@ void GpuSpectroFxDisplay::buildGeometry()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void GpuSpectroFxDisplay::openGLContextClosing()
+void GpuSpectroFxDisplay::closingGL()
 {
     releaseTargets();
     for(auto* b : { &vboScene, &iboScene, &vboPts }) if(*b){ glDeleteBuffers(1, b); *b=0; }
@@ -1107,7 +1107,7 @@ void GpuSpectroFxDisplay::drawScene(const Cam& cam, float t, float frac, float d
     glDisable(GL_BLEND);
 }
 
-void GpuSpectroFxDisplay::renderOpenGL()
+void GpuSpectroFxDisplay::renderGL()
 {
     GLint prevVao=0, prevFbo=0;
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
@@ -1120,7 +1120,7 @@ void GpuSpectroFxDisplay::renderOpenGL()
 
     // horloge : TIME = durée de l'historique affiché ; HOLD : rien ne bouge,
     // le défilement reprendra au même point (comme le Cristal)
-    const double now=juce::Time::getMillisecondCounterHiRes();
+    const double now=frameClockMs();
     if(lastFrameMs<=0.0) lastCaptureMs=lastFrameMs=now;
     const float dt=(float)juce::jlimit(0.0, 0.1, (now-lastFrameMs)*0.001);
     lastFrameMs=now;

@@ -57,7 +57,13 @@ public:
         GpuSpectroLed        = 27,
         GpuSpectroRibbons    = 28,
         GpuSpectroMatrix     = 29,
-        GpuSpectroSplash     = 30
+        GpuSpectroSplash     = 30,
+        // bits de l'échelle entière 32 bits (v1.81.50)
+        BitMeter             = 31,
+        // accordeur : fûts, basse, guitare (v1.81.51)
+        Tuner                = 32,
+        // Crystal lissé : maillage fin interpolé, sommets arrondis (v1.81.52)
+        GpuSpectroCrystal2   = 33
     };
     static constexpr int NUM_SLOTS = 6;
     // Assignation par défaut : Vectorscope, Multiband Corr, VU à aiguille, Loudness, Spectrum, VuMeter
@@ -134,6 +140,7 @@ public:
     bool largeText    { true };    // textes agrandis (Options › Affichage) — activé à chaque ouverture
     int  uiScale      { 0 };       // Options › Affichage › Taille de l'interface : 0 automatique (selon l'écran), sinon 100..200 %
     int  plateTint    { 1 };       // thème sombre : 0 gris d'origine, 1 ardoise (design de Sunny, v1.73)
+    int  colorVivid { 0 };         // intensité des couleurs des modules : 0 actuel, 1 vif, 2 très vif (v1.81.59)
     int  lightScreens { 1 };       // thème clair : 1 écrans des modules « Papier » (v1.75), 0 écrans noirs
     int  titleStyle   { 1 };       // titres des modules (à l'essai) : 0 sans, 1 filet d'accent, 2 bandeau
     int  logoColour   { 0 };       // lettres du logo de Sunny (à l'essai) : 0 gris gravé, 1 vert de Sunny
@@ -160,6 +167,8 @@ public:
     float gpuTerrainYaw { 0.f }, gpuTerrainPitch { 1.018f };
     float gpuNeonYaw    { 0.f }, gpuNeonPitch    { 1.018f };
     float gpuCrystalYaw { 0.f }, gpuCrystalPitch { 1.018f };
+    float gpuCrystal2Yaw { 0.f }, gpuCrystal2Pitch { 1.018f }, gpuCrystal2Zoom { 0.f }, gpuCrystal2TimeSec { 9.2f };   // Crystal 2 (v1.81.52)
+    bool  gpuCrystal2Hd { false };   // Crystal 2 : rendu HD (ombres, occlusion, reflets, lueur HDR), v1.81.54
     float gpuTerrainZoom { 0.f }, gpuNeonZoom { 0.f }, gpuCrystalZoom { 0.f };
     // spectrogrammes d'ambiance (GpuSpectroFx : 0 Bars, 1 LED, 2 Ribbons, 3 Matrix, 4 Splash) :
     // TIME (s), vue (écarts de rotation / inclinaison à la vue d'origine), zoom molette
@@ -194,7 +203,7 @@ public:
     bool  oscMono         { false };  // oscilloscope : une trace (L+R)/2 au lieu de L et R
     bool  oscSplit        { false };  // oscilloscope, en stéréo : L et R l'une au-dessus de l'autre (sinon superposées)
     int   oscStyle        { 0 };      // oscilloscope : 0 tube cathodique, 1 numérique, 2 vintage, 3 rempli
-    int   oscFps          { 30 };     // oscilloscope : images/s (24, 30 ou 60) — plus lisible que 60
+    int   oscFps          { 60 };     // oscilloscope : images/s (24, 30 ou 60), 60 par défaut depuis la v1.81.49
     bool  oscPersist      { true };   // oscilloscope : rémanence des deux images précédentes
     int   oscLineWidth    { 20 };     // oscilloscope : épaisseur du trait, curseur 0..100 (0 = le plus fin)
     int   oscTraceMode    { 0 };      // oscilloscope : 0 précis (tous les échantillons), 1 classique (enveloppe min / max)
@@ -203,6 +212,8 @@ public:
     bool  vecLineMode     { true };   // Vectorscope : LINE (true) ou POINT (false)
     int   needleModeSel   { 0 };      // VU-mètre à aiguille : 0=LR 1=L 2=R
     float needleCalibRef  { -10.f };  // VU-mètre à aiguille : calibration 0VU en dBFS (-4 à -30)
+    int   tunerMode       { 0 };      // accordeur : 0 aiguille, 1 tracé + coups (v1.81.51)
+    float tunerA4         { 440.f };  // accordeur : référence du la 4 (Hz)
     int   needleCalibStep { 2 };      // VU-mètre à aiguille : pas des flèches de calibration (2 ou 4 dB)
 
     // ── Spectre (identique Keystone) ─────────────────────────────────────
@@ -291,6 +302,14 @@ public:
     static constexpr int PSD_FFT_SIZE  = 1 << PSD_FFT_ORDER;
     static constexpr int PSD_NUM_BINS  = PSD_FFT_SIZE/2 + 1;  // DC..Nyquist inclus
     bool  getPSDData    (float* destDb, int numBins) const;
+    // PSD à un instant donné (ms, horloge getMillisecondCounterHiRes) : fondu
+    // entre les deux trames datées qui l'encadrent (v1.81.57). L'audio arrive
+    // par paquets (ex. 960 échantillons) et une trame tombe tous les 1024 : à
+    // chaque image 0 à 4 trames neuves. Lire « la dernière » faisait avancer
+    // le relief par à-coups ; lu à heure fixe (un peu dans le passé), il avance
+    // régulièrement. false : pas encore de trames datées.
+    bool  getPSDAt      (double timeMs, float* destDb, int numBins) const;
+    static constexpr double PSD_DISPLAY_DELAY_MS = 40.0;   // marge : deux trames encadrent toujours l'instant lu
     float getPSDBinFreq (int bin) const { return (float)bin*(float)currentSampleRate/(float)PSD_FFT_SIZE; }
 
 
@@ -301,6 +320,13 @@ public:
     // sauvegarde garde la disposition du user (fermeture ou projet enregistré
     // pendant le tour)
     std::atomic<bool> tourLayoutActive { false };
+    // Bit Meter (v1.81.50) : OU / ET des échantillons convertis en entiers 32 bits
+    // (complément à deux), relevés et remis à zéro par le module à chaque image.
+    // Un bit à 1 dans l'OU et à 0 dans le ET a changé. Calculé seulement quand
+    // le module est affiché.
+    std::atomic<bool>         bitMeterWanted { false };
+    std::atomic<juce::uint32> bitOrL { 0u }, bitOrR { 0u }, bitAndL { 0xFFFFFFFFu }, bitAndR { 0xFFFFFFFFu };
+    std::atomic<juce::uint64> bitOverCount { 0 };   // échantillons au-dessus de 0 dBFS (L et R)
     // États gardés quand la fenêtre du plugin se ferme et se rouvre (v1.81.46) :
     // HOLD de chaque module (par ModuleID) avec son image figée, valeur retenue
     // du Needle VU, PRÉCISION de l'oscilloscope. En mémoire seulement (pas dans
@@ -384,6 +410,16 @@ private:
     float psdAlpha { 0.f }, psdAlphaFast { 0.f };   // lissage normal / retombée rapide (son coupé)
     float psdBuf[2][PSD_NUM_BINS] {};
     std::atomic<int> psdReadIdx { 0 };
+    // historique daté (getPSDAt) : PSD_HIST trames, écrites par le thread audio
+    static constexpr int PSD_HIST = 16;
+    float  psdHist[PSD_HIST][PSD_NUM_BINS] {};
+    std::atomic<double> psdHistMs[PSD_HIST] {};
+    std::atomic<juce::int64> psdHistSeq[PSD_HIST] {};   // numéro de trame (contrôle de réécriture)
+    std::atomic<juce::int64> psdHistCount { 0 };
+    juce::int64 psdSampleClock { 0 };       // échantillons reçus depuis le début (thread audio)
+    double psdClockOffsetMs { 0.0 };         // heure murale - heure audio, lissée
+    double psdClockSr { 0.0 };
+    double psdFrameMs { 0.0 };               // heure de la trame en cours de calcul
     void  computePSDFrame();
 
     float runPeakL  { 0.f }, runPeakR  { 0.f };

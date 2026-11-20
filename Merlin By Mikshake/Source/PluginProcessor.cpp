@@ -307,6 +307,31 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         scopeTotal.store(scopeTotal.load(std::memory_order_relaxed)+(juce::uint64)numSamples, std::memory_order_release);   // anneau : position = total modulo SCOPE_SIZE
     }
 
+    // ── Bit Meter (v1.81.50) : signe + valeur absolue à l'échelle 32 bits ────
+    // (bit 31 = un échantillon négatif ; bits 30..0 = |x|, 1.0 = 2^31, le bit 30
+    // vaut donc -6 dBFS). Comme les bit meters du commerce : les bits hauts ne
+    // s'allument qu'avec le niveau, une source 16 bits laisse les 16 bits bas à
+    // 0, une source 24 bits les 8 derniers. (Le complément à deux allumait tous
+    // les bits hauts à chaque passage par zéro.)
+    if(bitMeterWanted.load(std::memory_order_relaxed))
+    {
+        const auto toBits=[](float x){
+            const double v=juce::jmin(2147483647.0, std::abs((double)x)*2147483648.0);
+            return (juce::uint32)std::llrint(v) | (x<0.f ? 0x80000000u : 0u);
+        };
+        juce::uint32 orL=0u, andL=0xFFFFFFFFu, orR=0u, andR=0xFFFFFFFFu;
+        juce::uint64 over=0;
+        for(int s=0;s<numSamples;++s){
+            const juce::uint32 ul=toBits(L[s]), ur=toBits(R[s]);
+            orL|=ul; andL&=ul; orR|=ur; andR&=ur;
+            if(std::abs(L[s])>1.f) ++over;
+            if(numChannels>1 && std::abs(R[s])>1.f) ++over;
+        }
+        bitOrL.fetch_or(orL, std::memory_order_relaxed);  bitAndL.fetch_and(andL, std::memory_order_relaxed);
+        bitOrR.fetch_or(orR, std::memory_order_relaxed);  bitAndR.fetch_and(andR, std::memory_order_relaxed);
+        if(over>0) bitOverCount.fetch_add(over, std::memory_order_relaxed);
+    }
+
     for(int s=0;s<numSamples;++s)
     {
         const float l=L[s], r=R[s];
@@ -405,14 +430,25 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     }
 
     // ── Densité spectrale (PSD) : alimentation du ring-buffer FFT ─────────
+    // horloge audio -> heure murale : le dernier échantillon du paquet arrive
+    // « maintenant » ; écart lissé (les rappels audio sont irréguliers)
+    const double psdSr=juce::jmax(1.0, currentSampleRate);
+    {
+        const double wall=juce::Time::getMillisecondCounterHiRes();
+        const double measured=wall-(double)(psdSampleClock+numSamples)*1000.0/psdSr;
+        if(psdClockSr!=psdSr || std::abs(measured-psdClockOffsetMs)>150.0){ psdClockOffsetMs=measured; psdClockSr=psdSr; }
+        else psdClockOffsetMs+=(measured-psdClockOffsetMs)*0.01;
+    }
     for(int s=0;s<numSamples;++s){
         psdRing[psdRingWrite] = (numChannels>1) ? (L[s]+R[s])*0.5f : L[s];
         psdRingWrite=(psdRingWrite+1)%PSD_FFT_SIZE;
         if(++psdSamplesAcc>=PSD_HOP){
             psdSamplesAcc=0;
+            psdFrameMs=(double)(psdSampleClock+s+1)*1000.0/psdSr+psdClockOffsetMs;
             computePSDFrame();
         }
     }
+    psdSampleClock+=numSamples;
 
     // ── Écoute d'une bande (plugin seulement, comme Merlin MTR) ───────────
     // placée après les mesures : elles lisent toujours le signal d'origine
@@ -712,6 +748,48 @@ void LeakAudioProcessor::computePSDFrame()
         psdBuf[w][b]=psdAvgLin[b];
     }
     psdReadIdx.store(w,std::memory_order_release);
+    {   // historique daté
+        const juce::int64 n=psdHistCount.load(std::memory_order_relaxed);
+        const int slot=(int)(n%PSD_HIST);
+        psdHistSeq[slot].store(-1, std::memory_order_release);   // en cours d'écriture
+        std::memcpy(psdHist[slot], psdAvgLin, sizeof(psdAvgLin));
+        psdHistMs[slot].store(psdFrameMs, std::memory_order_relaxed);
+        psdHistSeq[slot].store(n, std::memory_order_release);
+        psdHistCount.store(n+1, std::memory_order_release);
+    }
+}
+
+bool LeakAudioProcessor::getPSDAt(double timeMs, float* destDb, int numBins) const
+{
+    if(!destDb||numBins<=0) return false;
+    const int nb=juce::jmin(numBins,PSD_NUM_BINS);
+    const juce::int64 count=psdHistCount.load(std::memory_order_acquire);
+    if(count<2) return false;
+    // trames de la plus récente à la plus ancienne : a = la plus récente <= timeMs, b = la suivante
+    int a=-1, b=-1;
+    for(juce::int64 k=count-1; k>=juce::jmax((juce::int64)0, count-PSD_HIST+2); --k){
+        const int slot=(int)(k%PSD_HIST);
+        if(psdHistSeq[slot].load(std::memory_order_acquire)!=k) continue;
+        const double t=psdHistMs[slot].load(std::memory_order_relaxed);
+        if(t<=timeMs){ a=slot; break; }
+        b=slot;
+    }
+    if(a<0 && b<0) return false;
+    if(a<0) a=b;   // instant plus ancien que l'historique : la plus vieille trame
+    float w=0.f;
+    if(b>=0 && b!=a){
+        const double ta=psdHistMs[a].load(std::memory_order_relaxed), tb=psdHistMs[b].load(std::memory_order_relaxed);
+        w=(float)juce::jlimit(0.0, 1.0, tb>ta ? (timeMs-ta)/(tb-ta) : 1.0);
+    } else b=a;
+    const juce::int64 seqA=psdHistSeq[a].load(std::memory_order_acquire), seqB=psdHistSeq[b].load(std::memory_order_acquire);
+    for(int i=0;i<nb;++i){
+        const float p=psdHist[a][i]+(psdHist[b][i]-psdHist[a][i])*w;
+        destDb[i]=(p<1e-12f)?-120.f:10.f*std::log10(p);
+    }
+    // réécrites pendant la lecture (lecteur très en retard) : repli sur la dernière trame
+    if(psdHistSeq[a].load(std::memory_order_acquire)!=seqA || psdHistSeq[b].load(std::memory_order_acquire)!=seqB)
+        return getPSDData(destDb, numBins);
+    return true;
 }
 
 bool LeakAudioProcessor::getPSDData(float* destDb,int numBins) const
@@ -811,6 +889,7 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("uiScale", uiScale);
     xml.setAttribute("plateTint", plateTint);
     xml.setAttribute("lightScreens", lightScreens);
+    xml.setAttribute("colorVivid", colorVivid);
     xml.setAttribute("titleStyle", titleStyle);
     xml.setAttribute("logoColour", logoColour);
     xml.setAttribute("corrStyle", corrStyle);
@@ -829,6 +908,7 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("oscStyle", oscStyle);
     xml.setAttribute("oscSplit", oscSplit);
     xml.setAttribute("oscFps", oscFps);
+    xml.setAttribute("oscFps2", oscFps);   // v1.81.49 : 60 par défaut (voir le chargement)
     xml.setAttribute("oscPersist", oscPersist);
     xml.setAttribute("oscLineW", oscLineWidth);
     xml.setAttribute("oscTraceMode", oscTraceMode);
@@ -838,6 +918,8 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("needleModeSel", needleModeSel);
     xml.setAttribute("needleCalibRef", (double)needleCalibRef);
     xml.setAttribute("needleCalibStep", needleCalibStep);
+    xml.setAttribute("tunerMode", tunerMode);
+    xml.setAttribute("tunerA4", (double)tunerA4);
     xml.setAttribute("customSpectroLowColor",  (int)customSpectroLowColor);
     xml.setAttribute("customSpectroMidColor",  (int)customSpectroMidColor);
     xml.setAttribute("customSpectroHighColor", (int)customSpectroHighColor);
@@ -861,6 +943,9 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("gpuCrystalYaw", (double)gpuCrystalYaw); xml.setAttribute("gpuCrystalPitch", (double)gpuCrystalPitch);
     xml.setAttribute("gpuTerrainZoom", (double)gpuTerrainZoom); xml.setAttribute("gpuNeonZoom", (double)gpuNeonZoom);
     xml.setAttribute("gpuCrystalZoom", (double)gpuCrystalZoom);
+    xml.setAttribute("gpuCrystal2Yaw", (double)gpuCrystal2Yaw); xml.setAttribute("gpuCrystal2Pitch", (double)gpuCrystal2Pitch);
+    xml.setAttribute("gpuCrystal2Zoom", (double)gpuCrystal2Zoom); xml.setAttribute("gpuCrystal2TimeSec", (double)gpuCrystal2TimeSec);
+    xml.setAttribute("gpuCrystal2Hd", gpuCrystal2Hd);
     for(int i=0;i<5;++i){
         const juce::String n(i);
         xml.setAttribute("fxTime"+n, (double)fxTimeSec[i]); xml.setAttribute("fxTurn"+n, (double)fxYaw[i]);
@@ -1061,6 +1146,7 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             if(uiScale!=0) uiScale=juce::jlimit(100, 200, uiScale);
             plateTint = juce::jlimit(0, 1, xml->getIntAttribute("plateTint", plateTint));   // absent : inchangé
             lightScreens = juce::jlimit(0, 1, xml->getIntAttribute("lightScreens", lightScreens));
+            colorVivid   = juce::jlimit(0, 2, xml->getIntAttribute("colorVivid", colorVivid));
             titleStyle = juce::jlimit(0, 2, xml->getIntAttribute("titleStyle", titleStyle));
             logoColour = juce::jlimit(0, 1, xml->getIntAttribute("logoColour", logoColour));
             corrStyle  = juce::jlimit(0, 2, xml->getIntAttribute("corrStyle", corrStyle));
@@ -1078,7 +1164,10 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             oscMono     = xml->getBoolAttribute("oscMono", false);
             oscStyle    = juce::jlimit(0, 3, xml->getIntAttribute("oscStyle", 0));
             oscSplit    = xml->getBoolAttribute("oscSplit", oscStyle>=2);   // état plus ancien : ce que faisait ce style
-            oscFps      = juce::jlimit(10, 144, xml->getIntAttribute("oscFps", 30));
+            // 60 i/s par défaut depuis la v1.81.49 ; un état plus ancien à 30 (l'ancien
+            // défaut) passe à 60, un autre choix (24) est gardé
+            if(xml->hasAttribute("oscFps2")) oscFps = juce::jlimit(10, 144, xml->getIntAttribute("oscFps2", 60));
+            else { const int f=xml->getIntAttribute("oscFps", 60); oscFps = juce::jlimit(10, 144, f==30 ? 60 : f); }
             oscPersist  = xml->getBoolAttribute("oscPersist", true);
             // curseur 0..100 (v1.69), 20 d'origine ; les anciens niveaux 0..3
             // (« oscLineWidth », v1.67-1.68) ne sont pas repris : retour à 20
@@ -1090,6 +1179,8 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             needleModeSel  = xml->getIntAttribute("needleModeSel", 0);
             needleCalibRef = (float)xml->getDoubleAttribute("needleCalibRef", -10.0);
             needleCalibStep = xml->getIntAttribute("needleCalibStep", 2)==4 ? 4 : 2;
+            tunerMode = juce::jlimit(0, 1, xml->getIntAttribute("tunerMode", 0));
+            tunerA4   = (float)juce::jlimit(415.0, 466.0, xml->getDoubleAttribute("tunerA4", 440.0));
             customSpectroLowColor  = (uint32_t)xml->getIntAttribute("customSpectroLowColor",  (int)0xFF333333);
             customSpectroMidColor  = (uint32_t)xml->getIntAttribute("customSpectroMidColor",  (int)0xFFB0B0B0);
             customSpectroHighColor = (uint32_t)xml->getIntAttribute("customSpectroHighColor", (int)0xFF470000);
@@ -1117,6 +1208,11 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             gpuTerrainZoom  = (float)xml->getDoubleAttribute("gpuTerrainZoom",  0.0);
             gpuNeonZoom     = (float)xml->getDoubleAttribute("gpuNeonZoom",     0.0);
             gpuCrystalZoom  = (float)xml->getDoubleAttribute("gpuCrystalZoom",  0.0);
+            gpuCrystal2Yaw     = (float)xml->getDoubleAttribute("gpuCrystal2Yaw",   0.0);
+            gpuCrystal2Pitch   = (float)xml->getDoubleAttribute("gpuCrystal2Pitch", 1.018);
+            gpuCrystal2Zoom    = (float)xml->getDoubleAttribute("gpuCrystal2Zoom",  0.0);
+            gpuCrystal2TimeSec = (float)xml->getDoubleAttribute("gpuCrystal2TimeSec", 9.2);
+            gpuCrystal2Hd      = xml->getBoolAttribute("gpuCrystal2Hd", false);
             {
                 static constexpr float kTimeDef[5]={ 1.f, 1.f, 1.5f, 2.f, 2.f };
                 for(int i=0;i<5;++i){

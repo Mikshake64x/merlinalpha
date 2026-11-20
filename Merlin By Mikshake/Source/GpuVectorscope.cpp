@@ -313,7 +313,7 @@ void GpuVectorscopeDisplay::newOpenGLContextCreated()
     onContextCreated();
 }
 
-void GpuVectorscopeDisplay::openGLContextClosing()
+void GpuVectorscopeDisplay::closingGL()
 {
     if(vboLines){ glDeleteBuffers(1, &vboLines); vboLines=0; }
     for(auto* a : { &vaoQuad, &vaoLines }) if(*a){ glDeleteVertexArrays(1, a); *a=0; }
@@ -408,7 +408,7 @@ void GpuVectorscopeDisplay::readPoints(float dt)
     }
 }
 
-void GpuVectorscopeDisplay::renderOpenGL()
+void GpuVectorscopeDisplay::renderGL()
 {
     const auto bg=Col::bg;
     glClearColor(bg.getFloatRed(), bg.getFloatGreen(), bg.getFloatBlue(), 1.f);
@@ -417,7 +417,7 @@ void GpuVectorscopeDisplay::renderOpenGL()
     if(style==Style::Phosphor ? (phosphorShader==nullptr || lineShader==nullptr || fadeShader==nullptr) : densityShader==nullptr) return;
     applyVsync();
 
-    const double now=juce::Time::getMillisecondCounterHiRes();
+    const double now=frameClockMs();
     const float dt=(float)juce::jlimit(0.0, 0.1, (now-lastFrameMs)*0.001);
     lastFrameMs=now;
     readPoints(dt);
