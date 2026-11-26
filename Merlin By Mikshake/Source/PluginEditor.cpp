@@ -3969,20 +3969,23 @@ void ControlsBarLeak::paint(juce::Graphics& g)
     for(int i=0;i<4;++i)
         g.drawText(titles[i], groupLabel[i], juce::Justification::centredLeft, false);
 
-    // séparateurs gravés entre groupes : filet sombre + filet clair
-    for(float dx : groupDividerX){
-        g.setColour(Neu::shadowDark.withMultipliedAlpha(0.6f));
-        g.drawLine(dx,6.f,dx,(float)getHeight()-6.f,1.0f);
+    // cadres gravés des groupes (v1.81.69, aperçu « B ») : filet clair décalé + filet sombre
+    for(const auto& r : groupBox){
+        if(r.isEmpty()) continue;
+        const auto f=r.toFloat().reduced(0.5f);
         g.setColour(Neu::shadowLight);
-        g.drawLine(dx+1.f,6.f,dx+1.f,(float)getHeight()-6.f,1.0f);
+        g.drawRoundedRectangle(f.translated(1.f, 1.f), 7.f, 1.f);
+        g.setColour(Neu::shadowDark.withMultipliedAlpha(0.6f));
+        g.drawRoundedRectangle(f, 7.f, 1.f);
     }
 }
 void ControlsBarLeak::resized()
 {
-    // Une rangée, titres en ligne : PEAK HOLD, RANGE, MS à gauche, presets au
-    // centre, VIEW à droite. Les bounds des boutons/champs incluent 2,5 px de
-    // marge pour le relief neumorphique (voir NeuLookAndFeel) ; les dimensions
-    // suivent la taille de texte.
+    // v1.81.69 (aperçu merlin_barre_bas_preview.html « B ») : tous les réglages du
+    // Spectrum d'un bloc à gauche, chaque groupe dans un cadre gravé
+    // (PEAK HOLD · RANGE · MS · VIEW · CREST), presets calés à droite. Les
+    // bounds des boutons/champs incluent 2,5 px de marge pour le relief
+    // neumorphique (voir NeuLookAndFeel) ; les dimensions suivent la taille de texte.
     const float s=Ui::textScale;
     auto px=[s](float v){ return juce::roundToInt(v*s); };
     const int H=getHeight();
@@ -3995,39 +3998,39 @@ void ControlsBarLeak::resized()
         groupLabel[i]={x,0,w,H};
         x+=w+px(5.f);
     };
-    const int groupGap=px(10.f);
-    int x=px(4.f);
+    const int pad=px(6.f), gap=px(8.f);
+    const int boxY=juce::jmax(1, by-px(3.f)), boxH=juce::jmin(H-2, bh+px(6.f));
+    int x=px(2.f), start=0;
+    auto open =[&]{ start=x; x+=pad; };
+    auto close=[&](int i){ x+=pad; groupBox[i]={ start, boxY, x-start, boxH }; x+=gap; };
 
-    label(x,0);
+    open(); label(x,0);
     peakBtn.setBounds(x,by,px(42.f),bh); x+=px(44.f);
     peakSel.setBounds(x,by,px(70.f),bh); x+=px(70.f);
-    x+=groupGap; groupDividerX[0]=(float)x; x+=groupGap;
-    label(x,1);
+    close(0);
+    open(); label(x,1);
     rangeSel.setBounds(x,by,px(72.f),bh); x+=px(72.f);
-    x+=groupGap; groupDividerX[1]=(float)x; x+=groupGap;
-    label(x,2);
+    close(1);
+    open(); label(x,2);
     midBtn .setBounds(x,by,px(44.f),bh); x+=px(46.f);
     sideBtn.setBounds(x,by,px(44.f),bh); x+=px(44.f);
-    const int leftEnd=x;
-
-    // VIEW, calé à droite
+    close(2);
+    open();   // CREST à côté de MID / SIDE (demande du user)
+    crestBtn.setBounds(x,by,px(58.f),bh); x+=px(62.f);
+    crestFader.setBounds(x,by,px(96.f),bh); x+=px(96.f);
+    close(4);
+    open(); label(x,3);
     const int bbw=px(34.f), bgap=px(2.f);
-    int xr=getWidth()-px(4.f)-(bbw*3+bgap*2);
-    bands15Btn.setBounds(xr,             by,bbw,bh);
-    bands31Btn.setBounds(xr+bbw+bgap,    by,bbw,bh);
-    bands62Btn.setBounds(xr+(bbw+bgap)*2,by,bbw,bh);
-    const int vw=juce::roundToInt(juce::GlyphArrangement::getStringWidth(lf, titles[3]))+px(4.f);
-    groupLabel[3]={xr-px(5.f)-vw,0,vw,H};
-    // CREST et sa durée, juste avant VIEW
-    const int fw=px(96.f), cw=px(58.f);
-    crestFader.setBounds(groupLabel[3].getX()-px(12.f)-fw, by, fw, bh);
-    crestBtn.setBounds(crestFader.getX()-px(4.f)-cw, by, cw, bh);
-    const int rightStart=crestBtn.getX();
+    bands15Btn.setBounds(x,by,bbw,bh); x+=bbw+bgap;
+    bands31Btn.setBounds(x,by,bbw,bh); x+=bbw+bgap;
+    bands62Btn.setBounds(x,by,bbw,bh); x+=bbw;
+    close(3);
 
-    // presets au centre de l'espace restant
-    const int room=rightStart-leftEnd-px(24.f);
-    const int pw=juce::jlimit(juce::jmin(room, px(110.f)), px(320.f), room);
-    presets.setBounds(leftEnd+(rightStart-leftEnd-pw)/2, by, juce::jmax(0, pw), bh);
+    // presets calés à droite, dans la place qui reste
+    const int right=getWidth()-px(4.f);
+    const int room=right-x-px(8.f);
+    const int pw=juce::jlimit(juce::jmin(juce::jmax(0, room), px(110.f)), px(380.f), juce::jmax(0, room));
+    presets.setBounds(right-pw, by, juce::jmax(0, pw), bh);
 }
 
 //==============================================================================

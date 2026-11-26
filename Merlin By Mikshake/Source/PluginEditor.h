@@ -1412,10 +1412,10 @@ private:
     NeuAnimButton    crestBtn  { "CREST" };   // Spectrum : crête − RMS par bande (v1.81.68)
     MiniTimeFader    crestFader;               // durée de mesure du CREST
 
-    // titres en ligne (PEAK HOLD, RANGE, MS, VIEW) et séparateurs gravés entre
-    // groupes, placés dans resized()
+    // titres en ligne (PEAK HOLD, RANGE, MS, VIEW) et cadres gravés des groupes
+    // (PEAK HOLD, RANGE, MS, VIEW, CREST), placés dans resized()
     juce::Rectangle<int> groupLabel[4];
-    float groupDividerX[2] {};
+    juce::Rectangle<int> groupBox[5];
 
     std::function<void()> updateMSMode;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ControlsBarLeak)
