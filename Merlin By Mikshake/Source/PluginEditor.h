@@ -67,14 +67,15 @@ namespace Col {
     juce::Colour paperHeat(float t);
     inline juce::Colour hot(juce::Colour c, float k) { return paper ? c.interpolatedWith(textHi, k*0.45f) : c.interpolatedWith(juce::Colours::white, k); }
 
-    // Options > Apparence > Intensité des couleurs (v1.81.59) : 0 actuel, 1 vif,
-    // 2 très vif. Appliquée à l'image finale de chaque module (filtre CPU ou
-    // passe GPU) : saturation + contraste des seules couleurs, gris/noir/blanc intacts.
+    // Options > Graphismes > Saturation des couleurs (v1.81.65, fader 0..100 % ;
+    // avant : Actuel / Vif / Très vif = 0 / 50 / 100). Saturation + contraste des
+    // seules couleurs (passe GPU, Col::viv en 2D), gris/noir/blanc intacts.
     inline std::atomic<int> vivid { 0 };
     inline void vividParams(int v, float& sat, float& con)
     {
-        sat = v>=2 ? 1.5f  : v==1 ? 1.25f : 1.f;
-        con = v>=2 ? 1.08f : v==1 ? 1.04f : 1.f;
+        const float a = (float) juce::jlimit(0, 100, v) * 0.01f;
+        sat = 1.f + 0.5f*a;
+        con = 1.f + 0.08f*a;
     }
     // couleur / dégradé intensifiés selon vivid (tels quels à 0) : modules 2D
     juce::Colour viv(juce::Colour c);
@@ -213,6 +214,9 @@ namespace SpectroReadout {
     // de rendu, sans repeindre le calque 2D (v1.81.57)
     juce::Image renderBubble(juce::Rectangle<float> area, juce::Point<float> at,
                              float hz, float db, float ageSec, float scale, juce::Rectangle<float>& box);
+    // même bulle, première ligne libre (Stereogram : position stéréo au lieu des Hz)
+    juce::Image renderBubbleText(juce::Rectangle<float> area, juce::Point<float> at, const juce::String& line1,
+                                 float db, float ageSec, float scale, juce::Rectangle<float>& box);
 
     // Repères des spectrogrammes (CPU et GPU)
     // échelle de temps : pas lisible selon la durée affichée, libellé "0 s" / "-1.5 s"
@@ -772,8 +776,13 @@ public:
     std::function<void()> onSelectionChanged;
     // Style Blocks 3D (interrupteur cube) — false = Classic
     void set3D(bool b) { if(b!=blocks3D){ blocks3D=b; repaint(); } }
+    // CREST (v1.81.68, aperçu « B ») : RMS en barre, écart jusqu'à la crête coloré et chiffré
+    void setCrestMode(bool b) { if(b!=crestMode){ crestMode=b; forceTipRefresh=true; repaint(); } }
 
 private:
+    bool  crestMode { false };
+    float crestRms[LeakAudioProcessor::N_BANDS] {}, crestPk[LeakAudioProcessor::N_BANDS] {};
+    float prevCrest[LeakAudioProcessor::N_BANDS] {};
     static constexpr int NMAX = LeakAudioProcessor::N_BANDS;
     static const char* BAND_LABELS_15[LeakAudioProcessor::N_BANDS_15+LeakAudioProcessor::N_EXTRA_15];
     static const char* BAND_LABELS_31[LeakAudioProcessor::N_BANDS_31+LeakAudioProcessor::N_EXTRA_31];
@@ -1357,6 +1366,24 @@ private:
 // Bande du bas (v1.73, design de Sunny) : une seule rangée fixe, titres en
 // ligne — PEAK HOLD, RANGE, MS à gauche, presets au centre, VIEW à droite.
 // RESET et le volume Windows sont passés dans l'en-tête.
+// Petit fader horizontal de la barre du bas (durée du CREST, 0,5 à 30 s,
+// échelle logarithmique ; double-clic : 3 s)
+class MiniTimeFader : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    std::function<void(float)> onChange;
+    void  setValue(float v) { value=juce::jlimit(lo, hi, v); repaint(); }
+    float getValue() const  { return value; }
+    void paint(juce::Graphics&) override;
+    void mouseDown(const juce::MouseEvent& e) override { drag(e); }
+    void mouseDrag(const juce::MouseEvent& e) override { drag(e); }
+    void mouseDoubleClick(const juce::MouseEvent&) override { setValue(3.f); if(onChange) onChange(value); }
+private:
+    juce::Rectangle<float> track() const;
+    void drag(const juce::MouseEvent&);
+    float lo { 0.5f }, hi { 30.f }, value { 3.f };
+};
+
 class ControlsBarLeak : public juce::Component
 {
 public:
@@ -1382,6 +1409,8 @@ private:
     NeuAnimButton    bands15Btn{ "15" };
     NeuAnimButton    bands31Btn{ "31" };
     NeuAnimButton    bands62Btn{ "62" };
+    NeuAnimButton    crestBtn  { "CREST" };   // Spectrum : crête − RMS par bande (v1.81.68)
+    MiniTimeFader    crestFader;               // durée de mesure du CREST
 
     // titres en ligne (PEAK HOLD, RANGE, MS, VIEW) et séparateurs gravés entre
     // groupes, placés dans resized()
@@ -1565,6 +1594,14 @@ private:
     void refreshChassis();   // reconstruit les caches du châssis
     void applyLook();   // teinte + contraste du processeur -> châssis, caches, vignettes
     void applyVivid();  // intensité des couleurs : couleurs des modules 2D, passe des modules GPU
+    // Options > Graphismes > Optimiser pour cet ordinateur (v1.81.65) : test de
+    // quelques secondes sur le Spectrogram Crystal 2, posé le temps du test
+    struct GraphicsTest;
+    std::unique_ptr<GraphicsTest> graphicsTest;
+    void startGraphicsTest();
+    void graphicsTestTick();
+    void applyGraphicsStep(int step);
+    void finishGraphicsTest(int step, double measuredFps);
     void applyTextScale();   // taille de texte du processeur -> toute l'interface
     // Taille de l'interface (plugin) : échelle de l'hôte × celle choisie, appliquée
     // par AudioProcessorEditor::setScaleFactor (la DAW suit la taille de la fenêtre).
@@ -1611,14 +1648,14 @@ private:
     MultibandVectorscopeDisplay mbVectorscope;
     Spectrogram3DPeaksDisplay   spectro3dPeaks;
     Spectrogram3DSurfaceDisplay spectro3dSurface;
-    GpuSpectrogramDisplay gpuTerrain, gpuNeon, gpuCrystal, gpuCrystal2;
+    GpuSpectrogramDisplay gpuTerrain, gpuNeon, gpuCrystal, gpuCrystal2, gpuStereogram;
     GpuSurfaceDisplay     gpuSurface;   // Spectrogram Surface GPU
     GpuSpectroFxDisplay   gpuBars, gpuLed, gpuRibbons, gpuMatrix, gpuSplash;   // spectrogrammes d'ambiance (v1.81.37)
     GpuDotSpectrumDisplay gpuDotChroma, gpuDotNebula;
     GpuDotPanoramaDisplay gpuDotPano;
     GpuVectorscopeDisplay gpuVecPhosphor, gpuVecDensity;
     // tous les modules OpenGL (suspension sous les panneaux, Options > Image)
-    std::array<GpuModuleBase*, 16> gpuModules() { return { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuSurface,
+    std::array<GpuModuleBase*, 17> gpuModules() { return { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuStereogram, &gpuSurface,
                                                           &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash,
                                                           &gpuDotChroma, &gpuDotNebula, &gpuDotPano, &gpuVecPhosphor, &gpuVecDensity, &oscilloscope }; }
     ControlsBarLeak      controls;
@@ -1759,6 +1796,11 @@ private:
     void mouseMove(const juce::MouseEvent&) override;
     void mouseExit(const juce::MouseEvent&) override;
     int  dragSlot { -1 };                 // titre de module cliqué : candidat au détachement
+    // v1.81.67 : le menu des modules s'ouvre au RELÂCHEMENT du clic (emplacement
+    // noté à l'appui). Ouvert à l'appui, JUCE prenait le relâchement pour un
+    // choix quand il arrivait plus de 250 ms après (fenêtre épinglée, module
+    // détaché) : la ligne sous le pointeur était choisie toute seule.
+    int  menuSlotOnUp { -1 };
     juce::Point<int> dragStart, dragGrab; // départ (écran) / prise dans le module
     bool dragFollowing { false };         // fenêtre détachée qui suit la souris
     bool alwaysOnTopState { false };      // « Toujours au premier plan » de l'appli, repris par les fenêtres détachées

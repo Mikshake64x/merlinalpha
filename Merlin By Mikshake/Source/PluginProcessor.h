@@ -63,7 +63,9 @@ public:
         // accordeur : fûts, basse, guitare (v1.81.51)
         Tuner                = 32,
         // Crystal lissé : maillage fin interpolé, sommets arrondis (v1.81.52)
-        GpuSpectroCrystal2   = 33
+        GpuSpectroCrystal2   = 33,
+        // position stéréo dans le temps, en relief (v1.81.66)
+        GpuStereogram        = 34
     };
     static constexpr int NUM_SLOTS = 6;
     // Assignation par défaut : Vectorscope, Multiband Corr, VU à aiguille, Loudness, Spectrum, VuMeter
@@ -140,7 +142,7 @@ public:
     bool largeText    { true };    // textes agrandis (Options › Affichage) — activé à chaque ouverture
     int  uiScale      { 0 };       // Options › Affichage › Taille de l'interface : 0 automatique (selon l'écran), sinon 100..200 %
     int  plateTint    { 1 };       // thème sombre : 0 gris d'origine, 1 ardoise (design de Sunny, v1.73)
-    int  colorVivid { 0 };         // intensité des couleurs des modules : 0 actuel, 1 vif, 2 très vif (v1.81.59)
+    int  colorSat { 0 };           // saturation des couleurs des modules, 0..100 % (v1.81.65 ; ancien Vif = 50, Très vif = 100)
     int  lightScreens { 1 };       // thème clair : 1 écrans des modules « Papier » (v1.75), 0 écrans noirs
     int  titleStyle   { 1 };       // titres des modules (à l'essai) : 0 sans, 1 filet d'accent, 2 bandeau
     int  logoColour   { 0 };       // lettres du logo de Sunny (à l'essai) : 0 gris gravé, 1 vert de Sunny
@@ -168,6 +170,7 @@ public:
     float gpuNeonYaw    { 0.f }, gpuNeonPitch    { 1.018f };
     float gpuCrystalYaw { 0.f }, gpuCrystalPitch { 1.018f };
     float gpuCrystal2Yaw { 0.f }, gpuCrystal2Pitch { 1.018f }, gpuCrystal2Zoom { 0.f }, gpuCrystal2TimeSec { 9.2f };   // Crystal 2 (v1.81.52)
+    float gpuStereoYaw { 1.5707964f }, gpuStereoPitch { 1.018f }, gpuStereoZoom { 0.f }, gpuStereoTimeSec { 10.f };   // Stereogram 3D (v1.81.66)
     bool  gpuCrystal2Hd { false };   // Crystal 2 : rendu HD (ombres, occlusion, reflets, lueur HDR), v1.81.54
     float gpuTerrainZoom { 0.f }, gpuNeonZoom { 0.f }, gpuCrystalZoom { 0.f };
     // spectrogrammes d'ambiance (GpuSpectroFx : 0 Bars, 1 LED, 2 Ribbons, 3 Matrix, 4 Splash) :
@@ -190,6 +193,8 @@ public:
     // ── État persisté de la barre de contrôles et de quelques modules ──────────
     bool  peakHoldOn      { true };
     int   peakHoldIdx     { 2 };      // index dans {0.5,1,2,3,5,inf} → "2 s" par défaut
+    bool  crestMode       { false };  // Spectrum : bouton CREST (crête − RMS par bande, v1.81.68)
+    std::atomic<float> crestWindowSec { 3.f };   // durée de mesure du CREST, 0,5 à 30 s
     float dbRangeVal      { 50.f };   // plage affichée du Spectrum, en dB (défaut -50dB)
     float spectrumReleaseSec { 0.4f };   // RELEASE local — module Spectrum
     float dotChromaReleaseSec { 0.4f };  // RELEASE — Dot Spectrum Chroma (même réglage que le Spectrum)
@@ -218,6 +223,9 @@ public:
 
     // ── Spectre (identique Keystone) ─────────────────────────────────────
     bool getBandLevels (float* dest, int numBands) const;
+    // CREST (v1.81.68) : RMS et crête de chaque bande du Spectrum (signal de la
+    // bande, après le filtre), sur les crestWindowSec dernières secondes, en dB
+    bool getCrestData  (float* rmsDb, float* peakDb, int numBands) const;
     bool getSideLevels (float* dest, int numBands) const;
 
     struct VuData {
@@ -310,6 +318,16 @@ public:
     // régulièrement. false : pas encore de trames datées.
     bool  getPSDAt      (double timeMs, float* destDb, int numBins) const;
     static constexpr double PSD_DISPLAY_DELAY_MS = 40.0;   // marge : deux trames encadrent toujours l'instant lu
+
+    // ── Stereogram 3D (v1.81.66) : énergie par position stéréo ─────────────
+    // Même FFT 4096 points et même cadence que la PSD, sur L et R séparés.
+    // Pour chaque fréquence (20 Hz–20 kHz), l'angle entre Mid et Side donne
+    // la position : 0 = centre, 100 % = un seul côté, au-delà = opposition de
+    // phase (jusqu'à 150 %). L'énergie est cumulée sur STEREO_BINS positions
+    // de 150 % L à 150 % R, lissée comme la PSD, datée comme getPSDAt().
+    static constexpr int STEREO_BINS = 160;
+    bool getStereoAt(double timeMs, float* destDb) const;   // dB par position ; false avant deux trames
+    void noteStereoUse() { stereoUseMs.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed); }
     float getPSDBinFreq (int bin) const { return (float)bin*(float)currentSampleRate/(float)PSD_FFT_SIZE; }
 
 
@@ -393,6 +411,15 @@ private:
     float corrAlpha { 0.f };       // coefficient EMA, calculé dans rebuildFilters()
 
     float bandBufDB[2][N_BANDS] {};
+    // CREST : tranches de ~50 ms (somme des carrés, carré max), anneau de 30 s
+    static constexpr int CREST_RING = 640;
+    float crestChunkSum[CREST_RING][N_BANDS] {};
+    float crestChunkMax[CREST_RING][N_BANDS] {};
+    float crestAccSum[N_BANDS] {}, crestAccMax[N_BANDS] {};
+    int   crestHead { 0 }, crestFilled { 0 }, crestCount { 0 }, crestChunkLen { 2400 }, crestBands { 0 };
+    float crestRmsBuf[2][N_BANDS] {}, crestPkBuf[2][N_BANDS] {};
+    std::atomic<int> crestReadIdx { 0 };
+    void  pushCrestChunk(int nBands);
     float sideBufDB[2][N_BANDS] {};
     std::atomic<int> bandReadIdx { 0 };
     std::atomic<int> sideReadIdx { 0 };
@@ -421,6 +448,16 @@ private:
     double psdClockSr { 0.0 };
     double psdFrameMs { 0.0 };               // heure de la trame en cours de calcul
     void  computePSDFrame();
+    // Stereogram : calcul seulement si le module a lu dans la dernière seconde
+    std::atomic<double> stereoUseMs { 0.0 };
+    float stRingL[PSD_FFT_SIZE] {}, stRingR[PSD_FFT_SIZE] {};
+    float stFFTL[2*PSD_FFT_SIZE] {}, stFFTR[2*PSD_FFT_SIZE] {};
+    float stAvg[STEREO_BINS] {};
+    float stHist[PSD_HIST][STEREO_BINS] {};
+    std::atomic<double> stHistMs[PSD_HIST] {};
+    std::atomic<juce::int64> stHistSeq[PSD_HIST] {};
+    std::atomic<juce::int64> stHistCount { 0 };
+    void  computeStereoFrame();
 
     float runPeakL  { 0.f }, runPeakR  { 0.f };
     float vuRmsAccL { 0.f }, vuRmsAccR { 0.f };

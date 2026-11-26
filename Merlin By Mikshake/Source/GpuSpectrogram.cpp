@@ -97,6 +97,7 @@ uniform sampler2DShadow shadowMap;   // HD : profondeur vue depuis la lumière
 uniform sampler2D heights;
 uniform float headT, invNZ, ageSpan, sScale, sOff, parity, gridPhase, halfX, halfZ;
 uniform int   style;          // 0 terrain, 1 neon, 2 cristal
+uniform float centreLine;     // Stereogram : ligne C et reperes 100 % L / R
 uniform vec3  eye, viewDir, bg, accent;
 uniform vec3  hover;         // survol : u, age, actif (0/1)
 uniform float paper;         // 1 : ecran Papier (theme clair), encre sur fond clair
@@ -314,7 +315,7 @@ void main()
     float pl = 1.0 - smoothstep(0.0, 0.05, vH);
     if(pl > 0.0){
         float gu, ga;
-        float gp = max(lineMask(vU*32.0, gu), lineMask((vAge - gridPhase)*0.25, ga));
+        float gp = max(lineMask(vU*(centreLine > 0.5 ? 12.0 : 32.0), gu), lineMask((vAge - gridPhase)*0.25, ga));
         vec3 plc = paper > 0.5 ? mix(vec3(0.89, 0.91, 0.94), vec3(0.80, 0.84, 0.89), vD)
                                : mix(vec3(0.18, 0.17, 0.40), vec3(0.42, 0.44, 0.80), vD);
         plc = mix(plc, paper > 0.5 ? vec3(0.42, 0.49, 0.59) : vec3(0.78, 0.82, 1.0), gp*0.35);
@@ -322,6 +323,14 @@ void main()
         col = mix(col, plc, pl);
     }
 
+    // Stereogram : ligne du centre (C) et reperes 100 % L / R, sur le relief comme au sol
+    if(centreLine > 0.5){
+        float fu = max(fwidth(vU), 1e-6);
+        float cu = abs(vU - 0.5)/fu;
+        col = mix(col, paper > 0.5 ? vec3(0.15, 0.19, 0.23) : vec3(0.92), (1.0 - smoothstep(0.6, 1.6, cu))*0.85);
+        float eu = min(abs(vU - 1.0/6.0), abs(vU - 5.0/6.0))/fu;
+        col = mix(col, accent, (1.0 - smoothstep(0.6, 1.6, eu))*0.55);
+    }
     // curseur 3D : frequence (de l'avant au fond) + instant survoles, point au croisement
     if(hover.z > 0.5){
         float pu = abs(vU - hover.x)/max(fwidth(vU), 1e-6);
@@ -538,15 +547,17 @@ static int snapshotIdFor(GpuSpectrogramDisplay::Style s)
 {
     using M=LeakAudioProcessor::ModuleID;
     return (int)(s==GpuSpectrogramDisplay::Style::Terrain ? M::GpuSpectroTerrain : s==GpuSpectrogramDisplay::Style::Neon ? M::GpuSpectroNeon
-               : s==GpuSpectrogramDisplay::Style::Crystal2 ? M::GpuSpectroCrystal2 : M::GpuSpectroCrystal);
+               : s==GpuSpectrogramDisplay::Style::Crystal2 ? M::GpuSpectroCrystal2
+               : s==GpuSpectrogramDisplay::Style::Stereogram ? M::GpuStereogram : M::GpuSpectroCrystal);
 }
 
 GpuSpectrogramDisplay::GpuSpectrogramDisplay(LeakAudioProcessor& p, Style s)
-    : GpuModuleBase(p), style(s), nz(s==Style::Crystal2 ? NZMAX : 64)
+    : GpuModuleBase(p), style(s), nz((s==Style::Crystal2 || s==Style::Stereogram) ? NZMAX : 64)
 {
     // fader TIME : 1 à 20 s (milieu de course 4 s), 2.1 s par défaut
     timeFader=std::make_unique<ReleaseFader>();
-    timeFader->configure("TIME", 1.f, 20.f, 4.f, 2.1f);
+    if(style==Style::Stereogram) timeFader->configure("TIME", 1.f, 30.f, 8.f, 10.f);   // 1 à 30 s, 10 s par défaut
+    else                         timeFader->configure("TIME", 1.f, 20.f, 4.f, 2.1f);
     timeSecA=timeRef();
     timeFader->setValue(timeRef(), juce::dontSendNotification);
     timeFader->onValueChange=[this](float v){ timeRef()=v; timeSecA=v; repaint(); };   // échelle de temps
@@ -559,7 +570,7 @@ GpuSpectrogramDisplay::GpuSpectrogramDisplay(LeakAudioProcessor& p, Style s)
         hdBtn=std::make_unique<NeuAnimButton>("HD");
         hdBtn->setClickingTogglesState(true);
         hdBtn->setTooltip(TR("Ombres, occlusion, reflets et halo HDR (plus gourmand pour la carte graphique)"));
-        hdBtn->onClick=[this]{ hdOn=hdBtn->getToggleState(); processor.gpuCrystal2Hd=hdOn.load(); };
+        hdBtn->onClick=[this]{ hdOn=hdBtn->getToggleState(); processor.gpuCrystal2Hd=hdOn.load(); if(onHdToggled) onHdToggled(); };
         addAndMakeVisible(*hdBtn);
     }
     setMouseCursor(juce::MouseCursor::DraggingHandCursor);
@@ -583,6 +594,12 @@ GpuSpectrogramDisplay::~GpuSpectrogramDisplay()
     sn.hold=frozen.load();
     if(sn.hold){ sn.rows.assign(&rows[0][0], &rows[0][0]+nz*NX); sn.head=head; sn.frac=heldFrac; }
     else sn.rows.clear();
+}
+
+void GpuSpectrogramDisplay::setHd(bool on)
+{
+    hdOn=on;
+    if(hdBtn) hdBtn->setToggleState(on, juce::dontSendNotification);
 }
 
 void GpuSpectrogramDisplay::syncFromProcessor()
@@ -614,9 +631,18 @@ void GpuSpectrogramDisplay::updateBubble()
     float scale=(float)getApproximateScaleFactorForComponent(this);
     if(auto* d=juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds())) scale*=(float)d->scale;
     juce::Rectangle<float> box;
-    auto img=SpectroReadout::renderBubble(getLocalBounds().toFloat(), { hoverX.load(), hoverY.load() },
-                                          20.f*std::pow(PsdLogMap::topHz(processor.getCurrentSampleRate())/20.f, shownU),
-                                          shownH*90.f-100.f, shownAge*(float)captureMs()*0.001f, juce::jmax(1.f, scale), box);
+    juce::Image img;
+    if(stereo()){
+        // position : u 0..1 = 150 % L .. 150 % R ; au-delà de 100 % = opposition de phase
+        const float pos=shownU*3.f-1.5f, pct=std::abs(pos)*100.f;
+        juce::String where=pct<2.f ? juce::String("C") : juce::String(juce::roundToInt(pct))+" % "+(pos<0.f ? "L" : "R");
+        if(pct>100.5f) where << "  " << TR("hors phase");
+        img=SpectroReadout::renderBubbleText(getLocalBounds().toFloat(), { hoverX.load(), hoverY.load() }, where,
+                                             shownH*72.f-80.f, shownAge*(float)captureMs()*0.001f, juce::jmax(1.f, scale), box);
+    } else
+        img=SpectroReadout::renderBubble(getLocalBounds().toFloat(), { hoverX.load(), hoverY.load() },
+                                         20.f*std::pow(PsdLogMap::topHz(processor.getCurrentSampleRate())/20.f, shownU),
+                                         shownH*90.f-100.f, shownAge*(float)captureMs()*0.001f, juce::jmax(1.f, scale), box);
     {
         const juce::SpinLock::ScopedLockType sl(bubbleLock);
         bubbleImg=img; bubbleBox=box; bubbleCompW=juce::jmax(1, getWidth()); bubbleCompH=juce::jmax(1, getHeight());
@@ -687,12 +713,14 @@ void GpuSpectrogramDisplay::mouseExit(const juce::MouseEvent&)
 float& GpuSpectrogramDisplay::yawRef()
 {
     return style==Style::Terrain ? processor.gpuTerrainYaw : style==Style::Neon ? processor.gpuNeonYaw
-         : style==Style::Crystal2 ? processor.gpuCrystal2Yaw : processor.gpuCrystalYaw;
+         : style==Style::Crystal2 ? processor.gpuCrystal2Yaw : style==Style::Stereogram ? processor.gpuStereoYaw
+         : processor.gpuCrystalYaw;
 }
 float& GpuSpectrogramDisplay::pitchRef()
 {
     return style==Style::Terrain ? processor.gpuTerrainPitch : style==Style::Neon ? processor.gpuNeonPitch
-         : style==Style::Crystal2 ? processor.gpuCrystal2Pitch : processor.gpuCrystalPitch;
+         : style==Style::Crystal2 ? processor.gpuCrystal2Pitch : style==Style::Stereogram ? processor.gpuStereoPitch
+         : processor.gpuCrystalPitch;
 }
 
 float GpuSpectrogramDisplay::topLimit(int h) const
@@ -703,7 +731,8 @@ float GpuSpectrogramDisplay::topLimit(int h) const
 float& GpuSpectrogramDisplay::zoomRef()
 {
     return style==Style::Terrain ? processor.gpuTerrainZoom : style==Style::Neon ? processor.gpuNeonZoom
-         : style==Style::Crystal2 ? processor.gpuCrystal2Zoom : processor.gpuCrystalZoom;
+         : style==Style::Crystal2 ? processor.gpuCrystal2Zoom : style==Style::Stereogram ? processor.gpuStereoZoom
+         : processor.gpuCrystalZoom;
 }
 
 float& GpuSpectrogramDisplay::timeRef()
@@ -713,6 +742,7 @@ float& GpuSpectrogramDisplay::timeRef()
         case Style::Neon:    return processor.gpuNeonTimeSec;
         case Style::Crystal: break;
         case Style::Crystal2: return processor.gpuCrystal2TimeSec;
+        case Style::Stereogram: return processor.gpuStereoTimeSec;
     }
     return processor.gpuCrystalTimeSec;
 }
@@ -724,6 +754,7 @@ const char* GpuSpectrogramDisplay::title() const
         case Style::Neon:    return "SPECTROGRAM GPU - NEON";
         case Style::Crystal: return "SPECTROGRAM GPU - CRYSTAL";
         case Style::Crystal2: return "SPECTROGRAM GPU - CRYSTAL 2";
+        case Style::Stereogram: return "STEREOGRAM 3D";
     }
     return "";
 }
@@ -765,8 +796,8 @@ void GpuSpectrogramDisplay::mouseDrag(const juce::MouseEvent& e)
 void GpuSpectrogramDisplay::mouseDoubleClick(const juce::MouseEvent& e)
 {
     if(e.mods.isRightButtonDown()) return;
-    yaw=0.f; pitch=kDefaultPitch; zoom=0.f;
-    yawRef()=0.f; pitchRef()=kDefaultPitch; zoomRef()=0.f;
+    yaw=defaultYaw(); pitch=kDefaultPitch; zoom=0.f;
+    yawRef()=defaultYaw(); pitchRef()=kDefaultPitch; zoomRef()=0.f;
     repaint();
 }
 void GpuSpectrogramDisplay::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& w)
@@ -802,6 +833,19 @@ void GpuSpectrogramDisplay::paint(juce::Graphics& g)
     const float fTop=PsdLogMap::topHz(processor.getCurrentSampleRate());
     const float logSpan=std::log(fTop/20.f);
     g.setFont(Ui::iceland(9.f));
+    if(stereo()){
+        static const std::pair<float, const char*> marks[] = { {-1.5f,"150 L"}, {-1.f,"100 L"}, {-0.5f,"50 L"}, {0.f,"C"},
+                                                               {0.5f,"50 R"}, {1.f,"100 R"}, {1.5f,"150 R"} };
+        for(const auto& mk : marks){
+            juce::Point<float> at;
+            if(!project(mk.first/1.5f*cam.halfX, 0.f, -cam.halfZ-0.25f, at)) continue;
+            if(at.y<(float)titleBottom.load()+4.f || at.y>(float)H-4.f || at.x<off) continue;
+            const juce::String lbl(mk.second);
+            const float w=juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), lbl)+2.f;
+            SpectroReadout::drawShadowedText(g, lbl, { at.x-w*0.5f, at.y, w, 12.f*Ui::textScale }, juce::Justification::centred,
+                                             mk.first==0.f ? Col::textHi : Col::textMid.withAlpha(0.85f));
+        }
+    } else
     SpectroReadout::drawFreqMarks(g, fTop, [&](float hz, juce::Point<float>& at){
             return project((std::log(hz/20.f)/logSpan*2.f-1.f)*cam.halfX, 0.f, -cam.halfZ-0.25f, at); },   // le long de la ligne la plus récente
         12.f*Ui::textScale, { off+4.f, (float)titleBottom.load()+1.f, W3-8.f, (float)(H-titleBottom.load())-5.f });
@@ -852,7 +896,7 @@ void GpuSpectrogramDisplay::newOpenGLContextCreated()
 
     // grille statique (u, rang dans l'historique) : 2 rangées par capture, de
     // la ligne live (âge -1) à la plus ancienne affichée (âge NZ-3)
-    const bool fine=style==Style::Crystal2;
+    const bool fine=smooth();
     const int kGX=fine ? 3*(NX-1)+1 : kGXBase;
     const int kGZ=2*(nz-2)+1;   // 2 rangées par capture (Crystal 2 : 3x plus de captures)
     std::vector<float> verts; verts.reserve((size_t)kGX*kGZ*2);
@@ -1010,6 +1054,15 @@ void GpuSpectrogramDisplay::captureLive()
 // spectre à l'instant tMs (< 0 : la dernière trame) -> une ligne 0..1(.2)
 void GpuSpectrogramDisplay::captureAt(float* r, double tMs)
 {
+    if(stereo()){
+        // Stereogram : énergie par position (-80 dB -> 0, -8 dB -> 1)
+        processor.noteStereoUse();
+        float db[LeakAudioProcessor::STEREO_BINS];
+        static_assert(LeakAudioProcessor::STEREO_BINS==NX, "une colonne du maillage par position");
+        if(!processor.getStereoAt(tMs>=0.0 ? tMs : juce::Time::getMillisecondCounterHiRes(), db)) return;
+        for(int p=0;p<NX;++p) r[p]=juce::jlimit(0.f, 1.2f, (db[p]+80.f)/72.f);
+        return;
+    }
     if(!(tMs>=0.0 ? logMap.readAt(processor, tMs, liveDb) : logMap.read(processor, liveDb))) return;
     const float top=style==Style::Crystal2 ? 1.2f : 1.f;   // Crystal 2 : jusqu'à +8 dB, tassé dans le shader
     for(int p=0;p<NX;++p)
@@ -1052,7 +1105,7 @@ void GpuSpectrogramDisplay::pick(const Camera& cam, float frac, int w, int h)
         u=(x/cam.halfX+1.f)*0.5f;
         age=(z+cam.halfZ)/(2.f*cam.halfZ)*ageSpan()-frac;   // la plus récente au fond (z = -halfZ)
         const float hv=sampleH(u, age);
-        if(style!=Style::Crystal2) return hv*2.2f;
+        if(!smooth()) return hv*2.2f;
         const float k=0.9333f, rr=1.1111f-0.9333f;   // même tassement que softTop() du shader
         return (hv<k ? hv : k+rr*(1.f-std::exp(-(hv-k)/rr))*0.6f)*2.2f;
     };
@@ -1171,7 +1224,8 @@ void GpuSpectrogramDisplay::renderGL()
         sp.setUniform("gridPhase", (float)(captureCount & 3));   // lignes du plateau liées aux captures
         sp.setUniform("halfX", cam.halfX);
         sp.setUniform("halfZ", cam.halfZ);
-        sp.setUniform("style", (GLint)style);
+        sp.setUniform("style", (GLint)(stereo() ? Style::Crystal2 : style));   // même rendu que Crystal 2
+        sp.setUniform("centreLine", stereo() ? 1.f : 0.f);
         sp.setUniform("nxF", (float)NX);
         sp.setUniform("eye", cam.eye[0], cam.eye[1], cam.eye[2]);
         sp.setUniform("viewDir", cam.dir[0], cam.dir[1], cam.dir[2]);

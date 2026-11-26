@@ -61,6 +61,9 @@ protected:
     std::unique_ptr<juce::OpenGLShaderProgram> compileProgram(const char* vs, const char* fs, const char* gs=nullptr);
     void onContextCreated();     // mémorise la carte, réarme la V-Sync
     void applyVsync();           // en tête de renderOpenGL()
+public:
+    std::atomic<int> framesDrawn { 0 };   // images rendues (test « Optimiser », v1.81.65)
+protected:
     // rendu propre au module ; la base y ajoute la passe « intensité des
     // couleurs » (v1.81.59) et libère ses objets GL à la fermeture du contexte
     virtual void renderGL() = 0;

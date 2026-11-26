@@ -291,6 +291,21 @@ juce::Image renderBubble(juce::Rectangle<float> area, juce::Point<float> at,
     return img;
 }
 
+juce::Image renderBubbleText(juce::Rectangle<float> area, juce::Point<float> at, const juce::String& line1,
+                             float db, float ageSec, float scale, juce::Rectangle<float>& box)
+{
+    juce::String f, a, t;
+    bubbleTexts(1000.f, db, ageSec, f, a, t);
+    f=line1;
+    box=bubbleBox(area, at, f, a, t);
+    juce::Image img(juce::Image::ARGB, juce::jmax(1, (int)std::ceil(box.getWidth()*scale)),
+                    juce::jmax(1, (int)std::ceil(box.getHeight()*scale)), true, juce::SoftwareImageType());
+    juce::Graphics g(img);
+    g.addTransform(juce::AffineTransform::translation(-box.getX(), -box.getY()).scaled(scale));
+    drawLines(g, area, at, f, a, t);
+    return img;
+}
+
 void drawLines(juce::Graphics& g, juce::Rectangle<float> area, juce::Point<float> at,
                const juce::String& f, const juce::String& a, const juce::String& t)
 {
@@ -2575,6 +2590,14 @@ void SpectrumDisplayLeak::timerCallback()
     // fréquence d'échantillonnage changée : bandes ultrasoniques ajoutées / retirées
     if(processor.getNumActiveBands()!=activeBands){ setActiveBands(processor.getNumActiveBands()); return; }
     processor.getBandLevels(bandBuf,activeBands);
+    bool crestChanged=false;
+    if(crestMode){
+        processor.getCrestData(crestRms, crestPk, activeBands);
+        for(int i=0;i<activeBands;++i){
+            const float v=crestPk[i]+crestRms[i]*0.5f;
+            if(std::abs(v-prevCrest[i])>0.1f){ crestChanged=true; prevCrest[i]=v; }
+        }
+    }
     const bool isMSMode=(analysisMode==LeakAudioProcessor::AnalysisMode::MS);
     if(isMSMode) processor.getSideLevels(sideBuf,activeBands);
     const float attackK =1.f-std::exp(-dt/.005f);
@@ -2612,6 +2635,7 @@ void SpectrumDisplayLeak::timerCallback()
         if(peakOn && std::abs(peaks[i]-prevPeaks[i])>0.2f){anyChanged=true;prevPeaks[i]=peaks[i];}
         if(peakOn && isMSMode && std::abs(sidePeaks[i]-prevSidePeaks[i])>0.2f){anyChanged=true;prevSidePeaks[i]=sidePeaks[i];}
     }
+    if(crestChanged) anyChanged=true;
     globalClipLatch=false;
     for(int i=0;i<activeBands;++i) if(clipLatch[i]){globalClipLatch=true;break;}
     if(anyChanged) repaint();
@@ -2761,7 +2785,31 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
         side3D =Spec3D::levelGradient(gy0-dy, minY-dy);   // le flanc est décalé vers le haut
     }
 
-    for(int i=0;i<N;++i){
+    // CREST : écart crête − RMS (rouge < 6 dB écrasé, jaune 6–10, accent au-delà)
+    auto crestColour=[](float c){
+        if(c<6.f)  return Col::ink(juce::Colour(0xFFFF5A4A));
+        if(c<10.f) return Col::ink(juce::Colour(0xFFFFC23A));
+        return Col::accent; };
+    if(crestMode){
+        g.setFont(Ui::iceland(juce::jlimit(8.f, 11.f, gh*0.05f)));
+        for(int i=0;i<N;++i){
+            const float bx=barCache[i].x, bw=barCache[i].bw;
+            if(crestRms[i]<=-119.f) continue;
+            const float rms=juce::jmax(crestRms[i], -dbRange), pk=juce::jmax(crestPk[i], rms);
+            const float yR=juce::jmax(dbToY(rms), gy0), yP=juce::jmax(dbToY(pk), gy0);
+            const float cr=crestPk[i]-crestRms[i];
+            const juce::Colour cc=crestColour(cr);
+            if(minY-yR>0.5f){ g.setColour(Col::viv(Col::accent.withAlpha(0.32f))); g.fillRect(bx, yR, bw, minY-yR); }
+            if(yR-yP>0.5f){ g.setColour(Col::viv(cc.withAlpha(0.78f))); g.fillRect(bx, yP, bw, yR-yP); }
+            g.setColour(Col::viv(Col::accent)); g.fillRect(bx, yR-0.75f, bw, 1.5f);     // niveau RMS
+            g.setColour(Col::viv(Col::textHi)); g.fillRect(bx, yP-1.f, bw, 2.f);        // crête
+            if(bw>=13.f && yP-gy0>10.f){
+                g.setColour(Col::viv(cc));
+                g.drawText(juce::String(juce::roundToInt(cr)), juce::Rectangle<float>(bx-4.f, yP-13.f, bw+8.f, 11.f), juce::Justification::centred, false);
+            }
+        }
+    }
+    for(int i=0;i<N && !crestMode;++i){
         const float bx=barCache[i].x,bw=barCache[i].bw;
         const float db=juce::jmax(levels[i],-dbRange);
         const float barT=juce::jmax(dbToY(db),gy0);
@@ -2859,7 +2907,9 @@ void SpectrumDisplayLeak::paint(juce::Graphics& g)
         if(hoveredBand!=lastHoveredBand || forceTipRefresh){
             const float* F=processor.getBandFreqs();float f=F[juce::jmin(hoveredBand, processor.getNumActiveBands()-1)];
             juce::String freqStr=(f>=1000.f)?(juce::String(f/1000.f,(std::fmod(f,1000.f)==0.f)?0:2)+" kHz"):(juce::String((int)f)+" Hz");
-            cachedTipStr=isMSMode?freqStr+"  M:"+juce::String(levels[hoveredBand],1)+"  S:"+juce::String(sideLevel[hoveredBand],1)+" dB"
+            cachedTipStr=crestMode ? freqStr+"  |  RMS "+juce::String(crestRms[hoveredBand],1)+"  "+TR("crête")+" "
+                                         +juce::String(crestPk[hoveredBand],1)+"  CREST "+juce::String(crestPk[hoveredBand]-crestRms[hoveredBand],1)+" dB"
+                        :isMSMode?freqStr+"  M:"+juce::String(levels[hoveredBand],1)+"  S:"+juce::String(sideLevel[hoveredBand],1)+" dB"
                                  :freqStr+"  |  "+juce::String(levels[hoveredBand],1)+" dB";
             float tfs=juce::jlimit(9.f,12.f,gh*.07f);
             juce::Font tipFont=Ui::iceland(tfs);
@@ -3829,7 +3879,44 @@ ControlsBarLeak::ControlsBarLeak(SpectrumDisplayLeak& d, LeakAudioProcessor& p, 
     bands31Btn.onClick=[this,setBands]{setBands(31);};
     bands62Btn.onClick=[this,setBands]{setBands(62);};
     addAndMakeVisible(bands15Btn);addAndMakeVisible(bands31Btn);addAndMakeVisible(bands62Btn);
+    crestBtn.setClickingTogglesState(true);
+    crestBtn.setTooltip(TR("Facteur de crête de chaque bande : écart entre la crête et le RMS, sur la durée du fader"));
+    crestBtn.onClick=[this]{ processor.crestMode=crestBtn.getToggleState(); display.setCrestMode(processor.crestMode); };
+    crestFader.setTooltip(TR("Durée de mesure du CREST (double-clic : 3 s)"));
+    crestFader.onChange=[this](float v){ processor.crestWindowSec=v; };
+    addAndMakeVisible(crestBtn); addAndMakeVisible(crestFader);
     addAndMakeVisible(presets);   // RESET et volume Windows : dans l'en-tête (v1.73)
+}
+
+juce::Rectangle<float> MiniTimeFader::track() const
+{
+    auto r=getLocalBounds().toFloat();
+    return r.withTrimmedRight(r.getWidth()*0.38f).reduced(4.f, 0.f).withSizeKeepingCentre(r.getWidth()*0.62f-8.f, 4.f);
+}
+void MiniTimeFader::drag(const juce::MouseEvent& e)
+{
+    const auto t=track();
+    const float u=juce::jlimit(0.f, 1.f, (e.position.x-t.getX())/juce::jmax(1.f, t.getWidth()));
+    setValue(lo*std::pow(hi/lo, u));
+    if(onChange) onChange(value);
+}
+void MiniTimeFader::paint(juce::Graphics& g)
+{
+    const auto t=track();
+    const float u=std::log(value/lo)/std::log(hi/lo);
+    g.setColour(Col::viv(Col::pick(juce::Colour(0xFF0A1414), Col::knobDim)));
+    g.fillRoundedRectangle(t, 2.f);
+    g.setColour(Col::viv(Col::accent));
+    g.fillRoundedRectangle(t.withWidth(juce::jmax(2.f, t.getWidth()*u)), 2.f);
+    const float cx=t.getX()+t.getWidth()*u, cy=t.getCentreY();
+    g.setColour(Col::viv(Col::pick(juce::Colour(0xFFE6ECEF), juce::Colour(0xFF2A3036))));
+    g.fillEllipse(cx-5.f, cy-5.f, 10.f, 10.f);
+    g.setColour(Col::viv(Col::accent));
+    g.drawEllipse(cx-5.f, cy-5.f, 10.f, 10.f, 1.2f);
+    g.setFont(Ui::iceland(12.f));
+    g.setColour(Col::viv(Col::textHi));
+    const auto txt=value<10.f ? juce::String(value, 1)+" s" : juce::String(juce::roundToInt(value))+" s";
+    g.drawText(txt, getLocalBounds().toFloat().withTrimmedLeft(getWidth()*0.62f), juce::Justification::centredRight, false);
 }
 void ControlsBarLeak::syncFromProcessor()
 {
@@ -3842,6 +3929,10 @@ void ControlsBarLeak::syncFromProcessor()
     midBtn .setToggleState(mode==AM::Mid||mode==AM::MS,juce::dontSendNotification);
     sideBtn.setToggleState(mode==AM::Side||mode==AM::MS,juce::dontSendNotification);
 
+    // CREST (bouton + durée)
+    crestBtn.setToggleState(processor.crestMode, juce::dontSendNotification);
+    display.setCrestMode(processor.crestMode);
+    crestFader.setValue(processor.crestWindowSec.load());
     // Peak hold (on/off + durée)
     peakBtn.setToggleState(processor.peakHoldOn,juce::dontSendNotification);
     display.setPeakHoldEnabled(processor.peakHoldOn);
@@ -3927,7 +4018,11 @@ void ControlsBarLeak::resized()
     bands62Btn.setBounds(xr+(bbw+bgap)*2,by,bbw,bh);
     const int vw=juce::roundToInt(juce::GlyphArrangement::getStringWidth(lf, titles[3]))+px(4.f);
     groupLabel[3]={xr-px(5.f)-vw,0,vw,H};
-    const int rightStart=groupLabel[3].getX();
+    // CREST et sa durée, juste avant VIEW
+    const int fw=px(96.f), cw=px(58.f);
+    crestFader.setBounds(groupLabel[3].getX()-px(12.f)-fw, by, fw, bh);
+    crestBtn.setBounds(crestFader.getX()-px(4.f)-cw, by, cw, bh);
+    const int rightStart=crestBtn.getX();
 
     // presets au centre de l'espace restant
     const int room=rightStart-leftEnd-px(24.f);
@@ -4131,7 +4226,7 @@ AboutOverlay::AboutOverlay()
 
     column[2].setItems({
         H("Features"),
-        B("23 Modules in 4 Families: Spectrum, Spectrogram, Stereo, Level and Time"),
+        B("24 Modules in 4 Families: Spectrum, Spectrogram, Stereo, Level and Time"),
         B("5 Freely Assignable Slots plus a Fixed Master VU"),
         B("Standalone App and VST3 Plugin for Windows and macOS"),
         B("Audio Interface Loopback Capture, plus Direct System Output Capture on Windows"),
@@ -4140,6 +4235,7 @@ AboutOverlay::AboutOverlay()
         B("15 / 31 / 62 Band Spectrum, Stereo, Mid/Side or Side Analysis"),
         B("4096 Point Spectral Density with Welch Averaging"),
         B("3D Spectrograms: Lines, Surface, Terrain, Neon, Crystal, Smoothed Crystal 2"),
+        B("Stereogram 3D: Stereo Position over Time, Out of Phase Content beyond 100 %"),
         B("Vectorscopes: Classic, Phosphor, Density, Multiband"),
         B("Multiband Correlator, Panorama and Dot Panorama"),
         B("Triggered Oscilloscope with Adjustable Trace Width"),
@@ -4150,7 +4246,7 @@ AboutOverlay::AboutOverlay()
         B("Always on Top, Keyboard Left to Your DAW"),
         B("Live Sample Rate Display"),
         B("Light and Dark Themes, Accent Palettes"),
-        B("10 Interface Languages"),
+        B("11 Interface Languages"),
         B("One License for 5 Computers, 15 Day Free Trial"),
         H("The Side Key System Philosophy"),
         P("At Side Key System, calibration is not a final adjustment. It is part of the engineering process itself."),
@@ -5994,6 +6090,132 @@ void SpectralDensityDisplay::paint(juce::Graphics& g)
 //==============================================================================
 // LeakEditor — système de 6 slots configurable par clic droit
 //==============================================================================
+// ── Optimiser pour cet ordinateur (v1.81.65) ─────────────────────────────────
+// Test toujours fait sur le Spectrogram Crystal 2 (le plus lourd) : posé le
+// temps du test s'il n'est pas affiché, puis la disposition revient. On part
+// de la qualité maximale et on descend d'un cran tant que la cadence mesurée
+// n'atteint pas 90 % de la cible. Ne touche ni à la synchro ni aux couleurs.
+struct LeakEditor::GraphicsTest : juce::Timer
+{
+    explicit GraphicsTest(LeakEditor& e) : ed(e) {}
+    ~GraphicsTest() override { stopTimer(); }
+    void timerCallback() override { ed.graphicsTestTick(); }
+
+    LeakEditor& ed;
+    int step=0, phase=0, frames0=0;
+    double t0=0.0;
+    int beforeMsaa=4, beforeFps=60;
+    bool beforeHd=false, slotsChanged=false;
+    int savedSlots[LeakAudioProcessor::NUM_SLOTS] {};
+};
+
+namespace {
+    struct GfxStep { int msaa, fps; bool hd; };
+    constexpr GfxStep kGfxSteps[] = { {4, 60, true}, {4, 60, false}, {2, 60, false}, {0, 60, false}, {0, 30, false} };
+    constexpr int kNumGfxSteps = (int) (sizeof(kGfxSteps)/sizeof(kGfxSteps[0]));
+    constexpr double kGfxWarmupMs = 900.0, kGfxMeasureMs = 1000.0;
+    constexpr int kCrystal2Id = (int) LeakAudioProcessor::ModuleID::GpuSpectroCrystal2;
+}
+
+void LeakEditor::startGraphicsTest()
+{
+    if(graphicsTest!=nullptr) return;
+    graphicsTest=std::make_unique<GraphicsTest>(*this);
+    auto& t=*graphicsTest;
+    t.beforeMsaa=audioProcessor.gpuMsaa;
+    t.beforeFps=audioProcessor.uiFps;
+    t.beforeHd=audioProcessor.gpuCrystal2Hd;
+    for(int i=0;i<LeakAudioProcessor::NUM_SLOTS;++i) t.savedSlots[i]=audioProcessor.slotModule[i];
+    if(!gpuCrystal2.isShowing()){
+        // le plus grand emplacement libre de fenêtre détachée
+        int best=-1; juce::int64 bestArea=0;
+        for(int s=0;s<5;++s){
+            if(isDetached(s)) continue;
+            const auto a=(juce::int64)rcSlot[s].getWidth()*rcSlot[s].getHeight();
+            if(a>bestArea){ bestArea=a; best=s; }
+        }
+        if(best>=0){
+            for(int s=0;s<LeakAudioProcessor::NUM_SLOTS;++s)
+                if(audioProcessor.slotModule[s]==kCrystal2Id) audioProcessor.slotModule[s]=0;
+            audioProcessor.slotModule[best]=kCrystal2Id;
+            t.slotsChanged=true;
+            updateLayout();
+            repaint();
+        }
+    }
+    optionsOverlay.setOptimiseStatus(TR("Test en cours…"), false);
+    t.startTimer(50);
+}
+
+void LeakEditor::applyGraphicsStep(int step)
+{
+    const auto& st=kGfxSteps[juce::jlimit(0, kNumGfxSteps-1, step)];
+    audioProcessor.gpuMsaa=st.msaa;
+    audioProcessor.uiFps=st.fps;
+    audioProcessor.gpuCrystal2Hd=st.hd;
+    gpuCrystal2.setHd(st.hd);
+    applyGraphics();
+}
+
+void LeakEditor::graphicsTestTick()
+{
+    auto& t=*graphicsTest;
+    const double now=juce::Time::getMillisecondCounterHiRes();
+    if(t.phase==0){                     // cran suivant, puis temps de mise en route
+        applyGraphicsStep(t.step);
+        t.t0=now; t.phase=1;
+        return;
+    }
+    if(t.phase==1){                     // contexte refait (anticrénelage), shaders prêts
+        if(now-t.t0<kGfxWarmupMs) return;
+        t.frames0=gpuCrystal2.framesDrawn.load();
+        t.t0=now; t.phase=2;
+        return;
+    }
+    if(now-t.t0<kGfxMeasureMs) return;
+    const double fps=(gpuCrystal2.framesDrawn.load()-t.frames0)*1000.0/(now-t.t0);
+    if(fps>=kGfxSteps[t.step].fps*0.9 || t.step>=kNumGfxSteps-1){ finishGraphicsTest(t.step, fps); return; }
+    ++t.step; t.phase=0;
+}
+
+void LeakEditor::finishGraphicsTest(int step, double measuredFps)
+{
+    std::unique_ptr<GraphicsTest> t=std::move(graphicsTest);
+    t->stopTimer();
+    applyGraphicsStep(step);
+    if(t->slotsChanged){
+        for(int i=0;i<LeakAudioProcessor::NUM_SLOTS;++i) audioProcessor.slotModule[i]=t->savedSlots[i];
+        updateLayout();
+        repaint();
+    }
+    const auto& st=kGfxSteps[step];
+    auto aa=[](int n){ return n<=0 ? TR("Off") : juce::String(n)+"x"; };
+    auto onOff=[](bool b){ return b ? TR("Allumé") : TR("Éteint"); };
+    const juce::String arrow=juce::String(juce::CharPointer_UTF8("  \xe2\x86\x92  "));
+    juce::String msg;
+    const auto gpu=GpuModuleBase::getRendererInfo();
+    if(gpu.isNotEmpty()) msg << TR("Carte graphique") << " : " << gpu << "\n\n";
+    msg << TR("Avant") << arrow << TR("Après") << "\n\n";
+    msg << TR("Anticrénelage") << " : " << aa(t->beforeMsaa) << arrow << aa(st.msaa) << "\n";
+    msg << TR("Images par seconde") << " : " << t->beforeFps << arrow << st.fps << "\n";
+    msg << TR("Mode HD") << " : " << onOff(t->beforeHd) << arrow << onOff(st.hd) << "\n\n";
+    msg << TR("Cadence mesurée : {0} images par seconde").replace("{0}", juce::String(juce::roundToInt(measuredFps)));
+    if(step>=kNumGfxSteps-1 && measuredFps<st.fps*0.9)
+        msg << "\n" << TR("Même au réglage le plus léger, la carte graphique peine : affichez moins de modules 3D.");
+    optionsOverlay.setState(optionsState());
+    optionsOverlay.setOptimiseStatus(TR("Dernier test : {0} · {1} i/s · HD {2}")
+                                         .replace("{0}", aa(st.msaa)).replace("{1}", juce::String(st.fps))
+                                         .replace("{2}", onOff(st.hd).toLowerCase()), true);
+    PopupFocus::prepare();
+    juce::AlertWindow::showAsync(juce::MessageBoxOptions()
+                                     .withIconType(juce::MessageBoxIconType::InfoIcon)
+                                     .withTitle(TR("Optimisation terminée"))
+                                     .withMessage(msg)
+                                     .withButton("OK", 1)
+                                     .withAssociatedComponent(this),
+                                 nullptr);
+}
+
 LeakEditor::LeakEditor(LeakAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p),
       vectorscope(p), oscilloscope(p),
@@ -6006,6 +6228,7 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
       gpuNeon(p, GpuSpectrogramDisplay::Style::Neon),
       gpuCrystal(p, GpuSpectrogramDisplay::Style::Crystal),
       gpuCrystal2(p, GpuSpectrogramDisplay::Style::Crystal2),
+      gpuStereogram(p, GpuSpectrogramDisplay::Style::Stereogram),
       gpuSurface(p),
       gpuBars(p, GpuSpectroFxDisplay::Style::Bars),
       gpuLed(p, GpuSpectroFxDisplay::Style::Led),
@@ -6028,7 +6251,7 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
     Ui::titleStyle = audioProcessor.titleStyle; Ui::logoColour = audioProcessor.logoColour;
     Ui::corrStyle  = audioProcessor.corrStyle;
     applyColours();
-    Col::vivid=juce::jlimit(0, 2, audioProcessor.colorVivid);
+    Col::vivid=juce::jlimit(0, 100, audioProcessor.colorSat);
 
     addAndMakeVisible(topBar);
     addAndMakeVisible(controls);
@@ -6041,7 +6264,7 @@ LeakEditor::LeakEditor(LeakAudioProcessor& p)
         &corrDisplay, &panoDisplay, &panoLed, &bitMeter, &tuner,
         &spectralDensity, &needleVu, &mbVectorscope,
         &spectro3dPeaks, &spectro3dSurface,
-        &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano,
+        &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuStereogram, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano,
         &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash,
         &gpuVecPhosphor, &gpuVecDensity
     };
@@ -6179,6 +6402,13 @@ void LeakEditor::applyUiScale()
 LeakEditor::~LeakEditor()
 {
     stopTimer();
+    if(graphicsTest!=nullptr){   // fermeture pendant le test « Optimiser » : rien ne change
+        graphicsTest->stopTimer();
+        auto& t=*graphicsTest;
+        audioProcessor.gpuMsaa=t.beforeMsaa; audioProcessor.uiFps=t.beforeFps; audioProcessor.gpuCrystal2Hd=t.beforeHd;
+        if(t.slotsChanged) for(int i=0;i<LeakAudioProcessor::NUM_SLOTS;++i) audioProcessor.slotModule[i]=t.savedSlots[i];
+        graphicsTest.reset();
+    }
     // fermeture pendant la visite guidée : la disposition du user revient
     if(tourSlotsSaved) for(int i=0;i<5;++i) audioProcessor.slotModule[i]=tourSavedSlots[i];
     audioProcessor.tourLayoutActive=false;
@@ -6229,7 +6459,8 @@ OptionsOverlay::State LeakEditor::optionsState() const
     s.uiScale = audioProcessor.uiScale;
     s.plateTint = audioProcessor.plateTint;
     s.lightScreens = audioProcessor.lightScreens;
-    s.colorVivid   = audioProcessor.colorVivid;
+    s.colorSat     = audioProcessor.colorSat;
+    s.crystalHd    = audioProcessor.gpuCrystal2Hd;
     s.titleStyle = audioProcessor.titleStyle;
     s.logoColour = audioProcessor.logoColour;
     s.corrStyle = audioProcessor.corrStyle;
@@ -6366,6 +6597,9 @@ void LeakEditor::setupOptions()
     o.onFpsSelected  = [this](int hz){ audioProcessor.uiFps=hz;   applyGraphics(); };
     o.onMsaaSelected = [this](int n) { audioProcessor.gpuMsaa=n;  applyGraphics(); };
     o.onVsyncChanged = [this](bool on){ audioProcessor.gpuVsync=on; applyGraphics(); };
+    o.onCrystalHdChanged = [this](bool on){ audioProcessor.gpuCrystal2Hd=on; gpuCrystal2.setHd(on); };
+    o.onOptimise     = [this]{ startGraphicsTest(); };
+    gpuCrystal2.onHdToggled=[this]{ if(optionsOverlay.isVisible()) optionsOverlay.setState(optionsState()); };
     // Affichage
     o.onFullScreenChanged  = [this](bool on){ if(host.isFullScreen && host.isFullScreen()!=on && onToggleFullScreen) onToggleFullScreen(); };
     o.onAlwaysOnTopChanged = [this](bool on){ if(host.setAlwaysOnTop) host.setAlwaysOnTop(on); };
@@ -6382,7 +6616,7 @@ void LeakEditor::setupOptions()
     o.onUiScaleSelected      = [this](int pct){ audioProcessor.uiScale=pct; appliedUiScale=0.f; applyUiScale(); };
     o.onPlateTintSelected    = [this](int i){ audioProcessor.plateTint=i; applyLook(); };
     o.onLightScreensSelected = [this](bool on){ audioProcessor.lightScreens=on ? 1 : 0; applyLook(); };
-    o.onColorVividSelected   = [this](int v){ audioProcessor.colorVivid=juce::jlimit(0, 2, v); applyVivid(); };
+    o.onColorSatChanged      = [this](int v){ audioProcessor.colorSat=juce::jlimit(0, 100, v); applyVivid(); };
     o.onTitleStyleSelected   = [this](int i){ audioProcessor.titleStyle=i; applyLook(); };
     o.onLogoColourSelected   = [this](int i){ audioProcessor.logoColour=i; applyLook(); };
     o.onCorrStyleSelected    = [this](int i){ audioProcessor.corrStyle=i; applyLook(); };
@@ -6456,7 +6690,7 @@ void LeakEditor::reloadFromProcessor()
     oscilloscope.syncFromProcessor();
     spectro3dPeaks.syncFromProcessor();
     spectro3dSurface.syncFromProcessor();
-    for(auto* g : { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2 }) g->syncFromProcessor();
+    for(auto* g : { &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuStereogram }) g->syncFromProcessor();
     for(auto* g : { &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash }) g->syncFromProcessor();
     gpuSurface.syncFromProcessor();
     for(auto* d : { &gpuDotChroma, &gpuDotNebula }) d->syncFromProcessor();
@@ -6562,6 +6796,7 @@ juce::Component* LeakEditor::getComponentForModule(int id)
         case M::GpuSpectroNeon:       return &gpuNeon;
         case M::GpuSpectroCrystal:    return &gpuCrystal;
         case M::GpuSpectroCrystal2:   return &gpuCrystal2;
+        case M::GpuStereogram:        return &gpuStereogram;
         case M::GpuSpectroSurface:    return &gpuSurface;
         case M::GpuSpectroBars:       return &gpuBars;
         case M::GpuSpectroLed:        return &gpuLed;
@@ -6588,12 +6823,13 @@ void LeakEditor::mouseDown(const juce::MouseEvent& e)
 {
     if(!isOwnMouseEvent(e)) return;   // module détaché : sa fenêtre n'est plus dans l'éditeur
     const auto pt = e.getEventRelativeTo(this).getPosition();
+    menuSlotOnUp=-1;
     if(!e.mods.isRightButtonDown()){
         const int slot = hitTestSlot(pt);
         // emplacement d'un module détaché, partagé en deux : le ramener, ou en
         // mettre un autre (la fenêtre reste ouverte)
         if(isDetached(slot)){
-            if(detachedHalf(slot, true).contains(pt)) showModuleMenu(slot, e.getScreenPosition());
+            if(detachedHalf(slot, true).contains(pt)) menuSlotOnUp=slot;   // menu au relâchement
             else                                       reattachSlot(slot);
             return;
         }
@@ -6607,12 +6843,12 @@ void LeakEditor::mouseDown(const juce::MouseEvent& e)
         }
         // slot vide : le clic gauche ouvre aussi le menu des modules
         if(slot >= 0 && slot != 5 && getComponentForModule(audioProcessor.slotModule[slot]) == nullptr)
-            showModuleMenu(slot, e.getScreenPosition());
+            menuSlotOnUp=slot;   // menu au relâchement
         return;
     }
     const int slot = hitTestSlot(pt);
     // Slot F (VU master) fixe ; les autres, Loudness compris, se changent au clic droit
-    if(slot >= 0 && slot != 5) showModuleMenu(slot, e.getScreenPosition());
+    if(slot >= 0 && slot != 5) menuSlotOnUp=slot;   // menu au relâchement
 }
 
 //==============================================================================
@@ -6631,9 +6867,15 @@ void LeakEditor::mouseDrag(const juce::MouseEvent& e)
     });
 }
 
-void LeakEditor::mouseUp(const juce::MouseEvent&)
+void LeakEditor::mouseUp(const juce::MouseEvent& e)
 {
     if(!dragFollowing) dragSlot=-1;
+    const int pending=menuSlotOnUp;
+    menuSlotOnUp=-1;
+    // menu des modules : relâché dans l'emplacement cliqué (pas après un détachement)
+    if(pending>=0 && !dragFollowing && isOwnMouseEvent(e)
+       && hitTestSlot(e.getEventRelativeTo(this).getPosition())==pending)
+        showModuleMenu(pending, e.getScreenPosition());
 }
 
 void LeakEditor::detachSlot(int s)
@@ -7036,6 +7278,7 @@ namespace
         // (15, pas optimisé), Neon (17), Cyberpunk Ribbons (28), Splash (30) ; les
         // réglages qui les utilisaient prennent un équivalent (voir setStateInformation)
         { "St\xc3\xa9r\xc3\xa9o", {
+            { 34, "Stereogram 3D",        "GPU" },
             { 1,  "Vectorscope",          ""    },
             { 22, "Vectorscope Phosphor", "GPU" },
             { 23, "Vectorscope Density",  "GPU" },
@@ -7325,6 +7568,14 @@ static std::unique_ptr<juce::Drawable> makeModuleIcon(int moduleId)
                 p.lineTo(o*0.6f+S*0.25f,S*0.5f-o*0.5f); p.lineTo(o*0.6f+S*0.42f,S*0.72f-o);
                 p.lineTo(o*0.6f+S*0.6f,S*0.3f-o*0.4f);  p.lineTo(S-o*0.2f,S*0.92f-o);
             }
+            break;
+
+        case M::GpuStereogram:   // ligne du centre et nappe stéréo de part et d'autre
+            p.startNewSubPath(0.f,S*0.5f); p.lineTo(S,S*0.5f);
+            p.startNewSubPath(0.f,S*0.5f);
+            p.cubicTo(S*0.25f,S*0.12f, S*0.45f,S*0.3f, S*0.6f,S*0.2f); p.cubicTo(S*0.75f,S*0.1f, S*0.9f,S*0.35f, S,S*0.5f);
+            p.startNewSubPath(0.f,S*0.5f);
+            p.cubicTo(S*0.2f,S*0.82f, S*0.45f,S*0.7f, S*0.62f,S*0.85f); p.cubicTo(S*0.78f,S*0.95f, S*0.92f,S*0.62f, S,S*0.5f);
             break;
 
         case M::GpuSpectroCrystal:
@@ -7620,7 +7871,7 @@ void LeakEditor::updateLayout()
         &spectrum, &corrDisplay, &panoDisplay, &panoLed, &bitMeter, &tuner,
         &spectralDensity, &needleVu, &mbVectorscope,
         &spectro3dPeaks, &spectro3dSurface,
-        &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano,
+        &gpuTerrain, &gpuNeon, &gpuCrystal, &gpuCrystal2, &gpuStereogram, &gpuSurface, &gpuDotChroma, &gpuDotNebula, &gpuDotPano,
         &gpuBars, &gpuLed, &gpuRibbons, &gpuMatrix, &gpuSplash,
         &gpuVecPhosphor, &gpuVecDensity, &loudnessPanel
     };
@@ -8002,7 +8253,7 @@ void LeakEditor::applyVivid()
 {
     // modules 2D : couleurs intensifiées à la source (Col::viv), caches refaits ;
     // modules GPU : passe hors écran (GpuModuleBase::renderOpenGL)
-    Col::vivid=juce::jlimit(0, 2, audioProcessor.colorVivid);
+    Col::vivid=juce::jlimit(0, 100, audioProcessor.colorSat);
     ++Col::generation;
     juce::Component* const all[] = {
         &vectorscope, &oscilloscope, &loudnessPanel, &vuMeter, &spectrum,

@@ -1167,7 +1167,8 @@ public:
         int uiScale = 0;                    // taille de l'interface : 0 automatique, sinon pourcentage
         int plateTint = 1;                  // thème sombre : 0 gris, 1 ardoise
         int lightScreens = 1;               // thème clair : 1 écrans Papier, 0 écrans noirs
-        int colorVivid = 0;                 // intensité des couleurs : 0 actuel, 1 vif, 2 très vif
+        int colorSat = 0;                   // saturation des couleurs, 0..100 %
+        bool crystalHd = false;             // Mode HD du Spectrogram Crystal 2
         int titleStyle = 1;                 // titres des modules : 0 sans, 1 filet, 2 bandeau
         int logoColour = 0;                 // lettres du logo : 0 gris gravé, 1 vert de Sunny
         int corrStyle = 1;                  // corrélation des vectorscopes : 0 barre, 1 curseur, 2 gradué
@@ -1266,7 +1267,9 @@ public:
         largeTextSwitch.setOn (s.largeText);
         plateSeg.setSelected (juce::jlimit (0, 1, s.plateTint));
         screensSeg.setSelected (s.lightScreens != 0 ? 0 : 1);
-        vividSeg.setSelected (juce::jlimit (0, 2, s.colorVivid));
+        if (! satSlider.isMouseButtonDown (true))
+            satSlider.setValue (juce::jlimit (0, 100, s.colorSat));
+        hdSwitch.setOn (s.crystalHd);
         titleSeg.setSelected (juce::jlimit (0, 2, s.titleStyle));
         logoSeg.setSelected (juce::jlimit (0, 1, s.logoColour));
         corrSeg.setSelected (juce::jlimit (0, 2, s.corrStyle));
@@ -1422,6 +1425,9 @@ public:
     std::function<void (int)>   onFpsSelected;
     std::function<void (int)>   onMsaaSelected;          // 0, 2, 4, 8
     std::function<void (bool)>  onVsyncChanged;
+    std::function<void (bool)>  onCrystalHdChanged;      // Mode HD (Crystal 2)
+    std::function<void (int)>   onColorSatChanged;       // saturation des couleurs 0..100
+    std::function<void()>       onOptimise;              // Optimiser pour cet ordinateur
     // Affichage
     std::function<void (bool)>  onFullScreenChanged, onAlwaysOnTopChanged, onDarkChanged, onContrastChanged,
                                 onModules3DChanged, onLargeTextChanged, onMasterConsoleChanged;
@@ -1433,7 +1439,6 @@ public:
     std::function<void (int)>   onUiScaleSelected;       // taille de l'interface : 0 automatique, sinon pourcentage
     std::function<void (int)>   onPlateTintSelected;     // thème sombre : 0 gris, 1 ardoise
     std::function<void (bool)>  onLightScreensSelected;  // thème clair : écrans Papier ou noirs
-    std::function<void (int)>   onColorVividSelected;    // intensité des couleurs : 0, 1, 2
     std::function<void (int)>   onTitleStyleSelected;    // titres des modules : 0 sans, 1 filet, 2 bandeau
     std::function<void (int)>   onLogoColourSelected;    // lettres du logo : 0 gris, 1 vert de Sunny
     std::function<void (int)>   onCorrStyleSelected;     // corrélation des vectorscopes : 0 barre, 1 curseur, 2 gradué
@@ -1462,7 +1467,7 @@ private:
         static const CategoryDef cats[kNumCategories] =
         {
             { "Audio",     Icon::mic,    0xffff453a },
-            { "Image",     Icon::gauge,  0xff0a84ff },
+            { "Graphismes", Icon::gauge, 0xff0a84ff },
             { "Affichage", Icon::window, 0xff5e5ce6 },
             { "Apparence", Icon::brush,  0xffff375f },
             { "Langue",    Icon::globe,  0xff30b0c7 },
@@ -1527,21 +1532,44 @@ private:
         using OptionsUi::Icon;
         auto& p = pages[kImagePage];
         msaaSeg.setLabels ({ TR ("Off"), "2x", "4x", "8x" });
+        optimiseButton.setButtonText (TR ("Lancer"));
+        // v1.81.65 : un bouton qui règle tout selon la machine, réglages à la main en dessous
+        p.addGroup (TR ("Optimisation"), TR ("Test de quelques secondes avec le Spectrogram Crystal 2 : Merlin garde la meilleure "
+                                            "qualité qui reste fluide (anticrénelage, images par seconde, mode HD). Tout reste réglable ensuite."));
+        p.addRow (Icon::spark, juce::Colour (0xff30b158), TR ("Optimiser pour cet ordinateur"), {}, &optimiseButton, 104);
+        p.addRow (Icon::info, juce::Colour (0xff8e8e93), TR ("Carte graphique"), {});
         p.addGroup (TR ("Analyses"));
         p.addRow (Icon::cpu, juce::Colour (0xff8e8e93), TR ("Images par seconde"), TR ("30 = CPU léger"), &fpsSeg, fpsSeg.getIdealWidth());
         p.addGroup (TR ("Modules GPU"), TR ("L'anticrénelage lisse les contours et l'intérieur des reliefs ; plus il est élevé, "
                                            "plus la carte graphique travaille."));
         p.addRow (Icon::glass, juce::Colour (0xff64d2ff), TR ("Anticrénelage"), TR ("Spectrogrammes et modules OpenGL"), &msaaSeg, msaaSeg.getIdealWidth());
+        p.addRow (Icon::spectrum, juce::Colour (0xff64d2ff), TR ("Mode HD"), TR ("Spectrogram Crystal 2 : ombres, reflets, lueur"), &hdSwitch, 44, 26);
         p.addRow (Icon::timer, juce::Colour (0xffff9f0a), TR ("Synchro verticale"), TR ("Images calées sur l'écran (V-Sync)"), &vsyncSwitch, 44, 26);
-        p.addRow (Icon::info, juce::Colour (0xff8e8e93), TR ("Carte graphique"), {});
+        p.addGroup (TR ("Couleurs"));
+        satSlider.setDefault (0.0);
+        p.addRow (Icon::palette, juce::Colour (0xffff375f), TR ("Saturation des couleurs"), TR ("0 = couleurs d'origine · double-clic : 0"),
+                  &satSlider, 260);
 
         static const int fpsValues[] = { 30, 60, 90, 120, 144 };
         fpsSeg.onChange   = [this] (int i) { if (onFpsSelected) onFpsSelected (fpsValues[i]); };
         static const int msaaValues[] = { 0, 2, 4, 8 };
         msaaSeg.onChange  = [this] (int i) { if (onMsaaSelected) onMsaaSelected (msaaValues[i]); };
         vsyncSwitch.onChange = [this] (bool on) { if (onVsyncChanged) onVsyncChanged (on); };
+        hdSwitch.onChange    = [this] (bool on) { if (onCrystalHdChanged) onCrystalHdChanged (on); };
+        satSlider.onValueChange = [this] { if (onColorSatChanged) onColorSatChanged (juce::roundToInt (satSlider.getValue())); };
+        optimiseButton.onClick  = [this] { if (onOptimise) onOptimise(); };
     }
 
+public:
+    // état du bouton Optimiser : texte sous le titre, bouton grisé pendant le test
+    void setOptimiseStatus (const juce::String& text, bool canStart)
+    {
+        optimiseButton.setEnabled (canStart);
+        optimiseButton.setButtonText (canStart ? TR ("Lancer") : TR ("Test…"));
+        pages[kImagePage].setRowSubtitle (TR ("Optimiser pour cet ordinateur"), text);
+    }
+
+private:
     void buildDisplayPage()
     {
         using OptionsUi::Icon;
@@ -1620,9 +1648,6 @@ private:
         resetColoursButton.setButtonText (TR ("Réinitialiser"));
         p.addGroup (TR ("Couleurs"), TR ("Couleurs des écrans sombres ; en thème clair, les écrans Papier en reprennent l'accent."));
         p.addRow (Icon::palette, juce::Colour (0xff0a84ff), TR ("Couleur d'accent"), TR ("Palettes prêtes à l'emploi"), &accentSwatches, accentSwatches.getIdealWidth() + 140);
-        vividSeg.setLabels ({ TR ("Actuel"), TR ("Vif"), TR ("Très vif") });
-        p.addRow (Icon::palette, juce::Colour (0xffff375f), TR ("Intensité des couleurs"), TR ("Tous les modules, thème clair et sombre"), &vividSeg, vividSeg.getIdealWidth());
-        vividSeg.onChange = [this] (int i) { if (onColorVividSelected) onColorVividSelected (i); };
         static const char* const roleNames[8] = { "Accent", "Grille", "Fond des écrans", "Texte", "Canal Side",
                                                   "Spectrogramme : creux", "Spectrogramme : milieu", "Spectrogramme : crêtes" };
         for (int i = 0; i < 8; ++i)
@@ -1707,7 +1732,9 @@ private:
     OptionsUi::Switch fullScreenSwitch, alwaysOnTopSwitch, darkSwitch, contrastSwitch, modules3DSwitch, largeTextSwitch;
     OptionsUi::Segmented plateSeg { { "Gris", "Ardoise" } };
     OptionsUi::Segmented screensSeg { { "Clairs", "Noirs" } };
-    OptionsUi::Segmented vividSeg { { "Actuel", "Vif", "Très vif" } };
+    OptionsUi::ValueSlider satSlider;          // saturation des couleurs (Graphismes)
+    OptionsUi::Switch hdSwitch;                // Mode HD du Crystal 2 (Graphismes)
+    OptionsUi::PillButton optimiseButton { "Lancer" };
     OptionsUi::Segmented titleSeg { { "Sans", "Filet", "Bandeau" } };
     OptionsUi::Segmented logoSeg { { "Gris", "Vert" } };
     OptionsUi::Segmented corrSeg { { "Barre", "Curseur", "Gradué" } };

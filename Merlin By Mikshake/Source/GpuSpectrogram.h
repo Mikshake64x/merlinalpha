@@ -18,7 +18,9 @@ class NeuAnimButton;  // PluginEditor.h
 class GpuSpectrogramDisplay : public GpuModuleBase
 {
 public:
-    enum class Style { Terrain, Neon, Crystal, Crystal2 };   // Crystal2 : Crystal lissé (v1.81.52)
+    // Crystal2 : Crystal lissé (v1.81.52) ; Stereogram : même rendu que Crystal 2,
+    // mais position stéréo (150 % L .. 150 % R) à la place des fréquences (v1.81.66)
+    enum class Style { Terrain, Neon, Crystal, Crystal2, Stereogram };
 
     GpuSpectrogramDisplay(LeakAudioProcessor&, Style);
     ~GpuSpectrogramDisplay() override;
@@ -32,6 +34,8 @@ public:
     void mouseMove(const juce::MouseEvent&) override;
     void mouseExit(const juce::MouseEvent&) override;
     void syncFromProcessor();   // preset rappelé : TIME et vue 3D relus
+    void setHd(bool on);        // Options > Graphismes > Mode HD (le bouton HD du module suit)
+    std::function<void()> onHdToggled;   // bouton HD du module cliqué (les Options suivent)
 
 private:
     static constexpr int    NX = 160;          // fréquences
@@ -39,6 +43,9 @@ private:
     // TIME : durée de défilement fond -> avant (fader à gauche, 1–20 s)
     double captureMs() const { return juce::jmax(1.0, (double)timeSecA.load())*1000.0/(double)(nz-3); }
     float& timeRef();   // valeur sauvegardée (processeur) selon le style
+    bool  smooth() const { return style==Style::Crystal2 || style==Style::Stereogram; }   // maillage fin Catmull-Rom
+    bool  stereo() const { return style==Style::Stereogram; }
+    float defaultYaw() const { return stereo() ? juce::MathConstants<float>::halfPi : 0.f; }   // Stereogram : temps de gauche à droite
 
     // ── OpenGLRenderer (thread GL) ──
     void newOpenGLContextCreated() override;

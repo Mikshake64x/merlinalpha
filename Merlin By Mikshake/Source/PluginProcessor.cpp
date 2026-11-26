@@ -99,6 +99,8 @@ void LeakAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     juce::ignoreUnused(samplesPerBlock);
     currentSampleRate = sampleRate;
+    crestChunkLen = juce::jmax(64, juce::roundToInt(sampleRate*0.05));   // CREST : tranches de 50 ms
+    crestBands = 0;                                                      // anneau vidé au prochain bloc
     setNumActiveBands(bandMode);   // bandes jusqu'à la moitié de la nouvelle fréquence (+ filtres)
     auditionStatesConfigBands=-1;  // écoute : filtres à refaire pour la nouvelle fréquence d'échantillonnage
     for(auto& st : auditionStates) st.designed=false;
@@ -372,6 +374,8 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         for(int b=0;b<nBands;++b){
             const float yA=filtersA[b].process(inA), sqA=yA*yA;
             filtersA[b].peakAcc=(sqA>filtersA[b].peakAcc)?sqA:filtersA[b].peakAcc*rel;
+            crestAccSum[b]+=sqA;                                   // CREST : énergie et crête de la tranche
+            if(sqA>crestAccMax[b]) crestAccMax[b]=sqA;
             if(isMS){
                 const float yB=filtersB[b].process(side), sqB=yB*yB;
                 filtersB[b].peakAcc=(sqB>filtersB[b].peakAcc)?sqB:filtersB[b].peakAcc*rel;
@@ -388,6 +392,7 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
             }
         }
         if(++updateCounter>=UPDATE_INTERVAL){updateCounter=0;updateLevels();}
+        if(++crestCount>=crestChunkLen){ crestCount=0; pushCrestChunk(nBands); }
     }
 
     // ── Vectorscope : écriture batch (1 échantillon sur 4) ───────────────
@@ -439,13 +444,18 @@ void LeakAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         if(psdClockSr!=psdSr || std::abs(measured-psdClockOffsetMs)>150.0){ psdClockOffsetMs=measured; psdClockSr=psdSr; }
         else psdClockOffsetMs+=(measured-psdClockOffsetMs)*0.01;
     }
+    // Stereogram : calcul seulement si le module l'a lu dans la dernière seconde
+    const bool stereoOn=juce::Time::getMillisecondCounterHiRes()-stereoUseMs.load(std::memory_order_relaxed)<1000.0;
     for(int s=0;s<numSamples;++s){
         psdRing[psdRingWrite] = (numChannels>1) ? (L[s]+R[s])*0.5f : L[s];
+        stRingL[psdRingWrite] = L[s];
+        stRingR[psdRingWrite] = (numChannels>1) ? R[s] : L[s];
         psdRingWrite=(psdRingWrite+1)%PSD_FFT_SIZE;
         if(++psdSamplesAcc>=PSD_HOP){
             psdSamplesAcc=0;
             psdFrameMs=(double)(psdSampleClock+s+1)*1000.0/psdSr+psdClockOffsetMs;
             computePSDFrame();
+            if(stereoOn) computeStereoFrame();
         }
     }
     psdSampleClock+=numSamples;
@@ -686,6 +696,50 @@ void LeakAudioProcessor::updateVuExport()
     loudExport.lra=lraValue;
 }
 
+// CREST (v1.81.68) : une tranche de ~50 ms entre dans l'anneau, puis RMS et
+// crête de chaque bande sur la durée choisie (crestWindowSec)
+void LeakAudioProcessor::pushCrestChunk(int nBands)
+{
+    if(nBands!=crestBands){   // résolution ou fréquence changées : on repart de zéro
+        crestBands=nBands; crestFilled=0; crestHead=0;
+        std::fill(std::begin(crestAccSum), std::end(crestAccSum), 0.f);
+        std::fill(std::begin(crestAccMax), std::end(crestAccMax), 0.f);
+        return;
+    }
+    std::memcpy(crestChunkSum[crestHead], crestAccSum, sizeof(float)*(size_t)nBands);
+    std::memcpy(crestChunkMax[crestHead], crestAccMax, sizeof(float)*(size_t)nBands);
+    std::fill(crestAccSum, crestAccSum+nBands, 0.f);
+    std::fill(crestAccMax, crestAccMax+nBands, 0.f);
+    crestHead=(crestHead+1)%CREST_RING;
+    crestFilled=juce::jmin(crestFilled+1, CREST_RING);
+
+    const double sr=currentSampleRate>0.0 ? currentSampleRate : 48000.0;
+    const int want=juce::jlimit(1, CREST_RING, juce::roundToInt(crestWindowSec.load(std::memory_order_relaxed)*sr/(double)crestChunkLen));
+    const int K=juce::jmin(want, crestFilled);
+    const int w=1-crestReadIdx.load(std::memory_order_relaxed);
+    for(int b=0;b<nBands;++b){
+        double sum=0.0; float mx=0.f;
+        for(int k=1;k<=K;++k){
+            const int r=(crestHead-k+CREST_RING)%CREST_RING;
+            sum+=crestChunkSum[r][b];
+            if(crestChunkMax[r][b]>mx) mx=crestChunkMax[r][b];
+        }
+        const double ms=sum/((double)K*(double)crestChunkLen);
+        crestRmsBuf[w][b]=ms<1e-20 ? -120.f : juce::jlimit(-120.f, 6.f, (float)(10.0*std::log10(ms)));
+        crestPkBuf [w][b]=mx<1e-20f ? -120.f : juce::jlimit(-120.f, 6.f, 10.f*std::log10(mx));
+    }
+    crestReadIdx.store(w, std::memory_order_release);
+}
+
+bool LeakAudioProcessor::getCrestData(float* rmsDb, float* peakDb, int numBands) const
+{
+    const int r=crestReadIdx.load(std::memory_order_acquire);
+    const int n=juce::jmin(numBands, numActiveBands, N_BANDS);
+    std::memcpy(rmsDb,  crestRmsBuf[r], (size_t)n*sizeof(float));
+    std::memcpy(peakDb, crestPkBuf[r],  (size_t)n*sizeof(float));
+    return true;
+}
+
 bool LeakAudioProcessor::getBandLevels(float* dest,int numBands) const
 {
     const int r=bandReadIdx.load(std::memory_order_acquire);
@@ -757,6 +811,89 @@ void LeakAudioProcessor::computePSDFrame()
         psdHistSeq[slot].store(n, std::memory_order_release);
         psdHistCount.store(n+1, std::memory_order_release);
     }
+}
+
+// Stereogram 3D (v1.81.66) : énergie par position stéréo, voir PluginProcessor.h
+void LeakAudioProcessor::computeStereoFrame()
+{
+    for(int i=0;i<PSD_FFT_SIZE;++i){
+        const int k=(psdRingWrite+i)%PSD_FFT_SIZE;
+        stFFTL[i]=stRingL[k]; stFFTR[i]=stRingR[k];
+    }
+    std::fill(stFFTL+PSD_FFT_SIZE, stFFTL+2*PSD_FFT_SIZE, 0.f);
+    std::fill(stFFTR+PSD_FFT_SIZE, stFFTR+2*PSD_FFT_SIZE, 0.f);
+    psdWindowFn.multiplyWithWindowingTable(stFFTL, (size_t)PSD_FFT_SIZE);
+    psdWindowFn.multiplyWithWindowingTable(stFFTR, (size_t)PSD_FFT_SIZE);
+    psdFFT.performRealOnlyForwardTransform(stFFTL, true);
+    psdFFT.performRealOnlyForwardTransform(stFFTR, true);
+
+    static constexpr float NORM=2.f/((float)PSD_FFT_SIZE*0.5f), N2=NORM*NORM;   // même repère que la PSD
+    float acc[STEREO_BINS] {};
+    auto put=[&acc](float pos, float e){
+        const float x=juce::jlimit(0.f, (float)(STEREO_BINS-1), (pos+1.5f)/3.f*(float)(STEREO_BINS-1));
+        const int i=(int)x; const float f=x-(float)i;
+        acc[i]+=e*(1.f-f);
+        if(i+1<STEREO_BINS) acc[i+1]+=e*f;
+    };
+    const double sr=currentSampleRate>0.0 ? currentSampleRate : 48000.0;
+    const int b0=juce::jmax(1, (int)std::ceil(20.0*PSD_FFT_SIZE/sr));
+    const int b1=juce::jmin(PSD_NUM_BINS-2, (int)(20000.0*PSD_FFT_SIZE/sr));
+    constexpr float quarter=juce::MathConstants<float>::pi*0.25f;
+    for(int b=b0;b<=b1;++b){
+        const float lr=stFFTL[2*b], li=stFFTL[2*b+1], rr=stFFTR[2*b], ri=stFFTR[2*b+1];
+        const float pl=lr*lr+li*li, pr=rr*rr+ri*ri, e=(pl+pr)*N2;
+        if(e<1e-14f) continue;
+        const float mr=lr+rr, mi=li+ri, dr=lr-rr, di=li-ri;
+        // angle Mid / Side : 0 au centre, pi/4 d'un seul côté, pi/2 en opposition de phase
+        const float d=std::atan2(std::sqrt(dr*dr+di*di), std::sqrt(mr*mr+mi*mi))/quarter;
+        const float disp=d<=1.f ? d : 1.f+(d-1.f)*0.5f;   // 100 % .. 150 % au-delà
+        if(d>1.02f && std::abs(pl-pr)<0.02f*(pl+pr)){ put(-disp, e*0.5f); put(disp, e*0.5f); }   // opposition sans côté dominant
+        else put(pl>=pr ? -disp : disp, e);                                                       // L à gauche (négatif)
+    }
+    // léger flou : une fréquence pure n'est pas une aiguille d'un seul point
+    for(int pass=0; pass<2; ++pass){
+        float tmp[STEREO_BINS];
+        for(int i=0;i<STEREO_BINS;++i)
+            tmp[i]=0.25f*acc[juce::jmax(0, i-1)]+0.5f*acc[i]+0.25f*acc[juce::jmin(STEREO_BINS-1, i+1)];
+        std::memcpy(acc, tmp, sizeof(acc));
+    }
+    for(int i=0;i<STEREO_BINS;++i){
+        const float a = acc[i] < stAvg[i]*0.0631f ? psdAlphaFast : psdAlpha;
+        stAvg[i]+=(acc[i]-stAvg[i])*a;
+    }
+    const juce::int64 n=stHistCount.load(std::memory_order_relaxed);
+    const int slot=(int)(n%PSD_HIST);
+    stHistSeq[slot].store(-1, std::memory_order_release);
+    std::memcpy(stHist[slot], stAvg, sizeof(stAvg));
+    stHistMs[slot].store(psdFrameMs, std::memory_order_relaxed);
+    stHistSeq[slot].store(n, std::memory_order_release);
+    stHistCount.store(n+1, std::memory_order_release);
+}
+
+bool LeakAudioProcessor::getStereoAt(double timeMs, float* destDb) const
+{
+    if(destDb==nullptr) return false;
+    const juce::int64 count=stHistCount.load(std::memory_order_acquire);
+    if(count<2) return false;
+    int a=-1, b=-1;
+    for(juce::int64 k=count-1; k>=juce::jmax((juce::int64)0, count-PSD_HIST+2); --k){
+        const int slot=(int)(k%PSD_HIST);
+        if(stHistSeq[slot].load(std::memory_order_acquire)!=k) continue;
+        if(stHistMs[slot].load(std::memory_order_relaxed)<=timeMs){ a=slot; break; }
+        b=slot;
+    }
+    if(a<0 && b<0) return false;
+    if(a<0) a=b;
+    float w=0.f;
+    if(b>=0 && b!=a){
+        const double ta=stHistMs[a].load(std::memory_order_relaxed), tb=stHistMs[b].load(std::memory_order_relaxed);
+        w=(float)juce::jlimit(0.0, 1.0, tb>ta ? (timeMs-ta)/(tb-ta) : 1.0);
+    } else b=a;
+    for(int i=0;i<STEREO_BINS;++i){
+        const float p=stHist[a][i]+(stHist[b][i]-stHist[a][i])*w;
+        destDb[i]=(p<1e-12f)?-120.f:10.f*std::log10(p);
+    }
+    return true;
 }
 
 bool LeakAudioProcessor::getPSDAt(double timeMs, float* destDb, int numBins) const
@@ -889,13 +1026,15 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("uiScale", uiScale);
     xml.setAttribute("plateTint", plateTint);
     xml.setAttribute("lightScreens", lightScreens);
-    xml.setAttribute("colorVivid", colorVivid);
+    xml.setAttribute("colorSat", colorSat);
     xml.setAttribute("titleStyle", titleStyle);
     xml.setAttribute("logoColour", logoColour);
     xml.setAttribute("corrStyle", corrStyle);
     xml.setAttribute("masterConsole", masterConsole);
     xml.setAttribute("peakHoldOn", peakHoldOn);
     xml.setAttribute("peakHoldIdx", peakHoldIdx);
+    xml.setAttribute("crestMode", crestMode);
+    xml.setAttribute("crestWindowSec", (double)crestWindowSec.load());
     xml.setAttribute("dbRangeVal", (double)dbRangeVal);
     xml.setAttribute("spectrumReleaseSec", (double)spectrumReleaseSec);
     xml.setAttribute("dotChromaReleaseSec", (double)dotChromaReleaseSec);
@@ -945,6 +1084,8 @@ void LeakAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     xml.setAttribute("gpuCrystalZoom", (double)gpuCrystalZoom);
     xml.setAttribute("gpuCrystal2Yaw", (double)gpuCrystal2Yaw); xml.setAttribute("gpuCrystal2Pitch", (double)gpuCrystal2Pitch);
     xml.setAttribute("gpuCrystal2Zoom", (double)gpuCrystal2Zoom); xml.setAttribute("gpuCrystal2TimeSec", (double)gpuCrystal2TimeSec);
+    xml.setAttribute("gpuStereoYaw", (double)gpuStereoYaw); xml.setAttribute("gpuStereoPitch", (double)gpuStereoPitch);
+    xml.setAttribute("gpuStereoZoom", (double)gpuStereoZoom); xml.setAttribute("gpuStereoTimeSec", (double)gpuStereoTimeSec);
     xml.setAttribute("gpuCrystal2Hd", gpuCrystal2Hd);
     for(int i=0;i<5;++i){
         const juce::String n(i);
@@ -1146,13 +1287,16 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             if(uiScale!=0) uiScale=juce::jlimit(100, 200, uiScale);
             plateTint = juce::jlimit(0, 1, xml->getIntAttribute("plateTint", plateTint));   // absent : inchangé
             lightScreens = juce::jlimit(0, 1, xml->getIntAttribute("lightScreens", lightScreens));
-            colorVivid   = juce::jlimit(0, 2, xml->getIntAttribute("colorVivid", colorVivid));
+            colorSat     = juce::jlimit(0, 100, xml->getIntAttribute("colorSat",
+                                     juce::jlimit(0, 2, xml->getIntAttribute("colorVivid", 0))*50));   // anciens réglages
             titleStyle = juce::jlimit(0, 2, xml->getIntAttribute("titleStyle", titleStyle));
             logoColour = juce::jlimit(0, 1, xml->getIntAttribute("logoColour", logoColour));
             corrStyle  = juce::jlimit(0, 2, xml->getIntAttribute("corrStyle", corrStyle));
             masterConsole = xml->getBoolAttribute("masterConsole", false);
             peakHoldOn  = xml->getBoolAttribute("peakHoldOn", true);
             peakHoldIdx = xml->getIntAttribute("peakHoldIdx", 2);
+            crestMode   = xml->getBoolAttribute("crestMode", false);
+            crestWindowSec = (float)juce::jlimit(0.5, 30.0, xml->getDoubleAttribute("crestWindowSec", 3.0));
             dbRangeVal  = (float)xml->getDoubleAttribute("dbRangeVal", 50.0);
             spectrumReleaseSec = (float)xml->getDoubleAttribute("spectrumReleaseSec", 0.4);
             dotChromaReleaseSec = (float)xml->getDoubleAttribute("dotChromaReleaseSec", 0.4);
@@ -1212,6 +1356,10 @@ void LeakAudioProcessor::setStateInformation(const void* data,int sizeInBytes)
             gpuCrystal2Pitch   = (float)xml->getDoubleAttribute("gpuCrystal2Pitch", 1.018);
             gpuCrystal2Zoom    = (float)xml->getDoubleAttribute("gpuCrystal2Zoom",  0.0);
             gpuCrystal2TimeSec = (float)xml->getDoubleAttribute("gpuCrystal2TimeSec", 9.2);
+            gpuStereoYaw       = (float)xml->getDoubleAttribute("gpuStereoYaw",     1.5707964);
+            gpuStereoPitch     = (float)xml->getDoubleAttribute("gpuStereoPitch",   1.018);
+            gpuStereoZoom      = (float)xml->getDoubleAttribute("gpuStereoZoom",    0.0);
+            gpuStereoTimeSec   = (float)xml->getDoubleAttribute("gpuStereoTimeSec", 10.0);
             gpuCrystal2Hd      = xml->getBoolAttribute("gpuCrystal2Hd", false);
             {
                 static constexpr float kTimeDef[5]={ 1.f, 1.f, 1.5f, 2.f, 2.f };

@@ -267,6 +267,7 @@ void main(){
 // après coup -> attente du pilote à chaque module, cadence tombée vers 24 i/s.)
 void GpuModuleBase::renderOpenGL()
 {
+    ++framesDrawn;
     GLint vp[4]={0,0,0,0};
     glGetIntegerv(GL_VIEWPORT, vp);   // tout le composant (posé par JUCE)
     const int w=vp[2], h=vp[3];
